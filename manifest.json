@@ -1,6 +1,6 @@
 {
-  "version": "0.1.2",
-  "update": "禁秒加入空之律者",
+  "version": "0.1.1",
+  "update": "空之律者加入限制池",
   "files": {
     "audio/diedai.mp4": "0d60f62a791425b13e785a32211e1fc48381bc6e",
     "audio/dybl_mengyan1.mp3": "08905d3793554b71a9864691d70c9061d95dceb3",
@@ -214,7 +214,7 @@
     "image/shuoye_yiguyoutai.jpg": "c25ecb7638ffe49428da64264670af00ff8fc569",
     "image/shuoye_yiguyoutai_2.jpg": "a315145e6c33885ae935d523d774ca66eff14d53",
     "image/shuoye_zhenyan_bg.jpg": "141c340c258be892a767d73515c5e6f36202167c",
-    "info.json": "868e525a78e152272549775a7f359c910166c71b",
+    "info.json": "7be9d8e3a2ee00bd4d1ea214e416442cc0856f3b",
     "LICENSE": "7713a1753ce88f2c7e6b054ecc8e4c786df76300",
     "main/config.js": "77fbab204baee71809a2f126bb545d8ba8c173e5",
     "main/content.js": "42ad01b79b7486e0aaf980afbd6bafb802d214f3",
@@ -241,7 +241,7 @@
     "shuoye_wenyang.jpg": "8c4f80f4e45f484359dab0c881986e3495be3d67",
     "shuoye_zhende.jpg": "8149bfc3b234f429d95786a0c03f03fe8662cc6d",
     "update.js": "24862efc76462e96b1920137b94404f6964eca09",
-    "version.js": "5b8f49a28bcbe3e997188add750a4d4c8288dc51",
+    "version.js": "4762cb9b96c2a4c0d218073b24eb99cecc3ab095",
     "video/shuoye_diedai.mp4": "0d60f62a791425b13e785a32211e1fc48381bc6e",
     "【仇】增加时.mp3": "8835b14dd355d73c4f8e5e377313efd7cd68c78f",
     "技能一，选择选项时播放.mp3": "b72e64e8110a30d32d9a6640e7e7e2c424037aab",
