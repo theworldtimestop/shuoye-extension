@@ -1,6 +1,6 @@
 {
   "version": "0.1.1",
-  "update": "测试",
+  "update": "更新提示改回系统确认框，不再干扰游戏界面",
   "files": {
     "audio/diedai.mp4": "0d60f62a791425b13e785a32211e1fc48381bc6e",
     "audio/dybl_mengyan1.mp3": "08905d3793554b71a9864691d70c9061d95dceb3",
@@ -217,7 +217,7 @@
     "info.json": "7be9d8e3a2ee00bd4d1ea214e416442cc0856f3b",
     "LICENSE": "7713a1753ce88f2c7e6b054ecc8e4c786df76300",
     "main/config.js": "e2a1cd1e18ae2ca5d477e3d735ddc9d8e6494038",
-    "main/content.js": "42ad01b79b7486e0aaf980afbd6bafb802d214f3",
+    "main/content.js": "37eb0db37a53adee37c33b7b9f6a89914d655602",
     "main/package.js": "507519d13fd04ac018ca427d7b9f6fea7f14126f",
     "main/precontent.js": "11330891ddd0122a0d83ec372ee6e583f1d62591",
     "mp4/迭代.mp4": "0d60f62a791425b13e785a32211e1fc48381bc6e",
@@ -240,7 +240,7 @@
     "shuoye_weiershi.jpg": "fbb1dbe9b9532f0b0e767009e9473504d1a98a38",
     "shuoye_wenyang.jpg": "8c4f80f4e45f484359dab0c881986e3495be3d67",
     "shuoye_zhende.jpg": "8149bfc3b234f429d95786a0c03f03fe8662cc6d",
-    "update.js": "d359f514d9bd8f988197dca166fc8e5927788637",
+    "update.js": "24862efc76462e96b1920137b94404f6964eca09",
     "version.js": "4762cb9b96c2a4c0d218073b24eb99cecc3ab095",
     "video/shuoye_diedai.mp4": "0d60f62a791425b13e785a32211e1fc48381bc6e",
     "【仇】增加时.mp3": "8835b14dd355d73c4f8e5e377313efd7cd68c78f",

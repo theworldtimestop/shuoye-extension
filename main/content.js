@@ -269,8 +269,8 @@ export async function content(config, pack) {
         game.saveConfig("extension_朔夜_update_source_migrated", true);
     }
 
-    // 启动时静默检查线上更新（手动关闭或联机中不检查）
-    if (lib.config.extension_朔夜_auto_update !== false && navigator.onLine && !_status.connectMode) {
+    // 启动时静默检查线上更新（手动关闭、联机中、游戏进行中都不检查）
+    if (lib.config.extension_朔夜_auto_update !== false && navigator.onLine && !_status.connectMode && !_status.gameStarted) {
         update(false, EXTENSION_VERSION).catch(() => {});
     }
 }

@@ -18,22 +18,9 @@ const LOCAL_ONLY = [
 ];
 const isLocalOnly = (rel) => LOCAL_ONLY.some((re) => re.test(rel));
 
-// 询问是否更新：游戏内弹窗，两个按钮（取消只影响本次，下次启动会再问）
+// 询问是否更新：用系统 confirm，不碰游戏内 UI；点取消只是本次不更，下次启动会再问
 function askUpdate(text) {
-	return new Promise((resolve) => {
-		try {
-			const dialog = ui.create.dialog("发现新版本", "hidden");
-			dialog.add(text.replace(/\n/g, "<br>"));
-			dialog.open();
-			const control = ui.create.control(["立即更新", "稍后再更"], (link) => {
-				control.close();
-				dialog.close();
-				resolve(link === "立即更新");
-			});
-		} catch (e) {
-			resolve(confirm(text));
-		}
-	});
+	return confirm(text);
 }
 
 // ============ 核心更新流程 ============
