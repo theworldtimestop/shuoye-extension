@@ -9,6 +9,7 @@ const banCharacters = [
 	"shuoye_shuoye",
 	"shuoye_zhende",
 	"shuoye_zhenshiqiaotelude",
+	"shuoye_kongzhilvzhe",
 ];
 
 // 【区模式】开启后仅保留这些武将

@@ -49,7 +49,7 @@ export const config = {
     jinmiao: {
         name: "禁秒",
         init: false,
-        intro: "开启后禁用以下武将：U-奥尔加玛丽，希儿，太空伊什塔尔，朔夜，贞德，镇世·乔特鲁德",
+        intro: "开启后禁用以下武将：U-奥尔加玛丽，希儿，太空伊什塔尔，朔夜，贞德，镇世·乔特鲁德，空之律者",
     },
     qumoshi: {
         name: "区模式",
