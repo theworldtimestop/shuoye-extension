@@ -5,7 +5,7 @@ import { EXTENSION_VERSION } from "../version.js";
 export const config = {
     update_source: {
         name: `<font color="#9c27b0">更新镜像源`,
-        init: "0",
+        init: "1",
         item: {
             0: "GitHub官方源(直连)",
             1: "gh-proxy全球镜像",
