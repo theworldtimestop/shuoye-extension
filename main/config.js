@@ -3,6 +3,13 @@ import update from "../update.js";
 import { EXTENSION_VERSION } from "../version.js";
 
 export const config = {
+    version_display: {
+        name: `<span style="color:#ffa348">当前版本：v${EXTENSION_VERSION}</span>`,
+        clear: true,
+        onclick: function () {
+            alert(`《朔夜》当前版本 v${EXTENSION_VERSION}\n下方「检查更新」可获取最新版本`);
+        },
+    },
     update_source: {
         name: `<font color="#9c27b0">更新镜像源`,
         init: "0",

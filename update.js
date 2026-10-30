@@ -30,30 +30,38 @@ async function performUpdate(isManual, localVersion) {
 	}
 	if (!isManual && sessionStorage.shuoye_check) return;
 
-	// 获取清单，失败时依次换镜像
+	// 获取清单：选中的源最先发，其余镜像 400ms 后并发抢跑，谁先成功用谁
 	const primary = MIRRORS[Number(lib.config[`extension_${EXTNAME}_update_source`]) || 0] ?? "";
-	let p = primary;
-	let m;
-	let success = false;
-	for (const u of [primary, ...MIRRORS.filter((x) => x !== primary)]) {
-		try {
-			const r = await fetch(`${u}${REPO}/manifest.json`, { cache: "no-store" });
-			if (r.ok) {
-				m = JSON.parse(await r.text());
-				p = u;
-				console.log(`使用${u || "直连"}源获取清单成功`);
-				success = true;
-				break;
-			}
-		} catch (e) {
-			console.warn(`镜像 ${u || "直连"} 请求异常:`, e);
-		}
+	const attempts = [primary, ...MIRRORS.filter((x) => x !== primary)].map(
+		(u, i) =>
+			new Promise((resolve, reject) => {
+				setTimeout(async () => {
+					try {
+						const opt = { cache: "no-store" };
+						if (typeof AbortSignal !== "undefined" && AbortSignal.timeout) opt.signal = AbortSignal.timeout(8000);
+						const r = await fetch(`${u}${REPO}/manifest.json`, opt);
+						if (!r.ok) throw new Error(`HTTP ${r.status}`);
+						resolve({ source: u, manifest: await r.json() });
+					} catch (e) {
+						reject(e);
+					}
+				}, i === 0 ? 0 : 400);
+			}),
+	);
+	let picked = null;
+	try {
+		picked = await Promise.any(attempts);
+	} catch (e) {
+		console.warn("所有更新源均失败", e);
 	}
-	if (!success) {
+	if (!picked) {
 		const msg = "清单文件获取失败，请检查网络连接";
 		if (isManual) alert(msg);
 		throw new Error(msg);
 	}
+	const p = picked.source;
+	const m = picked.manifest;
+	console.log(`使用${p || "直连"}源获取清单成功`);
 
 	// 本地版本更高时跳过（避免开发版被旧清单覆盖），同版本仍允许修复文件
 	if (checkVersion(localVersion, m.version) > 0) {
