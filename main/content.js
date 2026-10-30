@@ -261,6 +261,14 @@ export async function content(config, pack) {
     }
     // 坐杀博徒：抽奖动画直接挂在技能对象上（skill.js 的 playAnimation / shuoye_zuosha_anim.effect），不再依赖 init 补丁
 
+    // 老版本的默认镜像源是「全球镜像」，升级后一次性迁回官方源（手动改过的不会再动）
+    if (!lib.config.extension_朔夜_update_source_migrated) {
+        if (String(lib.config.extension_朔夜_update_source) === "1") {
+            game.saveConfig("extension_朔夜_update_source", "0");
+        }
+        game.saveConfig("extension_朔夜_update_source_migrated", true);
+    }
+
     // 启动时静默检查线上更新（未手动关闭即执行）
     if (lib.config.extension_朔夜_auto_update !== false && navigator.onLine) {
         update(false, EXTENSION_VERSION).catch(() => {});
