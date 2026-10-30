@@ -1,6 +1,6 @@
 {
   "version": "0.1.0",
-  "update": "去掉重复的版本号显示",
+  "update": "更新提示改为游戏内弹窗，可选稍后再更",
   "files": {
     "audio/diedai.mp4": "0d60f62a791425b13e785a32211e1fc48381bc6e",
     "audio/dybl_mengyan1.mp3": "08905d3793554b71a9864691d70c9061d95dceb3",
@@ -240,7 +240,7 @@
     "shuoye_weiershi.jpg": "fbb1dbe9b9532f0b0e767009e9473504d1a98a38",
     "shuoye_wenyang.jpg": "8c4f80f4e45f484359dab0c881986e3495be3d67",
     "shuoye_zhende.jpg": "8149bfc3b234f429d95786a0c03f03fe8662cc6d",
-    "update.js": "aad1bbeb9a98e08ac44f6dadc15450540f6e5ab4",
+    "update.js": "d359f514d9bd8f988197dca166fc8e5927788637",
     "version.js": "442c815f61701bd687384a7bbf7a5b5f70f76562",
     "video/shuoye_diedai.mp4": "0d60f62a791425b13e785a32211e1fc48381bc6e",
     "【仇】增加时.mp3": "8835b14dd355d73c4f8e5e377313efd7cd68c78f",

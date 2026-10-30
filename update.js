@@ -18,6 +18,24 @@ const LOCAL_ONLY = [
 ];
 const isLocalOnly = (rel) => LOCAL_ONLY.some((re) => re.test(rel));
 
+// 询问是否更新：游戏内弹窗，两个按钮（取消只影响本次，下次启动会再问）
+function askUpdate(text) {
+	return new Promise((resolve) => {
+		try {
+			const dialog = ui.create.dialog("发现新版本", "hidden");
+			dialog.add(text.replace(/\n/g, "<br>"));
+			dialog.open();
+			const control = ui.create.control(["立即更新", "稍后再更"], (link) => {
+				control.close();
+				dialog.close();
+				resolve(link === "立即更新");
+			});
+		} catch (e) {
+			resolve(confirm(text));
+		}
+	});
+}
+
 // ============ 核心更新流程 ============
 async function performUpdate(isManual, localVersion) {
 	if (_status.connectMode && isManual) {
@@ -101,7 +119,10 @@ async function performUpdate(isManual, localVersion) {
 		if (isManual) alert("已经是最新版本，无需更新");
 		return;
 	}
-	if (!confirm(`《${EXTNAME}》发现新版本 ${m.version}\n${updateFiles.length}个文件需更新，是否继续？\n更新说明:\n${m.update || "无"}`)) return;
+	const okToUpdate = await askUpdate(
+		`《${EXTNAME}》发现新版本 ${m.version}\n${updateFiles.length} 个文件需更新\n更新说明：\n${m.update || "无"}`,
+	);
+	if (!okToUpdate) return;
 
 	let prog = createProgress(`更新 ${EXTNAME} 扩展`, updateFiles.length);
 	try {
