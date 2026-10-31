@@ -1,6 +1,101 @@
 import { lib, game, ui, get, ai, _status } from "noname";
 
+// 【朔夜表情】引擎原生聊天表情面板（ui.click.chat）与联机发送都固定读取
+// image/emotion/<包名>/ 下的图片，所以启动时把扩展内图片复制到该目录，
+// 再补登记 _status.emotion_cache，让面板和联机发送立刻可用。
+const SHUOYE_EMOTION_PACK = "shuoye_emotion";
+const SHUOYE_EMOTION_SRC = "extension/朔夜/image/emotion/shuoye_emotion/";
+const SHUOYE_EMOTION_DEST = "image/emotion/shuoye_emotion/";
+const SHUOYE_EMOTION_NAMES = Array.from({ length: 12 }, (_, i) => `${i + 1}.gif`);
+
+function shuoyeEmotionCache() {
+    if (!_status.emotion_cache) _status.emotion_cache = {};
+    _status.emotion_cache[SHUOYE_EMOTION_PACK] = SHUOYE_EMOTION_NAMES;
+}
+
+// 串行写队列：game.writeFile 的 ensureDirectory 在并发创建同一新目录时，
+// 只有第一个能建成功，其余会因 mkdir EEXIST 被吞掉且不再回调，
+// 表现为只有一张图落盘。所以把写入排成串行队列。
+let shuoyeWriteQueue = Promise.resolve();
+function shuoyeWriteEmotion(data, name) {
+    const task = shuoyeWriteQueue.then(
+        () =>
+            new Promise(done => {
+                game.writeFile(data, SHUOYE_EMOTION_DEST, name, () => done());
+            }),
+    );
+    shuoyeWriteQueue = task;
+    return task;
+}
+
+function shuoyePatchEmotionServer() {
+    const server = lib.message && lib.message.server;
+    if (!server || typeof server.emotion !== "function" || server.emotion._shuoyeHooked) {
+        return;
+    }
+    const originEmotion = server.emotion;
+    const hooked = function (id, pack, emotion) {
+        if (pack !== SHUOYE_EMOTION_PACK) {
+            return originEmotion.apply(this, arguments);
+        }
+        const str = `<img src="##assetURL##image/emotion/${pack}/${emotion}" width="50" height="50">`;
+        game.broadcastAll(function (playerid, str2) {
+            var player = null;
+            if (lib.playerOL && lib.playerOL[playerid]) {
+                player = lib.playerOL[playerid];
+            } else if (game.connectPlayers) {
+                for (var i = 0; i < game.connectPlayers.length; i++) {
+                    if (game.connectPlayers[i].playerid == playerid) {
+                        player = game.connectPlayers[i];
+                        break;
+                    }
+                }
+            }
+            if (player) {
+                player.say(str2);
+            }
+        }, id, str);
+    };
+    hooked._shuoyeHooked = true;
+    server.emotion = hooked;
+}
+
+function shuoyeInstallEmotion() {
+    if (typeof game.readFile !== "function" || typeof game.writeFile !== "function") {
+        return Promise.resolve(false);
+    }
+    const tasks = SHUOYE_EMOTION_NAMES.map(
+        name =>
+            new Promise(resolve => {
+                game.readFile(
+                    SHUOYE_EMOTION_SRC + name,
+                    data => {
+                        try {
+                            shuoyeWriteEmotion(data, name).then(() => resolve(true));
+                        } catch (e) {
+                            resolve(false);
+                        }
+                    },
+                    () => resolve(false),
+                );
+            }),
+    );
+    return Promise.all(tasks).then(results => !results.includes(false));
+}
+
 export async function precontent() {
+    // 【朔夜表情】包名、安装与缓存登记（面板按 get.translation(包名) 显示）
+    lib.translate.shuoye_emotion = "朔夜表情";
+    const shuoyeEmotionReady = shuoyeInstallEmotion();
+    shuoyePatchEmotionServer();
+    shuoyeEmotionReady.then(ok => ok && shuoyeEmotionCache());
+    if (lib.arenaReady) {
+        lib.arenaReady.push(() => {
+            // 引擎在 arenaReady 里会先重置 _status.emotion_cache 并扫描 image/emotion，
+            // 这里等复制完成后再补登记一次，保证首次启动面板就能看到「朔夜表情」
+            shuoyeEmotionReady.then(ok => ok && shuoyeEmotionCache());
+        });
+    }
     // 阵营判定（各模式通用）：有 side 的模式优先按边分营，否则按身份；
     // 其他身份（国战势力等）按身份字符串归栏，同势力即同阵营
     if (typeof lib.shuoyeCampOf !== "function") {
