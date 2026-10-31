@@ -367,6 +367,16 @@ const characters = {
         trashBin: [],
     },
 //#noname-kit-end character:shuoye_dilutianfeng
+//#noname-kit-begin character:shuoye_leinhaite
+    shuoye_leinhaite: {
+        sex: "male",
+        hp: 4,
+        group: "jin",
+        skills: ["shuoye_kuimie", "shuoye_mingfu", "shuoye_luli"],
+        img: "extension/朔夜/image/shuoye_leinhaite.jpg",
+        trashBin: [],
+    },
+//#noname-kit-end character:shuoye_leinhaite
 
 };
 for (let i in characters) {

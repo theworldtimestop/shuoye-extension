@@ -403,5 +403,13 @@ const translates = {
     shuoye_fenghao_info: "你使用【杀】结算后，若目标体力值减少，你可与其各失去1点体力；否则你令其失去1点体力，然后其增加等量体力上限。",
     shuoye_cangshu: "苍书",
     shuoye_cangshu_info: "你对其他角色使用牌时，你的已损体力值视为目标额外体力上限。你体力值减少后，下一次造成大于1点伤害时，你摸一张牌并回复1点体力。",
+
+    shuoye_leinhaite: "莱因哈特",
+    shuoye_kuimie: "溃灭",
+    shuoye_kuimie_info: "锁定技，你受到伤害时伤害值+1。拥有护甲的角色（含你自己）恢复体力时，其摸一张牌，然后从手牌或装备区选两张交给你，不足则全交；你自己恢复体力且装备区没有牌时跳过。",
+    shuoye_mingfu: "冥府",
+    shuoye_mingfu_info: "你受伤结算后，若你没有护甲，你可以获得1点护甲、回复1点体力并获得伤害来源一张牌，然后本回合此技能失效。",
+    shuoye_luli: "陆离",
+    shuoye_luli_info: "你造成伤害时，可令此伤害+1，然后你与目标各获得1点护甲。",
 };
 export default translates;

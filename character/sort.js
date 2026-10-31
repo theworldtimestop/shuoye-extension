@@ -1,7 +1,7 @@
 import characters from "./character.js";
 const characterSort = {
 	shuoye_sort_fate: ["shuoye_u_aoerjiamali", "shuoye_taikongyishitaer", "shuoye_aertuoliya", "shuoye_chongtiansiling", "shuoye_zhende"],
-	shuoye_sort_sai: ["shuoye_miaoshitiannv", "shuoye_tianqixinghun", "shuoye_nutaocanglan", "shuoye_weiershi", "shuoye_wujishengwu", "shuoye_xituo", "shuoye_qiaolienide", "shuoye_wuweijuezhe", "shuoye_zhenshiqiaotelude", "shuoye_kongyuanxingzhe", "shuoye_dilutianfeng"],
+	shuoye_sort_sai: ["shuoye_miaoshitiannv", "shuoye_tianqixinghun", "shuoye_nutaocanglan", "shuoye_weiershi", "shuoye_wujishengwu", "shuoye_xituo", "shuoye_qiaolienide", "shuoye_wuweijuezhe", "shuoye_zhenshiqiaotelude", "shuoye_kongyuanxingzhe", "shuoye_dilutianfeng", "shuoye_leinhaite"],
 	shuoye_sort_1999: ["shuoye_xingti", "shuoye_yuanlv", "shuoye_xugouji", "shuoye_luxi"],
 	shuoye_sort_guanxing: ["shuoye_zuguoren", "shuoye_fengchuanxiangzi", "shuoye_shuoye", "shuoye_wenyang", "shuoye_ying"],
 	shuoye_sort_zhoushuhuizhan: ["shuoye_yiguyoutai", "shuoye_wutiaowu", "shuoye_chengjinji"],

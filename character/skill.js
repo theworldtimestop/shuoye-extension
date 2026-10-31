@@ -14004,6 +14004,122 @@ const skills = {
         },
     },
 //#noname-kit-end skill:shuoye_cangshu
+//#noname-kit-begin skill:shuoye_kuimie
+    shuoye_kuimie: {
+        forced: true,
+        locked: true,
+        trigger: { player: "damageBegin3" },
+        group: ["shuoye_kuimie_recover"],
+        filter(event, player) {
+            return player.isIn() && event.num > 0;
+        },
+        async content(event, trigger, player) {
+            trigger.num += 1;
+        },
+        subSkill: {
+            recover: {
+                trigger: { global: "recoverAfter" },
+                forced: true,
+                filter(event, player) {
+                    const target = event.player;
+                    return player.isIn() && target && target.isIn() && target.hujia > 0;
+                },
+                async content(event, trigger, player) {
+                    const target = trigger.player;
+                    if (!target || !target.isIn()) return;
+                    if (target === player) {
+                        await target.draw();
+                        const equips = target.getCards("e");
+                        if (!equips.length) return;
+                        const num = Math.min(2, equips.length);
+                        const result = await target
+                            .chooseCard({
+                                position: "e",
+                                selectCard: [1, num],
+                                prompt: `溃灭：将装备区的至多${get.cnNumber(num)}张牌交给自己`,
+                                ai(card) {
+                                    return -get.value(card);
+                                },
+                            })
+                            .forResult();
+                        if (result.bool && result.cards && result.cards.length) {
+                            await target.gain(result.cards, "gain2");
+                        }
+                        return;
+                    }
+                    await target.draw();
+                    const count = Math.min(2, target.countCards("he"));
+                    if (count <= 0) return;
+                    await target.chooseToGive({
+                        target: player,
+                        position: "he",
+                        selectCard: [count, count],
+                        forced: true,
+                        prompt: `溃灭：交给${get.translation(player)}${get.cnNumber(count)}张牌`,
+                    });
+                },
+            },
+        },
+    },
+//#noname-kit-end skill:shuoye_kuimie
+//#noname-kit-begin skill:shuoye_mingfu
+    shuoye_mingfu: {
+        trigger: { player: "damageEnd" },
+        check(event, player) {
+            return true;
+        },
+        filter(event, player) {
+            return player.isIn() && !(player.hujia > 0) && !player.hasSkill("shuoye_mingfu_used");
+        },
+        async content(event, trigger, player) {
+            player.addTempSkill("shuoye_mingfu_used", "phaseAfter");
+            await player.changeHujia(1);
+            await player.recover(1);
+            const source = trigger.source;
+            if (source && source.isIn() && source.countGainableCards(player, "he") > 0) {
+                await player.gainPlayerCard(source, "he", 1, true);
+            }
+        },
+        subSkill: {
+            used: {
+                charlotte: true,
+                silent: true,
+            },
+        },
+    },
+//#noname-kit-end skill:shuoye_mingfu
+//#noname-kit-begin skill:shuoye_luli
+    shuoye_luli: {
+        trigger: { source: "damageBegin3" },
+        group: ["shuoye_luli_hujia"],
+        check(event, player) {
+            return get.attitude(player, event.player) < 0;
+        },
+        filter(event, player) {
+            return player.isIn() && event.player && event.player.isIn() && event.num > 0;
+        },
+        async content(event, trigger, player) {
+            trigger.num += 1;
+            trigger._shuoye_luli = true;
+        },
+        subSkill: {
+            hujia: {
+                trigger: { source: "damageEnd" },
+                forced: true,
+                silent: true,
+                filter(event, player) {
+                    return event._shuoye_luli && player.isIn() && event.player && event.player.isIn();
+                },
+                async content(event, trigger, player) {
+                    await player.changeHujia(1);
+                    if (trigger.player && trigger.player.isIn()) {
+                        await trigger.player.changeHujia(1);
+                    }
+                },
+            },
+        },
+    },
+//#noname-kit-end skill:shuoye_luli
 };
 
 export default skills;
