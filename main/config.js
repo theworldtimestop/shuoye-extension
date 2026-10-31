@@ -54,7 +54,7 @@ export const config = {
     qumoshi: {
         name: "区模式",
         init: false,
-        intro: "开启后只保留薇尔诗、爱丽丝、若怜、秤金次、五条悟、霍光，其余朔夜武将全部禁用。",
+        intro: "开启后只保留薇尔诗、爱丽丝、若怜、秤金次、五条悟、霍光、帝录天锋，其余朔夜武将全部禁用。",
     },
     zuosha_debug: {
         name: "坐杀博徒调试",

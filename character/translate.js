@@ -395,5 +395,13 @@ const translates = {
     shuoye_zuosha_fx_info: "坐杀博徒当前触发的所有效果（含剩余回合），鼠标悬停或点击可查看完整列表。",
     shuoye_zuosha_debug: "调试",
     shuoye_zuosha_debug_info: "调试用：指定下次抽奖三张牌的花色、点数与牌名。",
+
+    shuoye_dilutianfeng: "帝录天锋",
+    shuoye_fazhou: "法咒",
+    shuoye_fazhou_info: "锁定技，你参与的伤害或体力流失事件的数值改为目标体力上限的1/4，向上取整。",
+    shuoye_fenghao: "锋毫",
+    shuoye_fenghao_info: "你使用【杀】结算后，若目标体力值减少，你可与其各失去1点体力；否则你令其失去1点体力，然后其增加等量体力上限。",
+    shuoye_cangshu: "苍书",
+    shuoye_cangshu_info: "你对其他角色使用牌时，你的已损体力值视为目标额外体力上限。你体力值减少后，下一次造成大于1点伤害时，你摸一张牌并回复1点体力。",
 };
 export default translates;

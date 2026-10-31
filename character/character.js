@@ -358,6 +358,15 @@ const characters = {
         trashBin: [],
     },
 //#noname-kit-end character:shuoye_chengjinji
+//#noname-kit-begin character:shuoye_dilutianfeng
+    shuoye_dilutianfeng: {
+        sex: "female",
+        hp: 3,
+        group: "shen",
+        skills: ["shuoye_fazhou", "shuoye_fenghao", "shuoye_cangshu"],
+        trashBin: [],
+    },
+//#noname-kit-end character:shuoye_dilutianfeng
 
 };
 for (let i in characters) {

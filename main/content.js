@@ -209,7 +209,7 @@ export async function content(config, pack) {
     // 评级：SSS -> legend，SS -> epic，S -> rare，A -> junk
     const shuoyeRarity = {
         legend: ["shuoye_u_aoerjiamali", "shuoye_taikongyishitaer", "shuoye_shuoye", "shuoye_zhenshiqiaotelude", "shuoye_yiguyoutai"],
-        epic: ["shuoye_chengjinji", "shuoye_miaoshitiannv", "shuoye_tianqixinghun", "shuoye_xituo", "shuoye_qiaolienide", "shuoye_chongtiansiling", "shuoye_luxi", "shuoye_wuweijuezhe", "shuoye_kongyuanxingzhe", "shuoye_wuxinchan"],
+        epic: ["shuoye_chengjinji", "shuoye_miaoshitiannv", "shuoye_tianqixinghun", "shuoye_xituo", "shuoye_qiaolienide", "shuoye_chongtiansiling", "shuoye_luxi", "shuoye_wuweijuezhe", "shuoye_kongyuanxingzhe", "shuoye_wuxinchan", "shuoye_dilutianfeng"],
         rare: [
             "shuoye_zuguoren", "shuoye_ailisi", "shuoye_feiniaomashi", "shuoye_fengchuanxiangzi",
             "shuoye_nutaocanglan", "shuoye_wujishengwu", "shuoye_wutiaowu", "shuoye_xier",

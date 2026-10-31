@@ -6,5 +6,6 @@ const characterIntro = {
 	shuoye_luxi:'意识唤醒者艺术品，展出于19世纪20年代末，活跃至今，参展时长181年，诞生自12月30日冬。原展出于大不列颠及爱尔兰联合王国伦敦地区，后活跃于拉普拉斯科算中心。',
 	shuoye_zhende:'如果神明当真存于此世，想必会降天罚于我身吧。',
 	shuoye_ruolian: "——觉得强就自己玩",
+	shuoye_dilutianfeng: "承敕赦之权，执录世之锋。万录既成，天锋落定。",
 };
 export default characterIntro;

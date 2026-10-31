@@ -1,5 +1,10 @@
 import { lib, game, ui, get, ai, _status } from "noname";
 
+// 【法咒】结算口径：true = 目标体力上限；false = 目标当前体力值。
+// 按原文“体力值”应取 false，但【苍书】的“已损体力值视为目标额外体力上限”只有在 true 时才有实际作用，默认 true。
+// 改成 false 后，记得把 translate.js 里 shuoye_fazhou_info 的「体力上限」改回「体力值」。
+const DILU_FAZHOU_USE_MAXHP = true;
+
 /** @type { importCharacterConfig['skill'] } */
 const skills = {
     //怒涛沧岚
@@ -11813,7 +11818,7 @@ const skills = {
             const list = [];
             if (data.odd === 1) list.push("奇数×1 摸1");
             else if (data.odd === 2) list.push("奇数×2 摸2·回1·无距离");
-            else if (data.odd === 3) list.push("奇数×3 摸3·回1·无限制");
+            else if (data.odd === 3) list.push("奇数×3 摸5·回1·无限制");
             if (data.sameName === 2) list.push("同名×2 得2张");
             else if (data.sameName === 3) list.push("同名×3 回1·得3张·任意牌");
             if (data.sameNum === 2) list.push("同点×2 造伤+1·失牌摸1");
@@ -12029,7 +12034,7 @@ const skills = {
                 await player.recover(1);
                 S.addBuff(player, "nodistance", 1, getBuffGroup());
             } else if (data.odd === 3) {
-                await player.draw(3);
+                await player.draw(5);
                 await player.recover(1);
                 S.addBuff(player, "norestrict", 1, getBuffGroup());
                 await S.chooseFixNumber(player, [0, 1]);
@@ -13868,6 +13873,137 @@ const skills = {
         },
     },
 //#noname-kit-end skill:shuoye_juzhou_duel_fx
+    //帝录天锋
+//#noname-kit-begin skill:shuoye_fazhou
+    shuoye_fazhou: {
+        trigger: {
+            global: ["damageBegin4", "loseHpBegin"],
+        },
+        forced: true,
+        locked: true,
+        silent: true,
+        // 鸽府包【伤害】(gf_damage_a) 在 damageBegin4 用 lastDo 把伤害抬回峰值，
+        // 优先级比它更低、且同样 lastDo，才能排在它后面把数值压回去。
+        lastDo: true,
+        priority: -10000,
+        filter(event, player) {
+            if (!player.isIn()) return false;
+            const target = event.player;
+            if (!target || !target.isIn() || event.num <= 0) return false;
+            if (event.name == "damage") {
+                return event.source == player || event.player == player;
+            }
+            if (event.name == "loseHp") {
+                return event.player == player || event.source == player;
+            }
+            return false;
+        },
+        async content(event, trigger, player) {
+            const target = trigger.player;
+            let base = DILU_FAZHOU_USE_MAXHP ? target.maxHp : target.hp;
+            // 【苍书】前半段：你对其他角色使用牌时，你的已损体力值视为目标额外体力上限。
+            // 这里不真的改目标的 maxHp（避免联机改属性、触发别人的体力上限结算），只在法咒取值时加上。
+            if (trigger.source == player && target != player && player.hasSkill("shuoye_cangshu")) {
+                const use = trigger.getParent("useCard");
+                if (use && use.player == player && use.targets && use.targets.includes(target)) {
+                    base += Math.max(0, player.maxHp - player.hp);
+                }
+            }
+            trigger.num = Math.max(1, Math.ceil(base / 4));
+        },
+    },
+//#noname-kit-end skill:shuoye_fazhou
+//#noname-kit-begin skill:shuoye_fenghao
+    shuoye_fenghao: {
+        trigger: {
+            player: "useCardAfter",
+        },
+        group: "shuoye_fenghao_snapshot",
+        forced: true,
+        filter(event, player) {
+            if (!player.isIn()) return false;
+            if (!event.card || event.card.name != "sha") return false;
+            return event.targets && event.targets.some(target => target != player && target.isIn());
+        },
+        async content(event, trigger, player) {
+            const candidates = trigger.targets.filter(target => target != player && target.isIn());
+            if (!candidates.length) return;
+            const snapshot = trigger.shuoye_fenghao_hp;
+            const getHp = target => {
+                if (snapshot && snapshot.has(target)) return snapshot.get(target);
+                return target.hp;
+            };
+            // 多目标【杀】只取第一目标（优先取实际掉过血的）
+            const target = candidates.find(current => getHp(current) > current.hp) || candidates[0];
+            const before = getHp(target);
+            if (before > target.hp) {
+                const want = player.hp > 1 && get.attitude(player, target) < 0;
+                const result = await player.chooseBool(`锋毫：是否与${get.translation(target)}各失去1点体力？`).set("ai", () => want).forResult();
+                if (!result.bool) return;
+                await target.loseHp(1).set("source", player);
+                if (player.isIn()) await player.loseHp(1);
+                return;
+            }
+            const evt = target.loseHp(1).set("source", player);
+            await evt;
+            const num = Math.max(0, evt.num || 0);
+            if (num > 0 && target.isIn()) {
+                await target.gainMaxHp(num);
+            }
+        },
+        subSkill: {
+            snapshot: {
+                charlotte: true,
+                silent: true,
+                trigger: {
+                    player: "useCardBegin",
+                },
+                filter(event, player) {
+                    return event.card && event.card.name == "sha" && event.targets && event.targets.some(target => target != player && target.isIn());
+                },
+                async content(event, trigger, player) {
+                    trigger.shuoye_fenghao_hp = new Map(trigger.targets.map(target => [target, target.hp]));
+                },
+            },
+        },
+    },
+//#noname-kit-end skill:shuoye_fenghao
+//#noname-kit-begin skill:shuoye_cangshu
+    shuoye_cangshu: {
+        trigger: {
+            player: "changeHp",
+            source: "damageEnd",
+        },
+        forced: true,
+        silent: true,
+        marktext: "苍",
+        intro: {
+            name: "苍书",
+            content: "mark",
+        },
+        filter(event, player) {
+            if (event.name == "changeHp") {
+                return event.num < 0 && player.isIn();
+            }
+            if (event.name == "damage") {
+                return event.num > 1 && player.countMark("shuoye_cangshu") > 0;
+            }
+            return false;
+        },
+        async content(event, trigger, player) {
+            if (event.triggername == "changeHp") {
+                if (player.countMark("shuoye_cangshu") < 1) {
+                    player.addMark("shuoye_cangshu", 1, false);
+                }
+                return;
+            }
+            player.removeMark("shuoye_cangshu", player.countMark("shuoye_cangshu"), false);
+            player.logSkill(event.name);
+            await player.draw(1);
+            await player.recover(1);
+        },
+    },
+//#noname-kit-end skill:shuoye_cangshu
 };
 
 export default skills;
