@@ -6,7 +6,7 @@ import { lib, game, ui, get, ai, _status } from "noname";
 const SHUOYE_EMOTION_PACK = "shuoye_emotion";
 const SHUOYE_EMOTION_SRC = "extension/朔夜/image/emotion/shuoye_emotion/";
 const SHUOYE_EMOTION_DEST = "image/emotion/shuoye_emotion/";
-const SHUOYE_EMOTION_NAMES = Array.from({ length: 12 }, (_, i) => `${i + 1}.gif`);
+const SHUOYE_EMOTION_NAMES = Array.from({ length: 14 }, (_, i) => `${i + 1}.gif`);
 
 function shuoyeEmotionCache() {
     if (!_status.emotion_cache) _status.emotion_cache = {};

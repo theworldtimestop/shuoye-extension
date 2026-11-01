@@ -9691,7 +9691,9 @@ const skills = {
             }
             if (!targets2.length) {
                 await player.gainMaxHp();
-                player.addMark("shuoye_yinyu", 1, false);
+                await player.draw();
+                // 使用次数永久+1 只生效一次，之后失去该叠加效果（每回合最多两次）
+                if (player.countMark("shuoye_yinyu") < 1) player.addMark("shuoye_yinyu", 1, false);
             }
         },
     },
@@ -14120,6 +14122,86 @@ const skills = {
         },
     },
 //#noname-kit-end skill:shuoye_luli
+//#noname-kit-begin skill:shuoye_longqi
+    shuoye_longqi: {
+        zhuanhuanji: true,
+        mark: true,
+        marktext: "☯",
+        init(player, skill) {
+            player.storage[skill] = true;
+        },
+        intro: {
+            content(storage) {
+                return storage
+                    ? "阴：红色牌视为【万箭齐发】、黑色牌视为【闪】；使用或打出后摸一张牌并切换形态"
+                    : "阳：红色牌视为【桃】、黑色牌视为【南蛮入侵】；使用或打出后摸一张牌并切换形态";
+            },
+        },
+        group: ["shuoye_longqi_after"],
+        subSkill: {
+            after: {
+                charlotte: true,
+                silent: true,
+                popup: false,
+                forced: true,
+                trigger: { player: ["useCardAfter", "respondAfter"] },
+                filter(event, player) {
+                    if (!event.card) return false;
+                    if (!["tao", "wanjian", "nanman", "shan"].includes(event.card.name)) return false;
+                    const color = get.color(event.card, false);
+                    return color === "red" || color === "black";
+                },
+                async content(event, trigger, player) {
+                    const next = player.draw();
+                    await next;
+                    const cards = (next.result && next.result.cards) || [];
+                    if (cards.length) {
+                        player.addGaintag(cards, "shuoye_longqi_lock");
+                        player.addTempSkill("shuoye_longqi_lock", { global: "phaseAfter" });
+                    }
+                    player.changeZhuanhuanji("shuoye_longqi");
+                },
+            },
+            lock: {
+                charlotte: true,
+                silent: true,
+                popup: false,
+                onremove(player) {
+                    player.removeGaintag("shuoye_longqi_lock");
+                },
+            },
+        },
+        mod: {
+            cardname(card, player, name) {
+                const pos = get.position(card);
+                if (pos === "e" || pos === "j") return;
+                const color = get.color(card, false);
+                if (color !== "red" && color !== "black") return;
+                const yin = !!player.storage.shuoye_longqi;
+                if (yin) return color === "red" ? "wanjian" : "shan";
+                return color === "red" ? "tao" : "nanman";
+            },
+            cardEnabled2(card, player) {
+                if (card.hasGaintag && card.hasGaintag("shuoye_longqi_lock")) return false;
+            },
+            selectTarget(card, player, range) {
+                const pos = get.position(card);
+                if (pos === "e" || pos === "j") return;
+                const color = get.color(card, false);
+                if (color === "red" || color === "black") range[1] = 1;
+            },
+        },
+        ai: {
+            unequip: true,
+            skillTagFilter(player, tag, arg) {
+                if (tag !== "unequip") return false;
+                if (!arg || !arg.card) return false;
+                const color = get.color(arg.card, false);
+                return color === "red" || color === "black";
+            },
+        },
+    },
+//#noname-kit-end skill:shuoye_longqi
 };
 
 export default skills;

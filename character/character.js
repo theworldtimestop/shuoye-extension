@@ -377,6 +377,16 @@ const characters = {
         trashBin: [],
     },
 //#noname-kit-end character:shuoye_leinhaite
+//#noname-kit-begin character:shuoye_longyan
+    shuoye_longyan: {
+        sex: "female",
+        hp: 3,
+        group: "wei",
+        skills: ["shuoye_longqi"],
+        img: "extension/朔夜/image/shuoye_longyan.jpg",
+        trashBin: [],
+    },
+//#noname-kit-end character:shuoye_longyan
 
 };
 for (let i in characters) {

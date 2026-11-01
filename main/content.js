@@ -216,7 +216,7 @@ export async function content(config, pack) {
             "shuoye_yuanlv", "shuoye_diyabolo", "shuoye_fuhua", "shuoye_kongzhilvzhe",
             "shuoye_puqishenfu", "shuoye_xugouji", "shuoye_aertuoliya", "shuoye_zhende",
             "shuoye_huangquan", "shuoye_kongqirinai", "shuoye_wenyang", "shuoye_ying",
-            "shuoye_weiyue", "shuoye_huoguang",
+            "shuoye_weiyue", "shuoye_huoguang", "shuoye_longyan",
         ],
         junk: ["shuoye_xingti", "shuoye_weiershi", "shuoye_ruolian"],
     };

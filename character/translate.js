@@ -299,7 +299,7 @@ const translates = {
     shuoye_yixiang:'意象',
     shuoye_yixiang_info:'锁定技，一张非虚拟牌使用结算后，若指定多目标，你加一[群像]标记，否则加一[独白]标记。',
     shuoye_yinyu:'隐喻',
-    shuoye_yinyu_info:`每回合限一次，你使用牌时可以扣置之。然后明示一项，再选择一项令其他所有人猜测：①牌名字数②种类③花色。每一名角色猜错，你从弃牌堆中获得一张${get.poptip("shuoye_xugouren")}。若无人猜对，你增加一点体力上限，摸一张牌，该技能使用次数永久加一。`,
+    shuoye_yinyu_info:`每回合限一次，你使用牌时可以扣置之。然后明示一项，再选择一项令其他所有人猜测：①牌名字数②种类③花色。每一名角色猜错，你从弃牌堆中获得一张${get.poptip("shuoye_xugouren")}。若无人猜对，你增加一点体力上限，摸一张牌，该技能使用次数永久加一，然后失去此效果。`,
     shuoye_migong:'迷宫',
     shuoye_migong_info:`当你使用[隐喻]牌或${get.poptip("shuoye_xugouren")}时，可消耗①任意[群像]标记，增加等量目标(非装备方可选择)；②一个[独白]标记，在此牌结算后视为使用一张无任何限制且不计入次数的[酒]或[杀]。`,
     shuoye_xugou:'虚构',
@@ -411,5 +411,8 @@ const translates = {
     shuoye_mingfu_info: "你受伤结算后，若你没有护甲，你可以获得1点护甲、回复1点体力并获得伤害来源一张牌，然后本回合此技能失效。",
     shuoye_luli: "陆离",
     shuoye_luli_info: "你造成伤害时，可令此伤害+1，然后你与目标各获得1点护甲。",
+    shuoye_longyan: "龙琰",
+    shuoye_longqi: "龙契",
+    shuoye_longqi_info: "转换技，初始阴。你的红色牌均视为阴【万箭齐发】/阳【桃】，黑色牌均视为阴【闪】/阳【南蛮入侵】；使用或打出后摸一张牌（此牌本回合无法使用），然后切换形态。你的牌无视防具且只能指定单目标。",
 };
 export default translates;
