@@ -21,6 +21,10 @@ const quModeAllow = [
 	"shuoye_wutiaowu",
 	"shuoye_huoguang",
 	"shuoye_dilutianfeng",
+	"shuoye_qiaolienide",
+	"shuoye_xugouji",
+	"shuoye_xituo",
+	"shuoye_fengchuanxiangzi",
 ];
 
 const characterFilters = {};

@@ -27,7 +27,7 @@ const translates = {
         "①不计入次数",
         "②卫岳增加/减少一点护甲重置此技能",
         "③额外结算X次",
-        "④免疫下一次伤害",
+        "④消耗2点护甲，选择①②③中的一个效果执行",
     ].map(i => `<br>${i}`).join(""),
 
     shuoye_wujishengwu: "无极圣武",
@@ -337,7 +337,7 @@ const translates = {
     shuoye_wanxiang:'万象',
     shuoye_wanxiang_info: `①游戏开始时，你获得${get.poptip("shuoye_chudan")}。<br>②当其他角色死亡时，若你计算其的距离为：<br>1，你废除判定区；<br>2，你本局游戏造成伤害+1（可叠加）；<br>3，你本局游戏受到伤害时，增加1点体力上限，并摸1张牌，每回合限一次（可叠加）。`,
     shuoye_qiyuan:'祈愿',
-    shuoye_qiyuan_info:'限定技，出牌阶段，你令一名其他角色失去1点体力并增加1点护甲；若其未因此死亡，则你的下个回合开始时刷新此技能。',
+    shuoye_qiyuan_info:'限定技，出牌阶段，你令一名其他角色失去X点体力并增加X点护甲（X为此技能已发动次数，首次为1，之后递增）；若其未因此死亡，则你的下个回合开始时刷新此技能。',
     shuoye_chudan:"初诞",
     shuoye_chudan_info: `你造成伤害+1，当你伤害类牌被响应后，此技能转化为${get.poptip("shuoye_mengya")}。`,
     shuoye_mengya:"萌芽",

@@ -613,7 +613,7 @@ const skills = {
                 "①不计入次数",
                 "②卫岳增加/减少一点护甲重置此技能",
                 "③额外结算X次",
-                "④免疫下一次伤害",
+                "④消耗2点护甲，选择①②③中的一个效果执行",
             ];
             const { bool } = await player
                 .chooseBool(`你可以令${get.translation(trigger.player)}使用的${get.translation(trigger.card)}执行${list[num - 1]}`)
@@ -628,50 +628,78 @@ const skills = {
                     })()
                 )
                 .forResult();
-            if (bool) {
-                switch (num) {
-                    case 1: {
-                      if (trigger.addCount !== false) {
-                        trigger.addCount = false;
-                        const stat = player.getStat().card;
-                        const name = trigger.card.name;
-                        if (typeof stat[name] == "number") {
-                          stat[name]--;
+            if (!bool) return;
+            if (num == 1) {
+                if (trigger.addCount !== false) {
+                    trigger.addCount = false;
+                    const stat = player.getStat().card;
+                    const name = trigger.card.name;
+                    if (typeof stat[name] === "number") {
+                        stat[name]--;
+                    }
+                    game.log(trigger.card, "不计入次数限制");
+                }
+                return;
+            }
+            if (num == 2) {
+                const result = await player
+                    .chooseControl("增加", "减少")
+                    .set("prompt", `你发动${get.translation(event.name)}：选择增加或减少1点护甲`)
+                    .set("ai", () => {
+                        const player = get.player();
+                        if (_status.currentPhase == player && player.hasSha()) {
+                            return 1;
                         }
-                        game.log(trigger.card, "不计入次数限制");
-                      }
+                        return 0;
+                    })
+                    .forResult();
+                await player.changeHujia(result.index == 0 ? 1 : -1);
+                const historys = trigger.player.getHistory("useCard");
+                for (const history of historys) {
+                    history[`${event.name}_check`] = true;
+                }
+                return;
+            }
+            if (num == 3) {
+                if (lib.skill.dcshixian.filterx(trigger)) {
+                    trigger.effectCount += num;
+                    game.log(trigger.card, "额外结算", get.cnNumber(num), "次");
+                }
+                return;
+            }
+            // ④：消耗2点护甲，从①②③里选一个执行
+            await player.changeHujia(-2, null, true);
+            const choice = await player
+                .chooseControl(["不计入次数", "重置此技能", "额外结算"])
+                .set("prompt", `你发动${get.translation(event.name)}：消耗2点护甲，选择一个效果`)
+                .set("ai", () => 2)
+                .forResult();
+            if (choice.index == 0) {
+                if (trigger.addCount !== false) {
+                    trigger.addCount = false;
+                    const stat = player.getStat().card;
+                    const name = trigger.card.name;
+                    if (typeof stat[name] === "number") {
+                        stat[name]--;
                     }
-                    break;
-                    case 2: {
-                        const result = await player
-                            .chooseControl("增加", "减少")
-                            .set("prompt", `你发动${get.translation(event.name)}：选择增加或减少1点护甲`)
-                            .set("ai", () => {
-                                const player = get.player();
-                                if (_status.currentPhase == player && player.hasSha()) {
-                                    return 1;
-                                }
-                                return 0;
-                            })
-                            .forResult();
-                        await player.changeHujia(result.index == 0 ? 1 : -1);
-                        const historys = trigger.player.getHistory("useCard");
-                        for (const history of historys) {
-                            history[`${event.name}_check`] = true;
-                        }
-                    }
-                    break;
-                    case 3: {
-                        if (lib.skill.dcshixian.filterx(trigger)) {
-                            trigger.effectCount += num;
-                            game.log(trigger.card, "额外结算", get.cnNumber(num), "次");
-                        }
-                    }
-                    break;
-                    case 4: {
-                        trigger.player.addSkill("shuoyexiaoxiang_effect");
-                    }
-                    break;
+                    game.log(trigger.card, "不计入次数限制");
+                }
+            } else if (choice.index == 1) {
+                const result = await player
+                    .chooseControl("增加", "减少")
+                    .set("prompt", `你发动${get.translation(event.name)}：选择增加或减少1点护甲`)
+                    .set("ai", () => 0)
+                    .forResult();
+                await player.changeHujia(result.index == 0 ? 1 : -1);
+                const historys = trigger.player.getHistory("useCard");
+                for (const history of historys) {
+                    history[`${event.name}_check`] = true;
+                }
+            } else {
+                const num2 = Math.max(1, player.hujia - 1);
+                if (lib.skill.dcshixian.filterx(trigger)) {
+                    trigger.effectCount += num2;
+                    game.log(trigger.card, "额外结算", get.cnNumber(num2), "次");
                 }
             }
         },
@@ -2703,37 +2731,23 @@ const skills = {
 //#noname-kit-end skill:shuoye_chudan
 //#noname-kit-begin skill:shuoye_qiyuan
     shuoye_qiyuan: {
-        group: ["shuoye_qiyuan_watch"],
         enable: "phaseUse",
         limited: true,
         filterTarget: function (card, player, target) {
             return player != target;
         },
-        prompt2: "令一名其他角色失去1点体力并增加1点护甲；若其未因此死亡，则你的下个回合开始时刷新此技能",
+        prompt2: "令一名其他角色失去X点体力并增加X点护甲（X为此技能已发动次数，首次为1）；若其未因此死亡，则你的下个回合开始时刷新此技能",
         async content(event, trigger, player) {
             const target = event.target;
             player.awakenSkill("shuoye_qiyuan");
-            game.log(player, "发动了", "【祈愿】");
-            await target.loseHp(1);
-            await target.changeHujia(1, null, true);
+            const num = (player.storage.shuoye_qiyuan_stack || 0) + 1;
+            player.storage.shuoye_qiyuan_stack = num;
+            game.log(player, "发动了", "【祈愿】", "（第", num, "次）");
+            await target.loseHp(num);
+            await target.changeHujia(num, null, true);
             if (!target.isAlive()) return;
             player.storage.shuoye_qiyuan_refresh = true;
-        },
-        subSkill: {
-            watch: {
-                charlotte: true,
-                forced: true,
-                popup: false,
-                trigger: { player: "phaseBegin" },
-                filter(event, player) {
-                    return !!player.storage.shuoye_qiyuan_refresh;
-                },
-                content(event, trigger, player) {
-                    delete player.storage.shuoye_qiyuan_refresh;
-                    player.restoreSkill("shuoye_qiyuan");
-                    game.log(player, "刷新了", "【祈愿】");
-                },
-            },
+            player.addSkill("shuoye_qiyuan_revive");
         },
     },
 //#noname-kit-end skill:shuoye_qiyuan
@@ -14202,6 +14216,26 @@ const skills = {
         },
     },
 //#noname-kit-end skill:shuoye_longqi
+//#noname-kit-begin skill:shuoye_qiyuan_revive
+    shuoye_qiyuan_revive: {
+        charlotte: true,
+        forced: true,
+        popup: false,
+        silent: true,
+        trigger: {
+            player: "phaseBegin",
+        },
+        filter(event, player) {
+            return !!player.storage.shuoye_qiyuan_refresh;
+        },
+        async content(event, trigger, player) {
+            delete player.storage.shuoye_qiyuan_refresh;
+            player.restoreSkill("shuoye_qiyuan");
+            player.removeSkill("shuoye_qiyuan_revive");
+            game.log(player, "刷新了", "【祈愿】");
+        },
+    },
+//#noname-kit-end skill:shuoye_qiyuan_revive
 };
 
 export default skills;
