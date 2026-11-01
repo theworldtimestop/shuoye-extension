@@ -2324,7 +2324,15 @@ const skills = {
 //#noname-kit-end skill:shuoyezhouke
 //#noname-kit-begin skill:shuoyetaixu
     shuoyetaixu: {
+        forceLoad: true,
         group: ["shuoyetaixu_deal", "shuoyetaixu_take"],
+        mod: {
+            cardUsable(card, player, num) {
+                if (card && card.name == "sha") {
+                    return num + player.countMark("shuoyezhouke");
+                }
+            },
+        },
         subSkill: {
             deal: {
                 charlotte: true,
@@ -13986,6 +13994,7 @@ const skills = {
 //#noname-kit-end skill:shuoye_fenghao
 //#noname-kit-begin skill:shuoye_cangshu
     shuoye_cangshu: {
+        forceLoad: true,
         trigger: {
             player: "changeHp",
             source: "damageEnd",
@@ -13996,6 +14005,13 @@ const skills = {
         intro: {
             name: "苍书",
             content: "mark",
+        },
+        mod: {
+            cardUsable(card, player, num) {
+                if (card && card.name == "sha") {
+                    return num + Math.max(0, player.maxHp - player.hp);
+                }
+            },
         },
         filter(event, player) {
             if (event.name == "changeHp") {
