@@ -82,18 +82,42 @@ export async function content(config, pack) {
                 return function () {};
             }
             if (typeof fn !== "function") return fn;
-            const guarded = function () {
-                try {
-                    return fn.apply(this, arguments);
-                } catch (e) {
-                    console.error("[朔夜] 远程函数执行出错（已拦截，不影响对局）：", e);
-                    return undefined;
-                }
-            };
-            try {
-                guarded.toString = () => fn.toString();
-            } catch (e) {}
-            return guarded;
+            // 重建结果不能统一包成普通 function：
+            // ① async 函数会失去 instance AsyncFunction，被 StepCompiler 当普通 content 重新编译；
+            // ② StepCompiler 用原生 toString 取源码，包装函数闭包里的 fn 在新作用域不存在，调用即 ReferenceError。
+            // 木牛流马 muniu_skill_backup.content 是 async，联机客机扣置后牌不进木牛、也没有移动提示，正是这个包装导致的。
+            // 所以按原函数类型包装，普通函数原样返回。
+            const tag = Object.prototype.toString.call(fn);
+            if (tag === "[object AsyncGeneratorFunction]") {
+                return async function* () {
+                    try {
+                        yield* fn.apply(this, arguments);
+                    } catch (e) {
+                        console.error("[朔夜] 远程函数执行出错（已拦截，不影响对局）：", e);
+                    }
+                };
+            }
+            if (tag === "[object AsyncFunction]") {
+                return async function () {
+                    try {
+                        return await fn.apply(this, arguments);
+                    } catch (e) {
+                        console.error("[朔夜] 远程函数执行出错（已拦截，不影响对局）：", e);
+                        return undefined;
+                    }
+                };
+            }
+            if (tag === "[object GeneratorFunction]") {
+                return function* () {
+                    try {
+                        yield* fn.apply(this, arguments);
+                    } catch (e) {
+                        console.error("[朔夜] 远程函数执行出错（已拦截，不影响对局）：", e);
+                        return undefined;
+                    }
+                };
+            }
+            return fn;
         };
         shuoyeGuardedInfoFuncOL._shuoyeGuard = true;
         // 新版引擎用 freezeSlot 冻结了 Get.prototype.infoFuncOL，直接赋值会抛
