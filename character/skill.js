@@ -14252,6 +14252,1195 @@ const skills = {
         },
     },
 //#noname-kit-end skill:shuoye_qiyuan_revive
+//#noname-kit-begin skill:shuoye_lx_xiwang
+    //【李信】希望（瞬发技）
+    shuoye_lx_xiwang: {
+        audio: "ext:朔夜/audio/skill:1",
+        round: 1,
+        shjShunfa: true,
+        nobracket: true,
+        init(player) {
+            try {
+                window.lsxFx && window.lsxFx.syncButtons && window.lsxFx.syncButtons();
+            } catch (e) {}
+        },
+        clickableFilter(player) {
+            if (!player || !player.isAlive()) {
+                return false;
+            }
+            const used = player.storage && player.storage.shuoye_lx_xiwang_roundcount;
+            if (used != null && game.roundNumber - used < 1) {
+                return false;
+            }
+            if (!player.countCards("he")) {
+                return false;
+            }
+            if (!game.hasPlayer((t) => t !== player && t.isAlive() && t.countCards("he") > 0)) {
+                return false;
+            }
+            return true;
+        },
+        async doAction(player) {
+            try {
+                if (!player) {
+                    return;
+                }
+                const self = lib.skill.shuoye_lx_xiwang;
+                if (typeof self.clickableFilter === "function" && !self.clickableFilter(player)) {
+                    return;
+                }
+                let result;
+                try {
+                    result = await player
+                        .chooseTarget("###希望###选择一名角色，你与其各弃置至少一张牌，然后均摸牌至你的手牌上限", true, (card, player2, target) => {
+                            return target !== player2 && target.isAlive() && target.countCards("he") > 0;
+                        })
+                        .set("ai", (target) => {
+                            const me = get.player();
+                            const limit = me.getHandcardLimit();
+                            const mine = Math.max(0, limit - me.countCards("h"));
+                            const theirs = Math.max(0, limit - target.countCards("h"));
+                            const att = get.attitude(me, target);
+                            return mine + (att > 0 ? theirs * 0.7 : -theirs * 0.5);
+                        })
+                        .forResult();
+                } catch (e) {
+                    return;
+                }
+                if (!result || !result.bool || !result.targets || !result.targets.length) {
+                    return;
+                }
+                const target = result.targets[0];
+                player.logSkill("shuoye_lx_xiwang", target);
+                let discardMine = 0;
+                let discardTheirs = 0;
+                try {
+                    const res1 = await player
+                        .chooseToDiscard("###希望###弃置至少一张牌", "he", [1, Infinity], true)
+                        .set("allowChooseAll", true)
+                        .set("ai", (card) => 6 - get.value(card))
+                        .forResult();
+                    if (res1 && res1.cards) {
+                        discardMine = res1.cards.length;
+                    }
+                } catch (e) {}
+                if (target.isAlive()) {
+                    try {
+                        const res2 = await target
+                            .chooseToDiscard("###希望###弃置至少一张牌", "he", [1, Infinity], true)
+                            .set("allowChooseAll", true)
+                            .set("ai", (card) => 6 - get.value(card))
+                            .forResult();
+                        if (res2 && res2.cards) {
+                            discardTheirs = res2.cards.length;
+                        }
+                    } catch (e) {}
+                }
+                let drew = 0;
+                const limit = player.getHandcardLimit();
+                let need = Math.max(0, limit - player.countCards("h"));
+                if (need > 0) {
+                    try {
+                        const res = await player.draw(need).forResult();
+                        drew += res && res.cards && res.cards.length ? res.cards.length : need;
+                    } catch (e) {
+                        drew += need;
+                    }
+                }
+                if (target.isAlive()) {
+                    need = Math.max(0, limit - target.countCards("h"));
+                    if (need > 0) {
+                        try {
+                            const res = await target.draw(need).forResult();
+                            drew += res && res.cards && res.cards.length ? res.cards.length : need;
+                        } catch (e) {
+                            drew += need;
+                        }
+                    }
+                }
+                if (discardMine + discardTheirs < drew) {
+                    try {
+                        await player.chooseToUse().set("prompt", "###希望###你可以使用一张牌（不计入出牌阶段次数）").set("addCount", false);
+                    } catch (e) {}
+                }
+            } catch (e) {}
+        },
+    },
+//#noname-kit-end skill:shuoye_lx_xiwang
+//#noname-kit-begin skill:shuoye_lx_xiwang_ai
+    //【李信】希望（人机自动发动）
+    shuoye_lx_xiwang_ai: {
+        charlotte: true,
+        nopop: true,
+        popup: false,
+        silent: true,
+        trigger: { player: "phaseUseBegin" },
+        filter(event, player) {
+            if (!player.hasSkill("shuoye_lx_xiwang") || player.isUnderControl(true)) {
+                return false;
+            }
+            const self = lib.skill.shuoye_lx_xiwang;
+            return !!(self && typeof self.clickableFilter === "function" && self.clickableFilter(player));
+        },
+        async content(event, trigger, player) {
+            try {
+                await player.useSkill("shuoye_lx_xiwang").forResult();
+            } catch (e) {}
+        },
+    },
+//#noname-kit-end skill:shuoye_lx_xiwang_ai
+//#noname-kit-begin skill:shuoye_lx_liehua
+    //【李信】烈华
+    shuoye_lx_liehua: {
+        audio: "ext:朔夜/audio/skill:2",
+        trigger: { player: ["useCardAfter", "respondAfter"] },
+        filter(event, player) {
+            if (!_status.currentPhase || _status.currentPhase === player) {
+                return false;
+            }
+            const current = _status.currentPhase;
+            if (!current || !current.isAlive() || !current.countCards("h")) {
+                return false;
+            }
+            const map = {};
+            const cards = current.getCards("h");
+            for (let i = 0; i < cards.length; i++) {
+                const name = get.name(cards[i], current);
+                map[name] = (map[name] || 0) + 1;
+            }
+            return Object.keys(map).some((name) => map[name] >= 2);
+        },
+        async cost(event, trigger, player) {
+            const current = _status.currentPhase;
+            event.result = await player
+                .chooseBool("烈华：观看" + get.translation(current) + "的手牌，获得其中任意张牌名相同的牌（至少2），然后对其造成等量火焰伤害")
+                .set("ai", function () {
+                    return true;
+                })
+                .forResult();
+        },
+        async content(event, trigger, player) {
+            const current = _status.currentPhase;
+            if (!current || !current.isAlive()) {
+                return;
+            }
+            const hand = current.getCards("h");
+            const map = {};
+            for (let i = 0; i < hand.length; i++) {
+                const name = get.name(hand[i], current);
+                if (!map[name]) {
+                    map[name] = [];
+                }
+                map[name].push(hand[i]);
+            }
+            const names = Object.keys(map).filter((name) => map[name].length >= 2);
+            if (!names.length) {
+                return;
+            }
+            let chosenName = names[0];
+            if (names.length > 1) {
+                let res;
+                try {
+                    res = await player
+                        .chooseButton(["烈华：选择要获得的牌名", [names.slice(0), "vcard"]], true)
+                        .set("ai", (button) => {
+                            const list = button.link;
+                            return 1 + (Array.isArray(list) ? list.length * 0.1 : 0);
+                        })
+                        .forResult();
+                } catch (e) {
+                    res = null;
+                }
+                if (res && res.bool && res.links && res.links.length) {
+                    const link = res.links[0];
+                    const picked = Array.isArray(link) ? link[2] || link[link.length - 1] : link;
+                    if (picked) {
+                        chosenName = picked;
+                    }
+                }
+            }
+            const pool = map[chosenName] || [];
+            if (!pool.length) {
+                return;
+            }
+            let gainCards = pool.slice();
+            if (pool.length > 2) {
+                let res;
+                try {
+                    res = await player
+                        .chooseButton(["烈华：选择要获得的牌（至少2张）", pool.slice()], [2, pool.length], true)
+                        .set("ai", (button) => get.value(button.link))
+                        .forResult();
+                } catch (e) {
+                    res = null;
+                }
+                if (res && res.bool && res.links && res.links.length >= 2) {
+                    gainCards = res.links.slice();
+                }
+            }
+            if (!gainCards.length) {
+                return;
+            }
+            const num = gainCards.length;
+            try {
+                await player.gain(gainCards, current, "giveAuto");
+            } catch (e) {}
+            if (current.isAlive()) {
+                try {
+                    await current.damage(num, "fire", player);
+                } catch (e) {}
+            }
+        },
+        ai: {
+            fireAttack: true,
+            threaten: 1.4,
+        },
+    },
+//#noname-kit-end skill:shuoye_lx_liehua
+//#noname-kit-begin skill:shuoye_lx_guangyi
+    //【李信】光翼（1效果：将一张【杀】和一张【闪】当做【水淹七军】使用，像丈八蛇矛一样在需要出牌时可用）
+    shuoye_lx_guangyi: {
+        audio: "ext:朔夜/audio/skill:2",
+        group: ["shuoye_lx_guangyi_count"],
+        enable: ["phaseUse", "chooseToUse"],
+        position: "hs",
+        selectCard: 2,
+        filter(event, player) {
+            return player.countCards("hs", (card) => {
+                const name = get.name(card);
+                return name === "sha" || name === "shan";
+            });
+        },
+        filterCard(card, player) {
+            const name = get.name(card);
+            if (name !== "sha" && name !== "shan") {
+                return false;
+            }
+            const selected = ui.selected && ui.selected.cards;
+            if (selected && selected.length && get.name(selected[0]) === name) {
+                return false;
+            }
+            return true;
+        },
+        viewAs(cards, player) {
+            if (!Array.isArray(cards) || cards.length !== 2) {
+                return null;
+            }
+            const names = cards.map((card) => get.name(card));
+            if (!names.includes("sha") || !names.includes("shan")) {
+                return null;
+            }
+            return { name: "shuoye_lx_shuiyan" };
+        },
+        prompt: "将一张【杀】和一张【闪】当做一张【水淹七军】使用",
+        check(card) {
+            return 6 - get.value(card);
+        },
+        // 兜底：选了两张同类牌时 viewAs 返回 null，引擎会回退到 useSkill，
+        // 这里给一个空内容，避免出现未定义行为的空事件
+        async content(event, trigger, player) {},
+        ai: {
+            order: 6,
+            result: {
+                target(player, target) {
+                    return get.attitude(player, target) > 0 ? 0.4 : -1;
+                },
+            },
+        },
+    },
+//#noname-kit-end skill:shuoye_lx_guangyi
+//#noname-kit-begin skill:shuoye_lx_guangyi_count
+    //【李信】光翼（第二段：手牌数归零/等于体力上限后使用一张牌并手牌上限+1）
+    shuoye_lx_guangyi_count: {
+        charlotte: true,
+        nopop: true,
+        popup: false,
+        silent: true,
+        trigger: { global: ["gainAfter", "loseAfter"] },
+        usable: 1,
+        filter(event, player) {
+            const target = event.player;
+            if (!target || !target.isAlive()) {
+                return false;
+            }
+            const num = target.countCards("h");
+            if (!(num === 0 || num === target.maxHp)) {
+                return false;
+            }
+            return player.countCards("h") > 0;
+        },
+        async cost(event, trigger, player) {
+            const target = trigger.player;
+            event.result = await player
+                .chooseBool(
+                    "光翼：" +
+                        get.translation(target) +
+                        "的手牌数为" +
+                        get.cnNumber(target.countCards("h")) +
+                        "，你可以使用一张牌，然后手牌上限+1"
+                )
+                .set("ai", function () {
+                    return true;
+                })
+                .forResult();
+        },
+        async content(event, trigger, player) {
+            let used = false;
+            try {
+                const res = await player.chooseToUse().set("prompt", "光翼：你可以使用一张牌").set("addCount", false).forResult();
+                used = !!(res && res.bool);
+            } catch (e) {
+                used = false;
+            }
+            if (!used) {
+                return;
+            }
+            player.storage.shuoye_lx_guangyi_add = (Number(player.storage.shuoye_lx_guangyi_add) || 0) + 1;
+            player.storage.shuoye_lx_guangyi_mod = player.storage.shuoye_lx_guangyi_add;
+            if (!player.hasSkill("shuoye_lx_guangyi_mod")) {
+                player.addSkill("shuoye_lx_guangyi_mod");
+            }
+            try {
+                player.syncStorage("shuoye_lx_guangyi_mod");
+                player.markSkill("shuoye_lx_guangyi_mod");
+                player.updateMark("shuoye_lx_guangyi_mod");
+            } catch (e) {}
+        },
+    },
+//#noname-kit-end skill:shuoye_lx_guangyi_count
+//#noname-kit-begin skill:shuoye_lx_guangyi_mod
+    //【李信】光翼（手牌上限加成，永久累积）
+    shuoye_lx_guangyi_mod: {
+        charlotte: true,
+        nopop: true,
+        popup: false,
+        silent: true,
+        mark: true,
+        marktext: "翼",
+        intro: {
+            content: "手牌上限+$",
+        },
+        mod: {
+            maxHandcard(player, num) {
+                return num + (Number(player.storage.shuoye_lx_guangyi_add) || 0);
+            },
+        },
+    },
+//#noname-kit-end skill:shuoye_lx_guangyi_mod
+//#noname-kit-begin skill:shuoye_lx_wuwei
+    //【李信】无畏
+    shuoye_lx_wuwei: {
+        audio: "ext:朔夜/audio/skill:2",
+        trigger: { global: "damageAfter" },
+        forced: true,
+        filter(event, player) {
+            if (event.player !== player && event.source !== player) {
+                return false;
+            }
+            return player.hp < player.maxHp;
+        },
+        async content(event, trigger, player) {
+            try {
+                await player.draw(2);
+            } catch (e) {}
+            if (!player.isAlive()) {
+                return;
+            }
+            if (player.countCards("h") > player.maxHp) {
+                const need = player.countCards("h") - Math.max(0, player.hp);
+                if (need > 0) {
+                    try {
+                        await player.chooseToDiscard("###无畏###弃置" + get.cnNumber(need) + "张手牌", "h", need, true).set("ai", (card) => -get.value(card));
+                    } catch (e) {}
+                }
+                if (player.isAlive() && player.hp < player.maxHp) {
+                    try {
+                        await player.recover(1);
+                    } catch (e) {}
+                }
+            }
+        },
+        ai: {
+            maixie: true,
+        },
+    },
+//#noname-kit-end skill:shuoye_lx_wuwei
+//#noname-kit-begin skill:shuoye_lx_silie
+    //【李信】撕裂
+    shuoye_lx_silie: {
+        audio: "ext:朔夜/audio/skill:2",
+        trigger: { player: "useCardToPlayer" },
+        filter(event, player) {
+            if (!player || player.hp <= 1) {
+                return false;
+            }
+            const target = event.target;
+            if (!target || target === player || !target.isAlive()) {
+                return false;
+            }
+            return true;
+        },
+        async cost(event, trigger, player) {
+            const target = trigger.target;
+            const name = trigger.card ? trigger.card.name : "";
+            const ok = lib.skill.shuoye_lx_silie.aiDecide(player, trigger);
+            event.result = await player
+                .chooseBool(
+                    "撕裂：你可以失去1点体力，将" +
+                        get.translation(target) +
+                        "手牌中一张【" +
+                        get.translation(name) +
+                        "】无视防具、不可响应的对其使用"
+                )
+                .set(
+                    "ai",
+                    ok
+                        ? function () {
+                              return true;
+                          }
+                        : function () {
+                              return false;
+                          }
+                )
+                .forResult();
+        },
+        async content(event, trigger, player) {
+            const target = trigger.target;
+            const name = trigger.card ? trigger.card.name : "";
+            try {
+                await player.loseHp(1);
+            } catch (e) {}
+            if (!player.isAlive() || !target || !target.isAlive() || !name) {
+                return;
+            }
+            const pool = target.getCards("h", (card) => get.name(card, target) === name);
+            if (!pool.length) {
+                return;
+            }
+            let chosen = pool[0];
+            if (pool.length > 1) {
+                let res;
+                try {
+                    res = await player.chooseButton(["撕裂：选择一张牌对其使用", pool.slice()], true).forResult();
+                } catch (e) {
+                    res = null;
+                }
+                if (res && res.bool && res.links && res.links.length) {
+                    chosen = res.links[0];
+                }
+            }
+            let probe;
+            try {
+                probe = new lib.element.VCard({ name: name, cards: [chosen], isCard: true });
+            } catch (e) {
+                return;
+            }
+            if (!player.canUse(probe, target, false)) {
+                return;
+            }
+            try {
+                await player.gain(chosen, target);
+            } catch (e) {}
+            if (!player.isAlive() || !target.isAlive()) {
+                return;
+            }
+            let usedCard;
+            try {
+                usedCard = new lib.element.VCard({ name: name, cards: [chosen], isCard: true });
+            } catch (e) {
+                return;
+            }
+            // 无视防具
+            try {
+                target.addTempSkill("qinggang2");
+                if (!Array.isArray(target.storage.qinggang2)) {
+                    target.storage.qinggang2 = [];
+                }
+                target.storage.qinggang2.push(usedCard);
+            } catch (e) {}
+            try {
+                const next = player.useCard(usedCard, target);
+                next.directHit = [target];
+                await next;
+            } catch (e) {}
+            if (target.isAlive()) {
+                try {
+                    if (lib.lsxFx && typeof lib.lsxFx.voice === "function") {
+                        lib.lsxFx.voice(["skill/shuoye_lx_silie3.mp3"]);
+                    }
+                } catch (e) {}
+            }
+        },
+        aiDecide(player, trigger) {
+            const target = trigger.target;
+            if (!target || !target.isAlive() || player.hp <= 1) {
+                return false;
+            }
+            const name = trigger.card ? trigger.card.name : "";
+            const enemy = get.attitude(player, target) < 0;
+            const hpAfter = player.hp - 1;
+            const isDamage = !!get.is.damageCard({ name: name });
+            const handNum = target.countCards("h");
+            if (hpAfter >= 3) {
+                return enemy || handNum >= 3;
+            }
+            if (hpAfter === 2) {
+                return enemy && (isDamage || handNum >= 3);
+            }
+            return enemy && isDamage && handNum >= 4;
+        },
+    },
+//#noname-kit-end skill:shuoye_lx_silie
+//#noname-kit-begin skill:shuoye_lx_anye
+    //【李信】暗影
+    shuoye_lx_anye: {
+        audio: "ext:朔夜/audio/skill:2",
+        locked: true,
+        forced: true,
+        trigger: { player: ["changeHp"] },
+        filter(event, player) {
+            return event.changedHp < 0 || event.num < 0;
+        },
+        async content(event, trigger, player) {
+            let x = 1;
+            try {
+                if (lib.lsxFx && typeof lib.lsxFx.turnCounter === "function") {
+                    x = lib.lsxFx.turnCounter(player, "anye", 1) || 1;
+                }
+            } catch (e) {
+                x = 1;
+            }
+            try {
+                await player.gainMaxHp(x);
+            } catch (e) {}
+            if (!player.isAlive()) {
+                return;
+            }
+            try {
+                await player.loseMaxHp(1);
+            } catch (e) {}
+            if (!player.isAlive()) {
+                return;
+            }
+            player.storage.shuoye_lx_anye_stack = (Number(player.storage.shuoye_lx_anye_stack) || 0) + 1;
+            player.storage.shuoye_lx_anye_buff = player.storage.shuoye_lx_anye_stack;
+            if (!player.hasSkill("shuoye_lx_anye_buff")) {
+                player.addSkill("shuoye_lx_anye_buff");
+            }
+            try {
+                player.syncStorage("shuoye_lx_anye_buff");
+                player.markSkill("shuoye_lx_anye_buff");
+                player.updateMark("shuoye_lx_anye_buff");
+            } catch (e) {}
+        },
+        init(player) {
+            try {
+                if (player.storage.shuoye_lx_anye_stack > 0 && !player.hasSkill("shuoye_lx_anye_buff")) {
+                    player.addSkill("shuoye_lx_anye_buff");
+                }
+            } catch (e) {}
+        },
+    },
+//#noname-kit-end skill:shuoye_lx_anye
+//#noname-kit-begin skill:shuoye_lx_anye_buff
+    //【李信】暗影（下一张牌无次数限制且不可响应，可叠加）
+    shuoye_lx_anye_buff: {
+        charlotte: true,
+        nopop: true,
+        popup: false,
+        silent: true,
+        mark: true,
+        marktext: "影",
+        intro: {
+            content: "你对其他角色使用的牌无次数限制且不可响应（剩余$）",
+        },
+        mod: {
+            cardUsable(card, player, num) {
+                if (Number(player.storage.shuoye_lx_anye_stack) > 0) {
+                    return Infinity;
+                }
+            },
+        },
+        trigger: { player: "useCard1" },
+        forced: true,
+        firstDo: true,
+        filter(event, player) {
+            if (Number(player.storage.shuoye_lx_anye_stack) <= 0) {
+                return false;
+            }
+            return !!(event.targets && event.targets.some((target) => target !== player));
+        },
+        async content(event, trigger, player) {
+            const others = (trigger.targets || []).filter((target) => target !== player);
+            if (!others.length) {
+                return;
+            }
+            trigger.addCount = false;
+            trigger.nowuxie = true;
+            if (!Array.isArray(trigger.directHit)) {
+                trigger.directHit = [];
+            }
+            trigger.directHit.addArray(others);
+            player.storage.shuoye_lx_anye_stack = Math.max(0, (Number(player.storage.shuoye_lx_anye_stack) || 0) - 1);
+            try {
+                player.syncStorage("shuoye_lx_anye_buff");
+                if (player.storage.shuoye_lx_anye_stack > 0) {
+                    player.updateMark("shuoye_lx_anye_buff");
+                } else {
+                    player.removeSkill("shuoye_lx_anye_buff");
+                }
+            } catch (e) {}
+        },
+    },
+//#noname-kit-end skill:shuoye_lx_anye_buff
+//#noname-kit-begin skill:shuoye_lx_huiren
+    //【李信】灰刃
+    shuoye_lx_huiren: {
+        audio: "ext:朔夜/audio/skill:1",
+        enable: "phaseUse",
+        filter(event, player) {
+            // 正在结算中不可以再次发动
+            if (player.storage.shuoye_lx_huiren_busy) {
+                return false;
+            }
+            // 本回合其他角色体力值减少过（含受伤 / 失去体力）就不能再发动
+            if (lib.lsxFx && typeof lib.lsxFx.hasOtherHpDown === "function" && lib.lsxFx.hasOtherHpDown(player)) {
+                return false;
+            }
+            return game.hasPlayer((target) => target !== player && player.canUse({ name: "juedou" }, target, false));
+        },
+        async content(event, trigger, player) {
+            if (player.storage.shuoye_lx_huiren_busy) {
+                return;
+            }
+            player.storage.shuoye_lx_huiren_busy = true;
+            try {
+                // 硬校验：按钮状态可能滞后，这里再拦一次
+                let blocked = false;
+                try {
+                    if (lib.lsxFx && typeof lib.lsxFx.hasOtherHpDown === "function" && lib.lsxFx.hasOtherHpDown(player)) {
+                        blocked = true;
+                    }
+                } catch (e) {}
+                if (blocked) {
+                    try {
+                        game.log(player, "本回合已有其他角色体力值减少，无法发动", "#g【灰刃】");
+                    } catch (e) {}
+                    return;
+                }
+                try {
+                    if (lib.lsxFx && typeof lib.lsxFx.turnCounter === "function") {
+                        lib.lsxFx.turnCounter(player, "huiren", 1);
+                    }
+                } catch (e) {}
+                let res;
+                try {
+                    res = await player
+                        .chooseUseTarget({ name: "juedou" }, "###灰刃###你可以视为使用一张【决斗】", false)
+                        .set("ai", (target) => {
+                            const me = get.player();
+                            return -get.attitude(me, target);
+                        })
+                        .forResult();
+                } catch (e) {
+                    res = null;
+                }
+                if (!res || !res.bool) {
+                    return;
+                }
+                let drawn = [];
+                try {
+                    const result = await player.draw(1).forResult();
+                    drawn = (result && result.cards) || [];
+                } catch (e) {}
+                if (drawn.length) {
+                    const ids = drawn.map((card) => card.cardid).filter((id) => id != null);
+                    if (ids.length) {
+                        player.storage.shuoye_lx_huiren_cards = (Array.isArray(player.storage.shuoye_lx_huiren_cards)
+                            ? player.storage.shuoye_lx_huiren_cards
+                            : []
+                        ).concat(ids);
+                        if (!player.hasSkill("shuoye_lx_huiren_nolimit")) {
+                            player.addSkill("shuoye_lx_huiren_nolimit");
+                        }
+                        try {
+                            player.syncStorage("shuoye_lx_huiren_nolimit");
+                        } catch (e) {}
+                    }
+                }
+                let control;
+                try {
+                    const result = await player
+                        .chooseControl("摸一张牌", "本回合造成伤害+1")
+                        .set("prompt", "灰刃：请选择一项")
+                        .set("ai", () => {
+                            const me = get.player();
+                            return me.getCards("h").length ? "本回合造成伤害+1" : "摸一张牌";
+                        })
+                        .forResult();
+                    control = result && result.control;
+                } catch (e) {
+                    control = "摸一张牌";
+                }
+                if (control === "摸一张牌") {
+                    try {
+                        await player.draw(1);
+                    } catch (e) {}
+                } else {
+                    if (!player.hasSkill("shuoye_lx_huiren_dmg")) {
+                        player.addTempSkill("shuoye_lx_huiren_dmg", "phaseChange");
+                    }
+                    try {
+                        player.addMark("shuoye_lx_huiren_dmg", 1, false);
+                    } catch (e) {}
+                }
+            } finally {
+                delete player.storage.shuoye_lx_huiren_busy;
+            }
+        },
+        ai: {
+            order: 8,
+            result: {
+                player(player) {
+                    // 没有值得决斗的目标时不要空发动
+                    return player.hasValueTarget({ name: "juedou" }) ? 1 : 0;
+                },
+            },
+        },
+    },
+//#noname-kit-end skill:shuoye_lx_huiren
+//#noname-kit-begin skill:shuoye_lx_huiren_nolimit
+    //【李信】灰刃（因灰刃摸到的牌不计入手牌上限）
+    shuoye_lx_huiren_nolimit: {
+        charlotte: true,
+        nopop: true,
+        popup: false,
+        silent: true,
+        mod: {
+            maxHandcard(player, num) {
+                const ids = player.storage.shuoye_lx_huiren_cards;
+                if (!Array.isArray(ids) || !ids.length) {
+                    return num;
+                }
+                const cards = player.getCards("h");
+                let count = 0;
+                for (let i = 0; i < cards.length; i++) {
+                    if (ids.includes(cards[i].cardid)) {
+                        count++;
+                    }
+                }
+                return num + count;
+            },
+        },
+        trigger: { player: ["loseAfter", "cardsDiscardAfter"] },
+        forced: true,
+        silent: true,
+        popup: false,
+        filter(event, player) {
+            const ids = player.storage.shuoye_lx_huiren_cards;
+            return Array.isArray(ids) && ids.length > 0;
+        },
+        async content(event, trigger, player) {
+            try {
+                const inHand = player.getCards("h").map((card) => card.cardid);
+                const ids = (player.storage.shuoye_lx_huiren_cards || []).filter((id) => inHand.includes(id));
+                if (ids.length !== (player.storage.shuoye_lx_huiren_cards || []).length) {
+                    player.storage.shuoye_lx_huiren_cards = ids;
+                    player.syncStorage("shuoye_lx_huiren_nolimit");
+                }
+                if (!ids.length) {
+                    player.removeSkill("shuoye_lx_huiren_nolimit");
+                }
+            } catch (e) {}
+        },
+    },
+//#noname-kit-end skill:shuoye_lx_huiren_nolimit
+//#noname-kit-begin skill:shuoye_lx_huiren_dmg
+    //【李信】灰刃（本回合造成伤害+X）
+    shuoye_lx_huiren_dmg: {
+        charlotte: true,
+        nopop: true,
+        popup: false,
+        silent: true,
+        forced: true,
+        mark: true,
+        marktext: "刃",
+        intro: {
+            content: "本回合你造成的伤害+$",
+        },
+        trigger: { global: "damageBegin1" },
+        filter(event, player) {
+            return event.source === player && player.countMark("shuoye_lx_huiren_dmg") > 0;
+        },
+        async content(event, trigger, player) {
+            trigger.num += player.countMark("shuoye_lx_huiren_dmg");
+        },
+    },
+//#noname-kit-end skill:shuoye_lx_huiren_dmg
+//#noname-kit-begin skill:shuoye_lx_hpsnap
+    //【李信】回合开始体力快照（内部技）
+    shuoye_lx_hpsnap: {
+        charlotte: true,
+        nopop: true,
+        popup: false,
+        silent: true,
+        forced: true,
+        trigger: { global: "phaseBegin" },
+        async content(event, trigger, player) {
+            try {
+                if (lib.lsxFx && typeof lib.lsxFx.resetHpSnap === "function") {
+                    lib.lsxFx.resetHpSnap();
+                }
+            } catch (e) {}
+        },
+    },
+//#noname-kit-end skill:shuoye_lx_hpsnap
+//#noname-kit-begin skill:shuoye_lx_hpwatch
+    //【李信】灰刃·本回合体力减少监视（内部技）
+    shuoye_lx_hpwatch: {
+        charlotte: true,
+        nopop: true,
+        popup: false,
+        silent: true,
+        forced: true,
+        trigger: { global: "changeHpAfter" },
+        filter(event, player) {
+            return event.changedHp < 0;
+        },
+        async content(event, trigger, player) {
+            try {
+                if (lib.lsxFx && typeof lib.lsxFx.markHpDown === "function") {
+                    lib.lsxFx.markHpDown(trigger.player);
+                }
+            } catch (e) {}
+            // 让出牌阶段的技能按钮立即重新判定（灰刃/光翼等会因此变灰）
+            try {
+                let evt = _status.event;
+                while (evt && evt.name !== "chooseToUse") {
+                    evt = evt.parent;
+                }
+                if (evt) {
+                    evt._skillChoice = null;
+                }
+            } catch (e) {}
+            try {
+                game.broadcastAll(function () {
+                    try {
+                        let evt = _status && _status.event;
+                        while (evt && evt.name !== "chooseToUse") {
+                            evt = evt.parent;
+                        }
+                        if (!evt) {
+                            return;
+                        }
+                        evt._skillChoice = null;
+                        if (game.Check && typeof game.Check.skill === "function") {
+                            game.Check.skill(evt);
+                        }
+                    } catch (e) {}
+                });
+            } catch (e) {}
+        },
+    },
+//#noname-kit-end skill:shuoye_lx_hpwatch
+//#noname-kit-begin skill:shuoye_lx_yinian
+    //【李信】一念（太极技）
+    shuoye_lx_yinian: {
+        audio: "ext:朔夜/audio/skill:1",
+        group: ["shuoye_lx_yinian_yang", "shuoye_lx_yinian_yin", "shuoye_lx_yinian_end"],
+        locked: true,
+        init(player) {
+            try {
+                if (lib.config.extension_朔夜_quhua) {
+                    return;
+                }
+                if (!player.storage.shj_yin) {
+                    player.storage.shj_yin = 0;
+                }
+                if (!player.storage.shj_yang) {
+                    player.storage.shj_yang = 0;
+                }
+                lib.lsxFx.taiji(player);
+            } catch (e) {}
+        },
+        onremove(player) {
+            try {
+                lib.lsxFx.taiji(player, "hide");
+            } catch (e) {}
+        },
+    },
+//#noname-kit-end skill:shuoye_lx_yinian
+//#noname-kit-begin skill:shuoye_lx_yinian_yang
+    //【李信】一念·阳计数（每摸1张+1）
+    shuoye_lx_yinian_yang: {
+        charlotte: true,
+        nopop: true,
+        popup: false,
+        silent: true,
+        trigger: { player: "drawAfter" },
+        forced: true,
+        filter(event, player) {
+            return !lib.config.extension_朔夜_quhua;
+        },
+        async content(event, trigger, player) {
+            // 按次计算：一次摸牌事件只加 1 点阳（不管摸了几张）
+            lib.lsxFx.addTaiji(player, "yang", 1);
+        },
+    },
+//#noname-kit-end skill:shuoye_lx_yinian_yang
+//#noname-kit-begin skill:shuoye_lx_yinian_yin
+    //【李信】一念·阴计数（每1点造成/受到伤害+1）
+    shuoye_lx_yinian_yin: {
+        charlotte: true,
+        nopop: true,
+        popup: false,
+        silent: true,
+        trigger: { global: "damageAfter" },
+        forced: true,
+        filter(event, player) {
+            if (lib.config.extension_朔夜_quhua) {
+                return false;
+            }
+            return event.player === player || event.source === player;
+        },
+        async content(event, trigger, player) {
+            const num = Number(trigger.num) || 0;
+            if (num > 0) {
+                lib.lsxFx.addTaiji(player, "yin", num);
+            }
+        },
+    },
+//#noname-kit-end skill:shuoye_lx_yinian_yin
+//#noname-kit-begin skill:shuoye_lx_yinian_end
+    //【李信】一念·回合结束结算（满则极 → 阳/阴/调和；然后两侧相消）
+    shuoye_lx_yinian_end: {
+        charlotte: true,
+        nopop: true,
+        popup: false,
+        silent: true,
+        trigger: { player: "phaseJieshu" },
+        priority: -5,
+        filter(event, player) {
+            return !lib.config.extension_朔夜_quhua;
+        },
+        async content(event, trigger, player) {
+            const MAX = lib.lsxFx.TAIJI_MAX || 7;
+            const inForm = !!lib.lsxFx.inForm(player);
+            const yinFull = (Number(player.storage.shj_yin) || 0) >= MAX;
+            const yangFull = (Number(player.storage.shj_yang) || 0) >= MAX;
+            // 未变身且任一侧满：结算「极」+ 阳/阴/调和
+            if (!inForm && (yinFull || yangFull)) {
+                player.logSkill("shuoye_lx_yinian");
+                // 极：体力上限+1
+                try {
+                    await player.gainMaxHp(1);
+                } catch (e) {}
+                if (player.isAlive()) {
+                    if (yinFull && yangFull) {
+                        // 调和：选择任意形态进入，然后获得【神魔】
+                        let control = lib.lsxFx.FORM_GUANG;
+                        try {
+                            const result = await player
+                                .chooseControl(lib.lsxFx.FORM_GUANG, lib.lsxFx.FORM_AN)
+                                .set("choiceList", ["进入【光明神·李信】形态", "进入【弑杀神·李信】形态"])
+                                .set("prompt", "一念·调和：选择要进入的形态")
+                                .set("ai", function () {
+                                    return get.player().isDamaged() ? "shuoye_lx_guang" : "shuoye_lx_an";
+                                })
+                                .forResult();
+                            if (result && result.control) {
+                                control = result.control;
+                            }
+                        } catch (e) {}
+                        await lib.lsxFx.changeForm(player, control);
+                        if (player.isAlive() && !player.hasSkill("shuoye_lx_shenmo")) {
+                            player.addSkill("shuoye_lx_shenmo");
+                            game.log(player, "获得了技能", "#g【神魔】");
+                            try {
+                                player.popup("神魔");
+                            } catch (e) {}
+                        }
+                    } else if (yangFull) {
+                        // 阳：调整体力与手牌数至上限，然后变身光明神
+                        try {
+                            if (player.hp < player.maxHp) {
+                                await player.recover(player.maxHp - player.hp);
+                            }
+                            const need = player.getHandcardLimit() - player.countCards("h");
+                            if (need > 0) {
+                                await player.draw(need);
+                            }
+                        } catch (e) {}
+                        await lib.lsxFx.changeForm(player, lib.lsxFx.FORM_GUANG);
+                    } else {
+                        // 阴：体力值-1，摸牌至全场唯一最多，然后变身弑杀神
+                        try {
+                            await player.loseHp(1);
+                        } catch (e) {}
+                        if (player.isAlive()) {
+                            let most = 0;
+                            game.filterPlayer((target) => target !== player && target.isAlive()).forEach((target) => {
+                                const num = target.countCards("h");
+                                if (num > most) {
+                                    most = num;
+                                }
+                            });
+                            const need = most + 1 - player.countCards("h");
+                            if (need > 0) {
+                                try {
+                                    await player.draw(need);
+                                } catch (e) {}
+                            }
+                            await lib.lsxFx.changeForm(player, lib.lsxFx.FORM_AN);
+                        }
+                    }
+                }
+            }
+            // 相消（每回合结束都执行）：两侧同时减去较小值，必有一侧归零
+            const yin = Math.max(0, Number(player.storage.shj_yin) || 0);
+            const yang = Math.max(0, Number(player.storage.shj_yang) || 0);
+            const dec = Math.min(yin, yang);
+            if (dec > 0) {
+                player.storage.shj_yin = yin - dec;
+                player.storage.shj_yang = yang - dec;
+            }
+            try {
+                lib.lsxFx.taiji(player);
+            } catch (e) {}
+        },
+    },
+//#noname-kit-end skill:shuoye_lx_yinian_end
+//#noname-kit-begin skill:shuoye_lx_shenmo
+    //【李信】神魔
+    shuoye_lx_shenmo: {
+        audio: false,
+        trigger: { player: "phaseJieshu" },
+        // 先于【一念】的相消结算，否则满条会先被吃掉
+        priority: 5,
+        filter(event, player) {
+            if (!lib.lsxFx || typeof lib.lsxFx.inForm !== "function" || !lib.lsxFx.inForm(player)) {
+                return false;
+            }
+            const max = lib.lsxFx.TAIJI_MAX || 7;
+            const yin = Number(player.storage.shj_yin) || 0;
+            const yang = Number(player.storage.shj_yang) || 0;
+            return yin >= max || yang >= max;
+        },
+        async cost(event, trigger, player) {
+            const target = player.name1 === lib.lsxFx.FORM_GUANG ? lib.lsxFx.FORM_AN : lib.lsxFx.FORM_GUANG;
+            event.result = await player
+                .chooseBool("神魔：回合结束时，消耗已满的进度条，切换形态为【" + get.translation(target) + "】")
+                .set("ai", function () {
+                    return true;
+                })
+                .forResult();
+        },
+        async content(event, trigger, player) {
+            const max = lib.lsxFx.TAIJI_MAX || 7;
+            // 只消耗已满的那条（两侧都满就都清空），切形态后进度条依旧有意义
+            if ((Number(player.storage.shj_yin) || 0) >= max) {
+                player.storage.shj_yin = 0;
+            }
+            if ((Number(player.storage.shj_yang) || 0) >= max) {
+                player.storage.shj_yang = 0;
+            }
+            try {
+                lib.lsxFx.taiji(player);
+            } catch (e) {}
+            const target = player.name1 === lib.lsxFx.FORM_GUANG ? lib.lsxFx.FORM_AN : lib.lsxFx.FORM_GUANG;
+            await lib.lsxFx.changeForm(player, target);
+        },
+    },
+//#noname-kit-end skill:shuoye_lx_shenmo
+//#noname-kit-begin skill:shuoye_lx_form_aura
+    //【李信】形态光环（金光/暗红光+云雾，纯表现）
+    shuoye_lx_form_aura: {
+        charlotte: true,
+        nopop: true,
+        popup: false,
+        silent: true,
+        forced: true,
+        init(player) {
+            try {
+                lib.lsxFx.setAura(player);
+            } catch (e) {}
+        },
+        onremove(player) {
+            try {
+                lib.lsxFx.clearAura(player);
+            } catch (e) {}
+        },
+        trigger: { player: "die" },
+        async content(event, trigger, player) {
+            try {
+                lib.lsxFx.clearAura(player);
+                lib.lsxFx.taiji(player, "hide");
+            } catch (e) {}
+        },
+    },
+//#noname-kit-end skill:shuoye_lx_form_aura
+//#noname-kit-begin skill:shuoye_lx_beam_fx
+    //【李信】伤害牌光流（金/暗红/灰，纯表现）
+    shuoye_lx_beam_fx: {
+        charlotte: true,
+        nopop: true,
+        popup: false,
+        silent: true,
+        forced: true,
+        trigger: { player: "useCardToPlayer" },
+        filter(event, player) {
+            const target = event.target;
+            if (!target || target === player) {
+                return false;
+            }
+            const card = event.card;
+            if (!card) {
+                return false;
+            }
+            try {
+                return !!get.is.damageCard(card);
+            } catch (e) {
+                return false;
+            }
+        },
+        async content(event, trigger, player) {
+            if (!lib.lsxFx || typeof lib.lsxFx.formKeyOf !== "function") {
+                return;
+            }
+            const key = lib.lsxFx.formKeyOf(player);
+            if (!key) {
+                return;
+            }
+            try {
+                lib.lsxFx.beamBetween(player, trigger.target, key);
+            } catch (e) {}
+        },
+    },
+//#noname-kit-end skill:shuoye_lx_beam_fx
+//#noname-kit-begin skill:shuoye_lx_kill_line
+    //【李信】击杀台词（光/暗形态各一句）
+    shuoye_lx_kill_line: {
+        charlotte: true,
+        nopop: true,
+        popup: false,
+        silent: true,
+        forced: true,
+        trigger: { global: "die" },
+        filter(event, player) {
+            if (!event.player || event.player === player) {
+                return false;
+            }
+            return event.source === player;
+        },
+        async content(event, trigger, player) {
+            if (player.name1 === lib.lsxFx.FORM_GUANG) {
+                lib.lsxFx.voice(["skill/shuoye_lx_kill_line1.mp3"]);
+            } else if (player.name1 === lib.lsxFx.FORM_AN) {
+                lib.lsxFx.voice(["skill/shuoye_lx_kill_line2.mp3"]);
+            }
+        },
+    },
+//#noname-kit-end skill:shuoye_lx_kill_line
 };
 
 export default skills;

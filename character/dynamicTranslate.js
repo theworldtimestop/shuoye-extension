@@ -1,6 +1,12 @@
 import { lib, game, ui, get, ai, _status } from "noname"
 
 const dynamicTranslates = {
+    shuoye_lx_yinian(player, skill) {
+        if (lib.config.extension_朔夜_quhua) {
+            return "该模式未解锁。";
+        }
+        return lib.translate[skill + "_info"] || "";
+    },
     shuoyekuangyan(player, skill) {
         if (get.mode() == "boss") {
             return "出牌阶段限一次，你可移除自身护甲，令体力与手牌数等于体力上限，然后令一名角色失去你回复量+消耗护甲量体力，弃置你摸牌数牌。你下一次受到伤害时免疫之，并对来源造成原先你受到的伤害。";

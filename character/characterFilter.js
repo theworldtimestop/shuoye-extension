@@ -25,6 +25,7 @@ const quModeAllow = [
 	"shuoye_xugouji",
 	"shuoye_xituo",
 	"shuoye_fengchuanxiangzi",
+	"shuoye_lixin",
 ];
 
 const characterFilters = {};
@@ -37,6 +38,17 @@ for (const name of [...Object.keys(characters), ...Object.keys(epicCharacters)])
 			return !lib.config.extension_朔夜_jinmiao;
 		}
 		return true;
+	};
+}
+
+// 【李信】光明神/弑杀神为隐藏形态：默认不出现在选将列表，
+// 只能通过【一念】变身进入；开启「李信调试」后才作为可选武将显示。
+for (const name of ["shuoye_lx_guang", "shuoye_lx_an"]) {
+	characterFilters[name] = () => {
+		if (lib.config.extension_朔夜_qumoshi) {
+			return false;
+		}
+		return !!lib.config.extension_朔夜_lixin_debug;
 	};
 }
 

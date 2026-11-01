@@ -108,5 +108,51 @@ const cards = {
         },
     },
 //#noname-kit-end card:shuoye_xugouren
+//#noname-kit-begin card:shuoye_lx_shuiyan
+    shuoye_lx_shuiyan: {
+        type: "trick",
+        enable: true,
+        selectTarget: [1, 2],
+        targetprompt: ["受伤弃牌", "受伤摸牌"],
+        filterTarget(card, player, target) {
+            return target !== player;
+        },
+        async contentBefore(event, trigger, player) {
+            const evt = event.getParent();
+            const targets = (evt && (evt.stocktargets || evt.targets)) || [];
+            evt.shj_syqj_first = targets[0];
+        },
+        async content(event, trigger, player) {
+            const target = event.target;
+            const parent = event.getParent();
+            const first = parent && parent.shj_syqj_first;
+            await target.damage(1, "thunder", player);
+            if (!target.isAlive()) {
+                return;
+            }
+            if (target === first) {
+                await target.chooseToDiscard("he", true);
+            } else {
+                await target.draw(1);
+            }
+        },
+        ai: {
+            order: 6,
+            value: 4,
+            useful: 2,
+            tag: {
+                damage: 1,
+                thunderDamage: 1,
+                natureDamage: 1,
+                loseCard: 1,
+            },
+            result: {
+                target(player, target) {
+                    return get.attitude(player, target) > 0 ? 0.4 : -1;
+                },
+            },
+        },
+    },
+//#noname-kit-end card:shuoye_lx_shuiyan
 };
 export default cards;

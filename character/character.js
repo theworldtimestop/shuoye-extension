@@ -387,6 +387,18 @@ const characters = {
         trashBin: [],
     },
 //#noname-kit-end character:shuoye_longyan
+//#noname-kit-begin character:shuoye_lixin
+    //【李信】一念神魔
+    shuoye_lixin: {
+        sex: "male",
+        hp: 4,
+        group: "qun",
+        skills: ["shuoye_lx_huiren", "shuoye_lx_yinian", "shuoye_lx_beam_fx", "shuoye_lx_hpwatch", "shuoye_lx_hpsnap"],
+        img: "extension/朔夜/image/shuoye_lixin.jpg",
+        dieAudios: ["ext:朔夜/audio/die/shuoye_lixin1.mp3"],
+        trashBin: [],
+    },
+//#noname-kit-end character:shuoye_lixin
 
 };
 for (let i in characters) {

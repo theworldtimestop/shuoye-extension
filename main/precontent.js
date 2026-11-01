@@ -83,7 +83,15 @@ function shuoyeInstallEmotion() {
     return Promise.all(tasks).then(results => !results.includes(false));
 }
 
+// 【李信】形态特效 / 瞬发技按钮 / 太极进度条（模块实现见 lixinfx.js）
+import { installLixinFx } from "./lixinfx.js";
+
 export async function precontent() {
+    try {
+        installLixinFx();
+    } catch (e) {
+        console.error("[朔夜] 李信特效模块加载失败", e);
+    }
     // 【朔夜表情】包名、安装与缓存登记（面板按 get.translation(包名) 显示）
     lib.translate.shuoye_emotion = "朔夜表情";
     const shuoyeEmotionReady = shuoyeInstallEmotion();

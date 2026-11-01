@@ -1,1 +1,26 @@
-export default {};
+// 【李信】技能台词 / 阵亡台词（千幻聆音与原生台词均读此表）
+const voices = {
+	"#ext:朔夜/audio/skill/shuoye_lx_xiwang1": "一剑孤寒，斩尽天下不平事！",
+	"#ext:朔夜/audio/skill/shuoye_lx_liehua1": "心有光明，则身无暗影。",
+	"#ext:朔夜/audio/skill/shuoye_lx_liehua2": "你的野心到此为止。",
+	"#ext:朔夜/audio/skill/shuoye_lx_guangyi1": "心存一念，分明晦。",
+	"#ext:朔夜/audio/skill/shuoye_lx_guangyi2": "愈掌权柄，愈明天下之重。",
+	"#ext:朔夜/audio/skill/shuoye_lx_wuwei1": "梅隐之巅，凤栖于梧。",
+	"#ext:朔夜/audio/skill/shuoye_lx_wuwei2": "江湖路，终究是鲜血染就！",
+	"#ext:朔夜/audio/skill/shuoye_lx_silie1": "越是光明普照，越是如影随形。",
+	"#ext:朔夜/audio/skill/shuoye_lx_silie2": "于险绝处出招，方能一剑封喉！",
+	"#ext:朔夜/audio/skill/shuoye_lx_silie3": "夜路走多了，总会遇见我。",
+	"#ext:朔夜/audio/skill/shuoye_lx_anye1": "枯墨升云——望龙庭。",
+	"#ext:朔夜/audio/skill/shuoye_lx_anye2": "无回之渊，龙潜于夜。",
+	"#ext:朔夜/audio/skill/shuoye_lx_huiren1": "再生之恩，覆巢之恨……江湖恩怨了了，如何抉择？",
+	"#ext:朔夜/audio/skill/shuoye_lx_yinian1": "破而后立，方得新生。",
+	"#ext:朔夜/audio/skill/shuoye_lx_kill_line1": "梅隐栖栖剑，承让。",
+	"#ext:朔夜/audio/skill/shuoye_lx_kill_line2": "又一个……江湖纷争的牺牲品。",
+	"#shuoye_lixin:die": "岂能以无名之身战死……",
+	"#shuoye_lx_guang:die": "纵然身陨，不负梅隐之名……",
+	"#shuoye_lx_an:die": "龙困浅滩……",
+	"#ext:朔夜/audio/die/shuoye_lixin1:die": "岂能以无名之身战死……",
+	"#ext:朔夜/audio/die/shuoye_lx_guang1:die": "纵然身陨，不负梅隐之名……",
+	"#ext:朔夜/audio/die/shuoye_lx_an1:die": "龙困浅滩……",
+};
+export default voices;
