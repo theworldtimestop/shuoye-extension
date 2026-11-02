@@ -14556,11 +14556,10 @@ const skills = {
         enable: ["phaseUse", "chooseToUse"],
         position: "hs",
         selectCard: 2,
-        filter(event, player) {
-            return player.countCards("hs", (card) => {
-                const name = get.name(card);
-                return name === "sha" || name === "shan";
-            });
+        // 主动技：手上有没有【杀】/【闪】都能点；选不满直接取消。
+        // AI 想不想点由 ai.order 决定，人类不受 order 影响。
+        filter() {
+            return true;
         },
         filterCard(card, player) {
             const name = get.name(card);
@@ -14585,13 +14584,26 @@ const skills = {
         },
         prompt: "将一张【杀】和一张【闪】当做一张【水淹七军】使用",
         check(card) {
-            return 6 - get.value(card);
+            // 走到这一步说明 order 已经判定凑得齐，两张牌都给正分，保证能选满
+            return 10 - get.value(card);
         },
         // 兜底：选了两张同类牌时 viewAs 返回 null，引擎会回退到 useSkill，
         // 这里给一个空内容，避免出现未定义行为的空事件
         async content(event, trigger, player) {},
         ai: {
-            order: 6,
+            // AI 只在凑得齐一张【杀】和一张【闪】时才会点；凑不齐就不点，免得点进去再取消
+            order(item, player) {
+                if (!player) {
+                    player = get.player();
+                }
+                if (!player || !player.isAlive()) {
+                    return -1;
+                }
+                const hand = player.getCards("hs");
+                const hasSha = hand.some((card) => get.name(card) === "sha");
+                const hasShan = hand.some((card) => get.name(card) === "shan");
+                return hasSha && hasShan ? 6 : -1;
+            },
             result: {
                 target(player, target) {
                     return get.attitude(player, target) > 0 ? 0.4 : -1;
