@@ -1292,7 +1292,21 @@ function hasOtherHpDown(player) {
 // 变身：只更换武将牌（技能/立绘/特效），体力值与体力上限保持
 async function changeForm(player, formId) {
 	try {
-		if (!player || !lib.character || !lib.character[formId]) {
+		if (!player || !lib.character) {
+			return false;
+		}
+		// 游戏已结束时不再换将：录像复现是重跑事件，
+		// 结束后的换将会让复现的最终武将牌与录像不一致
+		if (typeof _status !== "undefined" && _status.over) {
+			return false;
+		}
+		// 动态形态数据缺失时补建一次（与录像/重载时的时序差异兼容）
+		if (!lib.character[formId]) {
+			try {
+				ensureHiddenForms();
+			} catch (e) {}
+		}
+		if (!lib.character[formId]) {
 			return false;
 		}
 		if (player.name1 === formId) {
@@ -1393,7 +1407,8 @@ function ensureHiddenForms() {
 function syncLixinPackVisibility() {
 	try {
 		ensureHiddenForms();
-		const show = !!lib.config.extension_朔夜_lixin_debug;
+		// 录像复现时也把隐藏形态放回包里，保证候选池和正常选将一致
+		const show = !!lib.config.extension_朔夜_lixin_debug || (typeof _status !== "undefined" && !!_status.video);
 		const pack = lib.characterPack && lib.characterPack.shuoye;
 		for (const id of HIDDEN_FORMS) {
 			const info = lib.character && lib.character[id];

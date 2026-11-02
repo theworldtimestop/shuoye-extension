@@ -48,6 +48,10 @@ for (const name of ["shuoye_lx_guang", "shuoye_lx_an"]) {
 		if (lib.config.extension_朔夜_qumoshi) {
 			return false;
 		}
+		// 录像复现时保持可见：否则关掉「李信调试」后候选池会少两个，选将结果顺位错位
+		if (typeof _status !== "undefined" && _status.video) {
+			return true;
+		}
 		return !!lib.config.extension_朔夜_lixin_debug;
 	};
 }
