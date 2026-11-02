@@ -3207,11 +3207,11 @@ const skills = {
                 forced: true,
                 locked: false,
                 async content(event, trigger, player) {
-                    let toAdd = ((trigger.name === "useCard") * 2 + (event.triggername === "damageSource") * 10);
+                    let toAdd = ((trigger.name === "useCard") * 2 + (event.triggername === "damageSource") * 8);
                     switch (event.triggername) {
                         case "useCardAfter": toAdd = 2; break;
-                        case "damageSource": toAdd = 10; break;
-                        default: toAdd = 7; break;
+                        case "damageSource": toAdd = 8; break;
+                        default: toAdd = 6; break;
                     }
                     lib.skill.shuoye_yuqi.addMark(player, toAdd);
                 },
@@ -3231,7 +3231,7 @@ const skills = {
                 forced: true,
                 locked: false,
                 async content(event, trigger, player) {
-                    player.removeMark("shuoye_yuqi", 5);
+                    player.removeMark("shuoye_yuqi", 6);
                 },
             },
         },
@@ -3457,8 +3457,9 @@ const skills = {
             player.removeMark("shuoye_yuqi", 77);
             // 登神演出：先放《安敢一战》mp4，结束后用它替换原版 BGM，播完自动换回
             try {
-                await lib.skill.shuoye_chunai.playVideo("安敢一战.mp4", { keepBgmPaused: true, gain: 1.5 });
-                lib.skill.shuoye_chunai.playBgmOnce(player, "skill/shuoye_anganyizhan.mp3");
+                // 视频音量减半（gain 1.5 → 0.75）；BGM 四倍（rate 不动，gain 给 4）
+                await lib.skill.shuoye_chunai.playVideo("安敢一战.mp4", { keepBgmPaused: true, gain: 0.75 });
+                lib.skill.shuoye_chunai.playBgmOnce(player, "skill/shuoye_anganyizhan.mp3", 1, 4, true);
             } catch (e) {}
         },
         ai: {
@@ -10663,13 +10664,15 @@ const skills = {
             }, name, o);
             return lib.skill.shuoye_chunai.showVideo(name, o);
         },
-        playBgmOnce(player, path, rate, gain) {
+        playBgmOnce(player, path, rate, gain, loop) {
             const url = lib.assetURL + "extension/朔夜/audio/" + path;
-            game.broadcastAll((u, r, g) => {
+            game.broadcastAll((u, r, g, l) => {
                 const bgm = ui.backgroundMusic;
                 if (!bgm) return;
                 try {
-                    bgm.loop = false;
+                    // loop 为真的曲子（安敢一战）会一直循环，直到被切歌；
+                    // 切歌时由 game.playBackgroundMusic 的补丁把 loop / 增益归位
+                    bgm.loop = Boolean(l);
                     const effRate = typeof r === "number" && r > 0 ? r : 1;
                     // BGM 元素也可走 WebAudio 增益（元素音量上限为 1）；
                     // 同一元素只能挂一次 MediaElementSource，缓存起来，平时增益保持 1
@@ -10756,7 +10759,7 @@ const skills = {
                         p.catch(() => {});
                     }
                 } catch (e) {}
-            }, url, rate, gain);
+            }, url, rate, gain, loop);
         },
         stopBgm() {
             game.broadcastAll(() => {
@@ -11776,18 +11779,18 @@ const skills = {
             } else {
                 specs = [S.randomSpec(pool), S.randomSpec(pool), S.randomSpec(pool)];
             }
-            const fixnum = player.storage.shuoye_zuosha_fixnum;
-            const fixname = player.storage.shuoye_zuosha_fixname;
-            if (fixnum && Array.isArray(fixnum.pos)) {
-                for (const pos of fixnum.pos) {
-                    if (specs[pos]) specs[pos].number = fixnum.value;
+            // 支持同一轮抽奖里多个位置分别指定（如 1、2 号位 + 3 号位），按 值→位置 依次套用
+            const applyFix = (list, key) => {
+                const items = Array.isArray(list) ? list : list && Array.isArray(list.pos) ? [list] : [];
+                for (const item of items) {
+                    if (!item || !Array.isArray(item.pos)) continue;
+                    for (const pos of item.pos) {
+                        if (specs[pos]) specs[pos][key] = item.value;
+                    }
                 }
-            }
-            if (fixname && Array.isArray(fixname.pos)) {
-                for (const pos of fixname.pos) {
-                    if (specs[pos]) specs[pos].name = fixname.value;
-                }
-            }
+            };
+            applyFix(player.storage.shuoye_zuosha_fixnum, "number");
+            applyFix(player.storage.shuoye_zuosha_fixname, "name");
             delete player.storage.shuoye_zuosha_fixnum;
             delete player.storage.shuoye_zuosha_fixname;
             return specs;
@@ -11806,20 +11809,24 @@ const skills = {
             const sameName = maxCount(specs.map((spec) => spec.name));
             const sameNum = maxCount(specs.map((spec) => spec.number));
             const sameSuit = maxCount(specs.map((spec) => spec.suit));
+            // 等差数列：三张点数严格递增且公差不为 0（1-2-3、4-6-8、1-5-9），三张同点不算
+            const numbers = specs.map((spec) => spec.number);
+            const arithmetic = numbers[1] - numbers[0] === numbers[2] - numbers[1] && numbers[0] !== numbers[1];
             const tier3 = [];
             if (odd === 3) tier3.push("odd");
             if (sameName === 3) tier3.push("name");
             if (sameNum === 3) tier3.push("num");
             if (sameSuit === 3) tier3.push("suit");
-            const count = (odd > 0 ? 1 : 0) + (sameName > 1 ? 1 : 0) + (sameNum > 1 ? 1 : 0) + (sameSuit > 1 ? 1 : 0);
+            const count = (odd > 0 ? 1 : 0) + (sameName > 1 ? 1 : 0) + (sameNum > 1 ? 1 : 0) + (sameSuit > 1 ? 1 : 0) + (arithmetic ? 1 : 0);
             return {
                 odd,
                 sameName,
                 sameNum,
                 sameSuit,
+                arithmetic,
                 tier3,
                 count,
-                fail: odd === 0 && sameName < 2 && sameNum < 2 && sameSuit < 2,
+                fail: odd === 0 && sameName < 2 && sameNum < 2 && sameSuit < 2 && !arithmetic,
             };
         },
         maxIndexes(specs, key) {
@@ -11841,14 +11848,15 @@ const skills = {
         labels(data) {
             const list = [];
             if (data.odd === 1) list.push("奇数×1 摸1");
-            else if (data.odd === 2) list.push("奇数×2 摸2·回1·无距离");
-            else if (data.odd === 3) list.push("奇数×3 摸5·回1·无限制");
+            else if (data.odd === 2) list.push("奇数×2 摸3·无距离");
+            else if (data.odd === 3) list.push("奇数×3 摸6·回1·无限制");
             if (data.sameName === 2) list.push("同名×2 得2张");
             else if (data.sameName === 3) list.push("同名×3 回1·得3张·任意牌");
             if (data.sameNum === 2) list.push("同点×2 造伤+1·失牌摸1");
             else if (data.sameNum === 3) list.push("同点×3 回1·造伤+1·转化摸1·两牌任意");
             if (data.sameSuit === 2) list.push("同花×2 回复摸1");
-            else if (data.sameSuit === 3) list.push("同花×3 回1·受伤-1·夺牌·回复摸1");
+            else if (data.sameSuit === 3) list.push("同花×3 回1·受伤-1·夺牌·回复摸1·不可响应");
+            if (data.arithmetic) list.push("等差 摸1·同点×2效果·指定3号位");
             return list;
         },
         activeEffects(player) {
@@ -11865,6 +11873,7 @@ const skills = {
                 if (buffs.convdraw) parts.push("使用或打出转化牌时摸" + get.cnNumber(buffs.convdraw) + "张牌");
                 if (buffs.any2) parts.push("可将两张牌视为任意非装备牌使用或打出");
                 if (buffs.suit3) parts.push("造成伤害时获得目标" + get.cnNumber(buffs.suit3) + "张牌");
+                if (buffs.noresponse) parts.push("使用牌不可被响应");
                 if (buffs.healdraw) parts.push("场上有人回复体力时你摸" + get.cnNumber(buffs.healdraw) + "张牌");
                 if (parts.length) list.push("【剩余" + (group.turns || 0) + "回合】" + parts.join("，"));
             }
@@ -11914,7 +11923,7 @@ const skills = {
         },
         refreshBuffSkills(player) {
             const S = lib.skill.shuoye_zuosha;
-            const keys = ["nodistance", "norestrict", "dmgup", "dmgdown", "losedraw", "convdraw", "healdraw", "suit3", "any2"];
+            const keys = ["nodistance", "norestrict", "dmgup", "dmgdown", "losedraw", "convdraw", "healdraw", "suit3", "any2", "noresponse"];
             for (const key of keys) {
                 const skill = "shuoye_zuosha_" + key;
                 if (S.getBuffStack(player, key) > 0) {
@@ -11942,7 +11951,7 @@ const skills = {
         clearBuffs(player) {
             const S = lib.skill.shuoye_zuosha;
             delete player.storage.shuoye_zuosha_buff_groups;
-            const keys = ["nodistance", "norestrict", "dmgup", "dmgdown", "losedraw", "convdraw", "healdraw", "suit3", "any2"];
+            const keys = ["nodistance", "norestrict", "dmgup", "dmgdown", "losedraw", "convdraw", "healdraw", "suit3", "any2", "noresponse"];
             for (const key of keys) {
                 delete player.storage["shuoye_zuosha_stack_" + key];
                 const skill = "shuoye_zuosha_" + key;
@@ -11970,6 +11979,8 @@ const skills = {
             } catch (e) {
                 console.error("[朔夜] 坐杀博徒：抽奖演出广播失败", e);
             }
+            // 等抽奖机播完：动画自己 7.45 秒（3.8 秒出结果文字、7 秒淡出），
+            // 结算压在动画之后，留 50ms 余量
             await new Promise((resolve) => setTimeout(resolve, 7500));
             const suitText = { spade: "黑桃", heart: "红桃", club: "梅花", diamond: "方块" };
             game.log(player, "坐杀博徒", "抽奖：", specs.map((spec) => "【" + get.translation(spec.name) + "·" + (suitText[spec.suit] || spec.suit) + "·" + get.strNumber(spec.number) + "】").join(""));
@@ -12054,11 +12065,10 @@ const skills = {
                 await player.draw(1);
                 await S.chooseFixNumber(player, [0]);
             } else if (data.odd === 2) {
-                await player.draw(2);
-                await player.recover(1);
+                await player.draw(3);
                 S.addBuff(player, "nodistance", 1, getBuffGroup());
             } else if (data.odd === 3) {
-                await player.draw(5);
+                await player.draw(6);
                 await player.recover(1);
                 S.addBuff(player, "norestrict", 1, getBuffGroup());
                 await S.chooseFixNumber(player, [0, 1]);
@@ -12103,13 +12113,20 @@ const skills = {
                 S.addBuff(player, "dmgdown", 1, getBuffGroup());
                 S.addBuff(player, "suit3", 1, getBuffGroup());
                 S.addBuff(player, "healdraw", 1, getBuffGroup());
+                S.addBuff(player, "noresponse", 1, getBuffGroup());
+            }
+            if (data.arithmetic) {
+                await player.draw(1);
+                S.addBuff(player, "dmgup", 1, getBuffGroup());
+                S.addBuff(player, "losedraw", 1, getBuffGroup());
+                await S.chooseFixNumber(player, [2]);
             }
             S.syncCurrentEffect(player);
         },
         async chooseFixNumber(player, pos) {
             const buttons = [];
             for (let i = 1; i <= 13; i++) buttons.push([String(i), get.strNumber(i)]);
-            const where = pos.length > 1 ? "1、2号位" : "1号位";
+            const where = pos.length > 1 ? "1、2号位" : pos[0] === 2 ? "3号位" : "1号位";
             const result = await player.chooseButton(["坐杀博徒：指定一个点数，下次抽奖" + where + "必为该点数", [buttons, "textbutton"]], true).set("ai", (button) => {
                 const num = parseInt(button.link);
                 return num === 7 ? 10 : 1;
@@ -12117,7 +12134,12 @@ const skills = {
             if (!result || !result.bool || !result.links || !result.links.length) return;
             const value = parseInt(result.links[0]);
             if (isNaN(value)) return;
-            player.storage.shuoye_zuosha_fixnum = { value: value, pos: pos.slice() };
+            const prev = player.storage.shuoye_zuosha_fixnum;
+            const list = Array.isArray(prev) ? prev.slice() : prev && Array.isArray(prev.pos) ? [prev] : [];
+            const same = list.find((item) => item && item.value === value);
+            if (same) same.pos = same.pos.concat(pos.filter((index) => !same.pos.includes(index)));
+            else list.push({ value: value, pos: pos.slice() });
+            player.storage.shuoye_zuosha_fixnum = list;
             game.log(player, "指定点数", "#y" + get.strNumber(value), "为下次抽奖" + where);
         },
         async chooseFixName(player, pos) {
@@ -12565,6 +12587,28 @@ const skills = {
         },
     },
 //#noname-kit-end skill:shuoye_zuosha_suit3
+//#noname-kit-begin skill:shuoye_zuosha_noresponse
+    shuoye_zuosha_noresponse: {
+        nopop: true,
+        charlotte: true,
+        silent: true,
+        popup: false,
+        forced: true,
+        // 同花×3：使用牌不可被响应。照麴义【伏骑】的写法，只动 directHit：
+        // 闪/杀/决斗靠它，无懈也靠它（_wuxie 的候选人过滤里 trigger.getParent().directHit）
+        trigger: {
+            player: "useCard",
+        },
+        content(event, trigger, player) {
+            if (!Array.isArray(trigger.directHit)) {
+                trigger.directHit = [];
+            }
+            // 填全场而不是只填目标：虚拟牌、结算中再使用的牌都走同一个 useCard 事件，
+            // useCard2 阶段追加的目标也在这个名单里
+            trigger.directHit.addArray(game.filterPlayer());
+        },
+    },
+//#noname-kit-end skill:shuoye_zuosha_noresponse
 //#noname-kit-begin skill:shuoye_zuosha_any2
     shuoye_zuosha_any2: {
         charlotte: true,
@@ -14252,8 +14296,8 @@ const skills = {
         },
     },
 //#noname-kit-end skill:shuoye_qiyuan_revive
-//#noname-kit-begin skill:shuoye_lx_xiwang
     //【李信】希望（瞬发技）
+//#noname-kit-begin skill:shuoye_lx_xiwang
     shuoye_lx_xiwang: {
         audio: "ext:朔夜/audio/skill:1",
         round: 1,
@@ -14367,8 +14411,8 @@ const skills = {
         },
     },
 //#noname-kit-end skill:shuoye_lx_xiwang
-//#noname-kit-begin skill:shuoye_lx_xiwang_ai
     //【李信】希望（人机自动发动）
+//#noname-kit-begin skill:shuoye_lx_xiwang_ai
     shuoye_lx_xiwang_ai: {
         charlotte: true,
         nopop: true,
@@ -14376,7 +14420,9 @@ const skills = {
         silent: true,
         trigger: { player: "phaseUseBegin" },
         filter(event, player) {
-            if (!player.hasSkill("shuoye_lx_xiwang") || player.isUnderControl(true)) {
+            // 联机时这段在主机跑：远方人控玩家在主机的视角里 isUnderControl(true) 是 false，
+            // 光看它会把「玩家自己没点」当成 AI 托管而自动发动。有 ws 的都是真人客户端。
+            if (!player.hasSkill("shuoye_lx_xiwang") || player.ws || player.isUnderControl(true)) {
                 return false;
             }
             const self = lib.skill.shuoye_lx_xiwang;
@@ -14384,13 +14430,18 @@ const skills = {
         },
         async content(event, trigger, player) {
             try {
-                await player.useSkill("shuoye_lx_xiwang").forResult();
+                // 希望没有 content，它是按钮驱动的（doAction），
+                // 用 useSkill 会造出一个没有 content 的事件，直接报 this.content is not a function
+                const self = lib.skill.shuoye_lx_xiwang;
+                if (self && typeof self.doAction === "function") {
+                    await self.doAction(player);
+                }
             } catch (e) {}
         },
     },
 //#noname-kit-end skill:shuoye_lx_xiwang_ai
-//#noname-kit-begin skill:shuoye_lx_liehua
     //【李信】烈华
+//#noname-kit-begin skill:shuoye_lx_liehua
     shuoye_lx_liehua: {
         audio: "ext:朔夜/audio/skill:2",
         trigger: { player: ["useCardAfter", "respondAfter"] },
@@ -14497,8 +14548,8 @@ const skills = {
         },
     },
 //#noname-kit-end skill:shuoye_lx_liehua
-//#noname-kit-begin skill:shuoye_lx_guangyi
     //【李信】光翼（1效果：将一张【杀】和一张【闪】当做【水淹七军】使用，像丈八蛇矛一样在需要出牌时可用）
+//#noname-kit-begin skill:shuoye_lx_guangyi
     shuoye_lx_guangyi: {
         audio: "ext:朔夜/audio/skill:2",
         group: ["shuoye_lx_guangyi_count"],
@@ -14549,8 +14600,8 @@ const skills = {
         },
     },
 //#noname-kit-end skill:shuoye_lx_guangyi
-//#noname-kit-begin skill:shuoye_lx_guangyi_count
     //【李信】光翼（第二段：手牌数归零/等于体力上限后使用一张牌并手牌上限+1）
+//#noname-kit-begin skill:shuoye_lx_guangyi_count
     shuoye_lx_guangyi_count: {
         charlotte: true,
         nopop: true,
@@ -14608,8 +14659,8 @@ const skills = {
         },
     },
 //#noname-kit-end skill:shuoye_lx_guangyi_count
-//#noname-kit-begin skill:shuoye_lx_guangyi_mod
     //【李信】光翼（手牌上限加成，永久累积）
+//#noname-kit-begin skill:shuoye_lx_guangyi_mod
     shuoye_lx_guangyi_mod: {
         charlotte: true,
         nopop: true,
@@ -14627,8 +14678,8 @@ const skills = {
         },
     },
 //#noname-kit-end skill:shuoye_lx_guangyi_mod
-//#noname-kit-begin skill:shuoye_lx_wuwei
     //【李信】无畏
+//#noname-kit-begin skill:shuoye_lx_wuwei
     shuoye_lx_wuwei: {
         audio: "ext:朔夜/audio/skill:2",
         trigger: { global: "damageAfter" },
@@ -14665,8 +14716,8 @@ const skills = {
         },
     },
 //#noname-kit-end skill:shuoye_lx_wuwei
-//#noname-kit-begin skill:shuoye_lx_silie
     //【李信】撕裂
+//#noname-kit-begin skill:shuoye_lx_silie
     shuoye_lx_silie: {
         audio: "ext:朔夜/audio/skill:2",
         trigger: { player: "useCardToPlayer" },
@@ -14791,8 +14842,8 @@ const skills = {
         },
     },
 //#noname-kit-end skill:shuoye_lx_silie
-//#noname-kit-begin skill:shuoye_lx_anye
     //【李信】暗影
+//#noname-kit-begin skill:shuoye_lx_anye
     shuoye_lx_anye: {
         audio: "ext:朔夜/audio/skill:2",
         locked: true,
@@ -14842,8 +14893,8 @@ const skills = {
         },
     },
 //#noname-kit-end skill:shuoye_lx_anye
-//#noname-kit-begin skill:shuoye_lx_anye_buff
     //【李信】暗影（下一张牌无次数限制且不可响应，可叠加）
+//#noname-kit-begin skill:shuoye_lx_anye_buff
     shuoye_lx_anye_buff: {
         charlotte: true,
         nopop: true,
@@ -14893,8 +14944,8 @@ const skills = {
         },
     },
 //#noname-kit-end skill:shuoye_lx_anye_buff
-//#noname-kit-begin skill:shuoye_lx_huiren
     //【李信】灰刃
+//#noname-kit-begin skill:shuoye_lx_huiren
     shuoye_lx_huiren: {
         audio: "ext:朔夜/audio/skill:1",
         enable: "phaseUse",
@@ -15009,8 +15060,8 @@ const skills = {
         },
     },
 //#noname-kit-end skill:shuoye_lx_huiren
-//#noname-kit-begin skill:shuoye_lx_huiren_nolimit
     //【李信】灰刃（因灰刃摸到的牌不计入手牌上限）
+//#noname-kit-begin skill:shuoye_lx_huiren_nolimit
     shuoye_lx_huiren_nolimit: {
         charlotte: true,
         nopop: true,
@@ -15055,8 +15106,8 @@ const skills = {
         },
     },
 //#noname-kit-end skill:shuoye_lx_huiren_nolimit
-//#noname-kit-begin skill:shuoye_lx_huiren_dmg
     //【李信】灰刃（本回合造成伤害+X）
+//#noname-kit-begin skill:shuoye_lx_huiren_dmg
     shuoye_lx_huiren_dmg: {
         charlotte: true,
         nopop: true,
@@ -15077,8 +15128,8 @@ const skills = {
         },
     },
 //#noname-kit-end skill:shuoye_lx_huiren_dmg
-//#noname-kit-begin skill:shuoye_lx_hpsnap
     //【李信】回合开始体力快照（内部技）
+//#noname-kit-begin skill:shuoye_lx_hpsnap
     shuoye_lx_hpsnap: {
         charlotte: true,
         nopop: true,
@@ -15095,8 +15146,8 @@ const skills = {
         },
     },
 //#noname-kit-end skill:shuoye_lx_hpsnap
-//#noname-kit-begin skill:shuoye_lx_hpwatch
     //【李信】灰刃·本回合体力减少监视（内部技）
+//#noname-kit-begin skill:shuoye_lx_hpwatch
     shuoye_lx_hpwatch: {
         charlotte: true,
         nopop: true,
@@ -15143,8 +15194,8 @@ const skills = {
         },
     },
 //#noname-kit-end skill:shuoye_lx_hpwatch
-//#noname-kit-begin skill:shuoye_lx_yinian
     //【李信】一念（太极技）
+//#noname-kit-begin skill:shuoye_lx_yinian
     shuoye_lx_yinian: {
         audio: "ext:朔夜/audio/skill:1",
         group: ["shuoye_lx_yinian_yang", "shuoye_lx_yinian_yin", "shuoye_lx_yinian_end"],
@@ -15170,8 +15221,8 @@ const skills = {
         },
     },
 //#noname-kit-end skill:shuoye_lx_yinian
-//#noname-kit-begin skill:shuoye_lx_yinian_yang
     //【李信】一念·阳计数（每摸1张+1）
+//#noname-kit-begin skill:shuoye_lx_yinian_yang
     shuoye_lx_yinian_yang: {
         charlotte: true,
         nopop: true,
@@ -15188,8 +15239,8 @@ const skills = {
         },
     },
 //#noname-kit-end skill:shuoye_lx_yinian_yang
-//#noname-kit-begin skill:shuoye_lx_yinian_yin
     //【李信】一念·阴计数（每1点造成/受到伤害+1）
+//#noname-kit-begin skill:shuoye_lx_yinian_yin
     shuoye_lx_yinian_yin: {
         charlotte: true,
         nopop: true,
@@ -15211,8 +15262,8 @@ const skills = {
         },
     },
 //#noname-kit-end skill:shuoye_lx_yinian_yin
-//#noname-kit-begin skill:shuoye_lx_yinian_end
     //【李信】一念·回合结束结算（满则极 → 阳/阴/调和；然后两侧相消）
+//#noname-kit-begin skill:shuoye_lx_yinian_end
     shuoye_lx_yinian_end: {
         charlotte: true,
         nopop: true,
@@ -15310,8 +15361,8 @@ const skills = {
         },
     },
 //#noname-kit-end skill:shuoye_lx_yinian_end
-//#noname-kit-begin skill:shuoye_lx_shenmo
     //【李信】神魔
+//#noname-kit-begin skill:shuoye_lx_shenmo
     shuoye_lx_shenmo: {
         audio: false,
         trigger: { player: "phaseJieshu" },
@@ -15352,8 +15403,8 @@ const skills = {
         },
     },
 //#noname-kit-end skill:shuoye_lx_shenmo
-//#noname-kit-begin skill:shuoye_lx_form_aura
     //【李信】形态光环（金光/暗红光+云雾，纯表现）
+//#noname-kit-begin skill:shuoye_lx_form_aura
     shuoye_lx_form_aura: {
         charlotte: true,
         nopop: true,
@@ -15379,8 +15430,8 @@ const skills = {
         },
     },
 //#noname-kit-end skill:shuoye_lx_form_aura
-//#noname-kit-begin skill:shuoye_lx_beam_fx
     //【李信】伤害牌光流（金/暗红/灰，纯表现）
+//#noname-kit-begin skill:shuoye_lx_beam_fx
     shuoye_lx_beam_fx: {
         charlotte: true,
         nopop: true,
@@ -15417,8 +15468,8 @@ const skills = {
         },
     },
 //#noname-kit-end skill:shuoye_lx_beam_fx
-//#noname-kit-begin skill:shuoye_lx_kill_line
     //【李信】击杀台词（光/暗形态各一句）
+//#noname-kit-begin skill:shuoye_lx_kill_line
     shuoye_lx_kill_line: {
         charlotte: true,
         nopop: true,

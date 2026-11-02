@@ -210,12 +210,95 @@ function animationOff() {
 }
 
 // ---------------------------------------------------------------- 音频
-// 台词音量倍率（1 = 原音量，2 = 翻倍）
-const VOICE_GAIN = 2;
+// 台词音量倍率（1 = 原音量，2 = 翻倍，4 = 再翻倍）
+const VOICE_GAIN = 4;
 
 function audioBaseVolume() {
 	const setting = lib.config && lib.config.volumn_audio != null ? lib.config.volumn_audio : 8;
 	return Math.max(0, Math.min(1, Number(setting) / 8));
+}
+
+// 变身 BGM 倍率。引擎把背景音乐写成 volumn_background/8（默认 8 → 1，元素音量已封顶），
+// 想再响一倍只能让 ui.backgroundMusic 走一次 WebAudio 增益通道；平时增益保持 1，等于没接管。
+const BGM_GAIN = 2;
+let bgmBoost = null;
+
+function bgmBaseVolume() {
+	const setting = lib.config && lib.config.volumn_background != null ? lib.config.volumn_background : 8;
+	return Math.max(0, Math.min(1, Number(setting) / 8));
+}
+
+function ensureBgmBoost() {
+	if (bgmBoost) {
+		return bgmBoost;
+	}
+	const el = ui.backgroundMusic;
+	if (!el) {
+		return null;
+	}
+	// 同一个 <audio> 只能 createMediaElementSource 一次：本包【纯爱】的 playBgmOnce
+	// 也会给 ui.backgroundMusic 挂增益并缓存在 _shuoyeGain 上，那边挂过就直接复用，
+	// 否则后挂的一边会抛 InvalidStateError，两边都变哑巴
+	if (el._shuoyeGain) {
+		bgmBoost = { ctx: el._shuoyeCtx || null, gain: el._shuoyeGain };
+		return bgmBoost;
+	}
+	const Ctx = typeof window !== "undefined" && (window.AudioContext || window.webkitAudioContext);
+	if (!Ctx) {
+		return null;
+	}
+	let ctx = null;
+	try {
+		ctx = new Ctx();
+		if (ctx.state === "suspended") {
+			try {
+				ctx.resume();
+			} catch (e) {}
+		}
+		const src = ctx.createMediaElementSource(el);
+		const gain = ctx.createGain();
+		gain.gain.value = 1;
+		src.connect(gain);
+		gain.connect(ctx.destination);
+		// 也存一份，供 playBgmOnce 直接复用
+		el._shuoyeCtx = ctx;
+		el._shuoyeGain = gain;
+		// 万一浏览器还在挂起状态，点一下页面就把它叫醒
+		if (ctx.state !== "running" && typeof document !== "undefined") {
+			const wake = () => {
+				try {
+					ctx.resume();
+				} catch (e) {}
+			};
+			try {
+				document.addEventListener("click", wake, { once: true });
+				document.addEventListener("touchend", wake, { once: true });
+			} catch (e) {}
+		}
+		bgmBoost = { ctx, gain };
+		return bgmBoost;
+	} catch (e) {
+		try {
+			if (ctx) {
+				ctx.close();
+			}
+		} catch (e2) {}
+		return null;
+	}
+}
+
+function setBgmGain(value) {
+	const boost = ensureBgmBoost();
+	if (boost) {
+		try {
+			boost.gain.gain.value = value;
+		} catch (e) {}
+		return;
+	}
+	// 没有增益通道：退回元素音量（上限 1，只能尽量拉高）
+	try {
+		ui.backgroundMusic.volume = Math.max(0, Math.min(1, bgmBaseVolume() * value));
+	} catch (e) {}
 }
 
 // 用 WebAudio 增益把台词音量翻倍；增益不可用时退回普通播放（略提高元素音量）
@@ -266,7 +349,7 @@ function playBoosted(url, onDone) {
 	if (!ctx) {
 		// 没有增益通道：元素音量尽量拉高（上限 1）
 		try {
-			audio.volume = Math.min(1, audioBaseVolume() * 1.6);
+			audio.volume = Math.min(1, audioBaseVolume() * (VOICE_GAIN * 0.8));
 		} catch (e) {}
 	}
 	const cleanup = () => {
@@ -318,23 +401,33 @@ function playSeq(urls) {
 }
 
 // ---------------------------------------------------------------- 变身演出：BGM + 背景
-function formShow() {
+// 变身 BGM：各端都换（跟着变身走），loop 只在首歌上生效，切歌时还回去
+function formShowBgm() {
 	try {
-		if (ui.backgroundMusic) {
-			const url = lib.assetURL + "extension/" + PKG + "/audio/skill/shuoye_lx_yinian2.mp3";
-			if (ui.backgroundMusic.src != url) {
-				ui.backgroundMusic.src = url;
-				ui.backgroundMusic.loop = true;
-				ui.backgroundMusic.autoplay = true;
-				const p = ui.backgroundMusic.play && ui.backgroundMusic.play();
-				if (p && p.catch) {
-					p.catch(() => {});
-				}
-			} else {
-				ui.backgroundMusic.loop = true;
-			}
+		if (!ui.backgroundMusic) {
+			return;
 		}
+		const url = lib.assetURL + "extension/" + PKG + "/audio/skill/shuoye_lx_yinian2.mp3";
+		if (ui.backgroundMusic.src != url) {
+			ui.backgroundMusic.src = url;
+			ui.backgroundMusic.loop = true;
+			ui.backgroundMusic.autoplay = true;
+			const p = ui.backgroundMusic.play && ui.backgroundMusic.play();
+			if (p && p.catch) {
+				p.catch(() => {});
+			}
+		} else {
+			ui.backgroundMusic.loop = true;
+		}
+		// 变身 BGM 再响一倍
+		try {
+			setBgmGain(BGM_GAIN);
+		} catch (e) {}
 	} catch (e) {}
+}
+
+// 变身背景图（这条还走广播，各端都换）
+function formShowBg() {
 	try {
 		if (ui.background && ui.background.setBackgroundImage) {
 			ui.background.setBackgroundImage("extension/" + PKG + "/image/shuoye_lx_bg.jpg");
@@ -346,45 +439,99 @@ function formShow() {
 	} catch (e) {}
 }
 
+// 本机调用：两样都做（window.lsxFx.formShow 的兼容入口）
+function formShow() {
+	formShowBgm();
+	formShowBg();
+}
+
 // ---------------------------------------------------------------- 伤害牌光流
 // 同时存在的光流数量（用来在同屏多条光流时自动减少粒子数，避免卡顿）
 let liveBeamCount = 0;
 
+// 同一道光流可能同时从两条路到达（主机广播的 exec + 客机自己跑内容的本地调用），
+// 用「起点>终点:颜色」+ 150ms 窗口去重，避免画两遍
+let lastBeamSig = { sig: "", at: 0 };
+
+// 临时诊断：控制台搜 [lsxfx] 就能看到光流在哪一环被拦（定位完删掉）
+function beamLog(msg) {
+	try {
+		console.log.apply(console, ["[lsxfx]"].concat(Array.prototype.slice.call(arguments)));
+	} catch (e) {}
+}
+
 function beam(pid1, pid2, colorKey) {
+	let beamCounted = false;
 	try {
 		if (typeof document === "undefined" || !document.body) {
 			return;
 		}
-		if (animationOff()) {
+		// 低性能模式只减量，不整个跳过；只有主动关闭动画才不画
+		const beamAnimOff = !!(lib.config && lib.config.animation === false);
+		const beamLowPerf = !!(lib.config && lib.config.low_performance);
+		if (beamAnimOff) {
+			beamLog("skip: animation off");
 			return;
 		}
+		const sig = pid1 + ">" + pid2 + ":" + colorKey;
+		const now = Date.now();
+		if (lastBeamSig.sig === sig && now - lastBeamSig.at < 150) {
+			beamLog("skip: duplicate");
+			return;
+		}
+		lastBeamSig = { sig, at: now };
 		// 光流过多时直接放弃（保留卡顿底线）
 		if (liveBeamCount > 6) {
+			beamLog("skip: liveBeamCount", liveBeamCount);
 			return;
 		}
 		const p1 = findPlayerByPid(pid1);
 		const p2 = findPlayerByPid(pid2);
 		if (!p1 || !p2) {
+			beamLog("skip: no-player", pid1, pid2, !!p1, !!p2);
 			return;
 		}
 		const r1 = p1.getBoundingClientRect();
 		const r2 = p2.getBoundingClientRect();
 		if (!r1 || !r2 || (!r1.width && !r1.height) || (!r2.width && !r2.height)) {
+			beamLog("skip: no-rect", !!r1, !!r2);
 			return;
 		}
-		const a = { x: r1.left + r1.width / 2, y: r1.top + r1.height / 2 };
-		const b = { x: r2.left + r2.width / 2, y: r2.top + r2.height / 2 };
+		// 参照【具咒】对波：小屏/手机上 body 被 transform 缩放，固定坐标系会错位。
+		// 把武将牌中心换算到 body 的 layout 坐标系，舞台也按 body 尺寸铺，两端各算各的。
+		const bodyEl = document.body;
+		const bodyRect = bodyEl.getBoundingClientRect();
+		const viewW = bodyEl.offsetWidth || document.documentElement.clientWidth || window.innerWidth;
+		const viewH = bodyEl.offsetHeight || document.documentElement.clientHeight || window.innerHeight;
+		let bodyScale = viewW > 0 && bodyRect.width > 0 ? bodyRect.width / viewW : 1;
+		if (!(bodyScale > 0.01)) {
+			bodyScale = 1;
+		}
+		const centerOf = (rect) => ({
+			x: (rect.left + rect.width / 2 - bodyRect.left) / bodyScale,
+			y: (rect.top + rect.height / 2 - bodyRect.top) / bodyScale,
+		});
+		const a = centerOf(r1);
+		const b = centerOf(r2);
 		const dx = b.x - a.x;
 		const dy = b.y - a.y;
 		const len = Math.sqrt(dx * dx + dy * dy);
 		if (!(len > 16)) {
+			beamLog("skip: too-short", len);
 			return;
 		}
 		const angle = (Math.atan2(dy, dx) * 180) / Math.PI;
 		const cfg = COLORS[colorKey] || COLORS.gold;
 		const scene = document.createElement("div");
 		scene.className = "shj-fx-scene";
+		// 覆盖样式表里的 fixed/100vw：改成按 body layout 尺寸铺的 absolute 舞台（坐标已换算过）
+		scene.style.position = "absolute";
+		scene.style.left = "0px";
+		scene.style.top = "0px";
+		scene.style.width = viewW + "px";
+		scene.style.height = viewH + "px";
 		liveBeamCount++;
+		beamCounted = true;
 		// 棱形（两头收尖）刀光：内联 clip-path 作兵底，样式表失效时也是利的
 		const lensClip = "polygon(0% 50%,7% 20%,22% 4%,62% 0%,100% 50%,62% 100%,22% 96%,7% 80%)";
 		const coreClip = "polygon(0% 50%,10% 26%,45% 0%,100% 50%,45% 100%,10% 74%)";
@@ -424,10 +571,10 @@ function beam(pid1, pid2, colorKey) {
 		} catch (e) {}
 		// 同色粒子：沿光带两侧散开→向外飞散→消隐
 		try {
-			if (!animationOff()) {
+			{
 				const base = colorKey === "gray" ? 26 : 44;
-				const div = liveBeamCount > 2 ? 3 : liveBeamCount > 1 ? 2 : 1;
-				const count = Math.max(8, Math.round(base / div));
+				const div = (liveBeamCount > 2 ? 3 : liveBeamCount > 1 ? 2 : 1) * (beamLowPerf ? 2 : 1);
+				const count = Math.max(beamLowPerf ? 4 : 8, Math.round(base / div));
 				const parts = document.createElement("div");
 				parts.className = "shj-beam-parts";
 				parts.style.left = a.x + "px";
@@ -478,13 +625,19 @@ function beam(pid1, pid2, colorKey) {
 		head.appendChild(dot);
 		scene.appendChild(head);
 		document.body.appendChild(scene);
+		beamLog("draw", pid1, pid2, colorKey, len);
 		setTimeout(() => {
 			try {
 				scene.remove();
 			} catch (e) {}
 			liveBeamCount = Math.max(0, liveBeamCount - 1);
 		}, 2100);
-	} catch (e) {}
+	} catch (e) {
+		// 中途抛错时回滚计数，否则累计超过上限后攻击特效会永久不再绘制
+		if (beamCounted) {
+			liveBeamCount = Math.max(0, liveBeamCount - 1);
+		}
+	}
 }
 
 // ---------------------------------------------------------------- 形态光环
@@ -931,6 +1084,63 @@ function syncButtons() {
 			return;
 		}
 		const alive = game.filterPlayer ? game.filterPlayer() : game.players || [];
+		// 客机兜底：game.broadcast 在联机房间里不一定送得到，
+		// 这里用本地 hp 快照自己判一次「本回合有其他角色体力减少」，写回 storage
+		try {
+			const phase = typeof _status !== "undefined" && _status.currentPhase;
+			const turnKey = phase ? String(phase.playerid) : "";
+			if (!lib.lsxFx) {
+				lib.lsxFx = {};
+			}
+			if (lib.lsxFx._hpTickKey !== turnKey) {
+				lib.lsxFx._hpTickKey = turnKey;
+				const snap = {};
+				const all = (game.players || []).concat(game.dead || []);
+				for (const p of all) {
+					if (p) {
+						snap[p.playerid] = p.hp;
+					}
+				}
+				lib.lsxFx._hpTickSnap = snap;
+				// 新回合：把上一回合的标记清掉（带回合戳，客机收不到主机的清空广播也靠这一步）
+				for (const p of all) {
+					if (!p || !p.storage) {
+						continue;
+					}
+					const rec = p.storage.shuoye_lx_hpdown;
+					if (!rec || rec.turn !== turnKey) {
+						p.storage.shuoye_lx_hpdown = { turn: turnKey, victims: {} };
+					}
+				}
+			} else {
+				const snap = lib.lsxFx._hpTickSnap || {};
+				const dropped = [];
+				const all = (game.players || []).concat(game.dead || []);
+				for (const p of all) {
+					if (!p) {
+						continue;
+					}
+					const before = snap[p.playerid];
+					if (typeof before === "number" && p.hp < before) {
+						dropped.push(p.playerid);
+					}
+				}
+				if (dropped.length) {
+					for (const p of all) {
+						if (!p || !p.storage || !p.skills || !p.skills.includes("shuoye_lx_huiren")) {
+							continue;
+						}
+						if (!p.storage.shuoye_lx_hpdown || !p.storage.shuoye_lx_hpdown.victims) {
+							p.storage.shuoye_lx_hpdown = { turn: turnKey, victims: {} };
+						}
+						p.storage.shuoye_lx_hpdown.turn = turnKey;
+						for (const vid of dropped) {
+							p.storage.shuoye_lx_hpdown.victims[vid] = true;
+						}
+					}
+				}
+			}
+		} catch (e) {}
 		const wanted = {};
 		for (let i = 0; i < alive.length; i++) {
 			const p = alive[i];
@@ -1257,8 +1467,10 @@ function hasOtherHpDown(player) {
 		}
 		const holder = turnEvent();
 		// ① 跨端广播的本回合掉血记录（写在李信自己的 storage 上，每回合开始清空）
+		// 带回合戳的记录只在本回合算数，防止客机收不到清空广播时旧记录残留
+		const phaseKey = typeof _status !== "undefined" && _status.currentPhase ? String(_status.currentPhase.playerid) : "";
 		const rec = player.storage && player.storage.shuoye_lx_hpdown;
-		if (rec && rec.victims) {
+		if (rec && rec.victims && (!rec.turn || rec.turn === phaseKey)) {
 			if (Object.keys(rec.victims).some((pid) => pid != player.playerid)) {
 				return true;
 			}
@@ -1441,6 +1653,8 @@ export function installLixinFx() {
 	window.lsxFx.taiji = taiji;
 	window.lsxFx.playSeq = playSeq;
 	window.lsxFx.formShow = formShow;
+	window.lsxFx.formShowBgm = formShowBgm;
+	window.lsxFx.formShowBg = formShowBg;
 	window.lsxFx.syncButtons = syncButtons;
 	window.lsxTaijiIntro = taijiIntro;
 
@@ -1479,16 +1693,40 @@ export function installLixinFx() {
 			if (!from || !to) {
 				return;
 			}
-			game.broadcastAll(
-				function (pid1, pid2, key) {
+			const pid1 = from.playerid;
+			const pid2 = to.playerid;
+			beamLog("beamBetween", pid1, pid2, colorKey, "online=" + !!game.online);
+			const run = function (p1, p2, key) {
+				try {
+					window.lsxFx.beam(p1, p2, key);
+				} catch (e) {}
+			};
+			// 不用 broadcastAll：它开局就 `if (game.online) return`，联机房间里客机那侧既不广播也不画。
+			// 先走 game.broadcast（局域网主从），再对每个远端玩家的连接单播一份（联机房间里
+			// lib.node.clients 可能是空的，但 player.ws 是实连着的 Client，send 会把函数封成 exec）。
+			// 同一道光流有 150ms 去重，两条路都到达也只画一遍。
+			try {
+				game.broadcast(run, pid1, pid2, colorKey);
+			} catch (e) {}
+			let sent = 0;
+			try {
+				const all = (game.players || []).concat(game.dead || []);
+				for (let i = 0; i < all.length; i++) {
+					const p = all[i];
+					if (!p || p === from || !p.ws || typeof p.ws.send !== "function") {
+						continue;
+					}
+					if (typeof p.isMine === "function" && p.isMine()) {
+						continue;
+					}
 					try {
-						window.lsxFx.beam(pid1, pid2, key);
+						p.ws.send(run, pid1, pid2, colorKey);
+						sent++;
 					} catch (e) {}
-				},
-				from.playerid,
-				to.playerid,
-				colorKey
-			);
+				}
+			} catch (e) {}
+			beamLog("ws-send", sent);
+			run(pid1, pid2, colorKey);
 		} catch (e) {}
 	};
 
@@ -1574,6 +1812,7 @@ export function installLixinFx() {
 
 	api.formShow = function () {
 		try {
+			// BGM + 背景：各端都换，谁变身都放这首
 			const run = function () {
 				try {
 					window.lsxFx.formShow();
@@ -1608,6 +1847,27 @@ export function installLixinFx() {
 					syncLixinPackVisibility();
 				} catch (e) {}
 				return result;
+			};
+		}
+	} catch (e) {}
+
+	// 换回其他背景音乐时把 BGM 增益收回 1，避免整局音乐都被放大
+	try {
+		if (!game._shjBgmGainPatched) {
+			game._shjBgmGainPatched = true;
+			const originPlayBackgroundMusic = game.playBackgroundMusic;
+			game.playBackgroundMusic = function (...args) {
+				// 只收已有增益，不在这里建通道（开局时 AudioContext 可能还是挂起的）
+				try {
+					if (bgmBoost) {
+						bgmBoost.gain.gain.value = 1;
+					}
+					// 变身那首是 loop=true 放的；切歌时把循环标志还回去，别让后面的歌也单曲循环
+					if (ui.backgroundMusic && ui.backgroundMusic.loop) {
+						ui.backgroundMusic.loop = false;
+					}
+				} catch (e) {}
+				return originPlayBackgroundMusic.apply(this, args);
 			};
 		}
 	} catch (e) {}

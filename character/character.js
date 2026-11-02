@@ -387,8 +387,8 @@ const characters = {
         trashBin: [],
     },
 //#noname-kit-end character:shuoye_longyan
-//#noname-kit-begin character:shuoye_lixin
     //【李信】一念神魔
+//#noname-kit-begin character:shuoye_lixin
     shuoye_lixin: {
         sex: "male",
         hp: 4,

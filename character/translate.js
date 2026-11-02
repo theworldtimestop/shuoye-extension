@@ -345,7 +345,7 @@ const translates = {
 
     shuoye_fengchuanxiangzi: "丰川祥子",
     shuoye_yuqi:'雨泣',
-    shuoye_yuqi_info:'持恒技，你在以下情况获得【幸福度】(10/100)：使用一张牌[2]，受到一点伤害[-5]，获得牌[7]，造成一点伤害[10]。',
+    shuoye_yuqi_info:'持恒技，你在以下情况获得【幸福度】(10/100)：使用一张牌[2]，受到一点伤害[-6]，获得牌[6]，造成一点伤害[8]。',
     shuoye_weituan:'卫团',
     shuoye_weituan_info:`你按照幸福度解锁以下技能：10-${get.poptip("shuoye_dinghan")}，40-${get.poptip("shuoye_shenxian")}，70-${get.poptip("shuoye_powei")}，100-${get.poptip("shuoye_dengshen")}。`,
     shuoye_dinghan:'定汉',
@@ -433,6 +433,9 @@ const translates = {
     shuoye_zuosha_fx_info: "坐杀博徒当前触发的所有效果（含剩余回合），鼠标悬停或点击可查看完整列表。",
     shuoye_zuosha_debug: "调试",
     shuoye_zuosha_debug_info: "调试用：指定下次抽奖三张牌的花色、点数与牌名。",
+    // 只给按钮写中文名，不写 _info：武将牌技能栏要求存在 _info 才列出，因此这两条仍保持隐藏
+    shuoye_zuosha_any2: "同点",
+    shuoye_zuosha_any3: "同名",
 
     shuoye_dilutianfeng: "帝录天锋",
     shuoye_fazhou: "法咒",
