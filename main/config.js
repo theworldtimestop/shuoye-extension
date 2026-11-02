@@ -47,17 +47,17 @@ export const config = {
         },
     },
     jinmiao: {
-        name: "禁秒",
+        name: "禁顶阴",
         init: false,
         intro: "开启后禁用以下武将：U-奥尔加玛丽，希儿，太空伊什塔尔，朔夜，贞德，镇世·乔特鲁德，空之律者",
     },
     qumoshi: {
-        name: "区模式",
+        name: "阳间模式",
         init: false,
         intro: "开启后只保留薇尔诗、爱丽丝、若怜、秤金次、五条悟、霍光、帝录天锋、乔列尼德、虚构集、希拓、丰川祥子、李信，其余朔夜武将全部禁用。",
     },
     quhua: {
-        name: "区化",
+        name: "削弱武将",
         init: false,
         intro: "开启后封印如下技能：李信【一念】",
     },
