@@ -1872,7 +1872,7 @@ export function installLixinFx() {
 		}
 	} catch (e) {}
 
-	// 台词音量翻倍：本包李信系列（shuoye_lx）的语音改走增益通道，其余保持引擎原逻辑
+	// 台词音量翻四倍：本包李信本体与三形态（shuoye_lx / shuoye_lixin）的语音改走增益通道，其余保持引擎原逻辑
 	try {
 		if (!game._shjVoiceBoostPatched) {
 			game._shjVoiceBoostPatched = true;
@@ -1884,7 +1884,9 @@ export function installLixinFx() {
 							? args[0]
 							: { path: args.filter((a) => typeof a === "string" || typeof a === "number").join("/") };
 					const path = String(options.path || "");
-					if (/shuoye_lx/i.test(path) && /\.(mp3|ogg|wav)$/i.test(path)) {
+					// 李信系列语音：技能是 shuoye_lx_*，本体阵亡是 shuoye_lixin1；
+					// 详情页/皮肤页给的路径不带扩展名（引擎会自己补 .mp3），所以只认音频目录，后缀自己补
+					if (/(?:shuoye_lx|shuoye_lixin)/i.test(path) && /(?:^|\/)(?:skill|die)\//i.test(path)) {
 						if (_status.video && !options.video) {
 							return;
 						}
@@ -1896,6 +1898,10 @@ export function installLixinFx() {
 							parsed = parsed.replace(/^ext:/, "extension/");
 						} else if (!/^https?:/i.test(parsed)) {
 							parsed = parsed.startsWith("audio/") ? parsed : "audio/" + parsed;
+						}
+						// 增益通道自己拼 URL，没有后缀就按引擎默认补 .mp3，否则放不出声
+						if (!/\.(mp3|ogg|wav|m4a)$/i.test(parsed)) {
+							parsed += ".mp3";
 						}
 						const url = /^https?:/i.test(parsed) ? parsed : lib.assetURL + parsed;
 						playBoosted(url, null);
