@@ -15134,6 +15134,9 @@ const skills = {
         forced: true,
         mark: true,
         marktext: "刃",
+        // 临时技被 removeSkill 摘掉时把标记一起清掉，否则 storage 里的「刃」会留到下一回合，
+        // 下一回合再选一次加伤就叠成 +2
+        onremove: true,
         intro: {
             content: "本回合你造成的伤害+$",
         },
