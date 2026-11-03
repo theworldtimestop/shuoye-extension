@@ -47,7 +47,7 @@ const COLORS = {
 };
 
 const CSS = `
-.shj-taiji-link{cursor:pointer;font-weight:700;background:linear-gradient(90deg,#111 0%,#fff 16%,#000 32%,#f2f2f2 48%,#000 64%,#fff 80%,#111 100%);background-size:300% 100%;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;animation:shjTaijiFlow 5s linear infinite;}
+.shj-taiji-link{cursor:pointer;font-weight:700;background:linear-gradient(90deg,#111 0%,#fff 16%,#000 32%,#f2f2f2 48%,#000 64%,#fff 80%,#111 100%);background-size:300% 100%;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;text-shadow:none !important;animation:shjTaijiFlow 5s linear infinite;}
 @keyframes shjTaijiFlow{0%{background-position:0 0}100%{background-position:300% 0}}
 .shj-fx-scene{position:fixed;left:0;top:0;width:100vw;height:100vh;pointer-events:none;z-index:2147482000;overflow:hidden;}
 /* 刀光主体：极细的梭形，软渐变流光（无硬边条纹，不像方块在推） */
@@ -138,9 +138,9 @@ z-index:2147483500;pointer-events:auto;}
 .shj-shunfa-btn.shj-off{opacity:.45;filter:grayscale(.8);cursor:default;}
 
 /* 【李信】称号「一念神魔」逐字流光 */
-.shj-title-gold,.shj-title-dark{display:inline-block;background-size:200% 100%;background-position:0% 50%;-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent;animation:shjTitleFlow 3.2s linear infinite;}
-.shj-title-gold{background-image:linear-gradient(90deg,#8a6a0a,#ffe066,#fff4bf,#ffd700,#8a6a0a);}
-.shj-title-dark{background-image:linear-gradient(90deg,#3d0303,#8f1414,#d43a3a,#8f1414,#3d0303);}
+.shj-title-gold,.shj-title-dark{display:inline-block;background-size:200% 100%;background-position:0% 50%;-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent;text-shadow:none !important;animation:shjTitleFlow 3.2s linear infinite;}
+.shj-title-gold{background-image:linear-gradient(90deg,#efb92f,#ffe89a,#fffdf4,#ffdd63,#efb92f);}
+.shj-title-dark{background-image:linear-gradient(90deg,#cf2020,#f24444,#ffa8a8,#f24444,#cf2020);}
 @keyframes shjTitleFlow{0%{background-position:0% 50%;}100%{background-position:200% 50%;}}
 
 .shj-tip-bg{position:absolute;left:0;top:0;width:100%;height:100%;z-index:999;background:rgba(0,0,0,.62);}

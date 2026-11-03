@@ -14750,16 +14750,13 @@ const skills = {
             return true;
         },
         async cost(event, trigger, player) {
-            const target = trigger.target;
             const name = trigger.card ? trigger.card.name : "";
             const ok = lib.skill.shuoye_lx_silie.aiDecide(player, trigger);
             event.result = await player
                 .chooseBool(
-                    "撕裂：你可以失去1点体力，将" +
-                        get.translation(target) +
-                        "手牌中一张【" +
+                    "撕裂：你可以失去1点体力，将其手牌中一张【" +
                         get.translation(name) +
-                        "】无视防具、不可响应的对其使用"
+                        "】无视防具、不可响应的对其使用；若其没有同名手牌，则令其随机重铸若干张牌"
                 )
                 .set(
                     "ai",
@@ -14784,6 +14781,24 @@ const skills = {
             }
             const pool = target.getCards("h", (card) => get.name(card, target) === name);
             if (!pool.length) {
+                // 没有同名牌：令其随机重铸 X 张，X 为本回合【暗影】触发次数
+                let x = 0;
+                try {
+                    if (lib.lsxFx && typeof lib.lsxFx.turnCounter === "function") {
+                        x = Number(lib.lsxFx.turnCounter(player, "anye", 0)) || 0;
+                    }
+                } catch (e) {
+                    x = 0;
+                }
+                const num = Math.max(0, Math.min(x, target.countCards("h")));
+                if (num > 0 && target.isAlive()) {
+                    try {
+                        const cards = target.getCards("h").randomGets(num);
+                        if (cards.length) {
+                            await target.recast(cards);
+                        }
+                    } catch (e) {}
+                }
                 return;
             }
             let chosen = pool[0];
@@ -14807,18 +14822,13 @@ const skills = {
             if (!player.canUse(probe, target, false)) {
                 return;
             }
-            try {
-                await player.gain(chosen, target);
-            } catch (e) {}
-            if (!player.isAlive() || !target.isAlive()) {
-                return;
-            }
             let usedCard;
             try {
                 usedCard = new lib.element.VCard({ name: name, cards: [chosen], isCard: true });
             } catch (e) {
                 return;
             }
+            // 直接使用目标手牌，不获得；这张会照常消耗【暗影·蓄势】
             // 无视防具
             try {
                 target.addTempSkill("qinggang2");
@@ -14828,7 +14838,8 @@ const skills = {
                 target.storage.qinggang2.push(usedCard);
             } catch (e) {}
             try {
-                const next = player.useCard(usedCard, target);
+                const next = player.useCard(usedCard, [chosen], target);
+                next.nowuxie = true;
                 next.directHit = [target];
                 await next;
             } catch (e) {}
@@ -14866,6 +14877,7 @@ const skills = {
         audio: "ext:朔夜/audio/skill:2",
         locked: true,
         forced: true,
+        group: ["shuoye_lx_anye_reward"],
         trigger: { player: ["changeHp"] },
         filter(event, player) {
             return event.changedHp < 0 || event.num < 0;
@@ -14901,6 +14913,17 @@ const skills = {
                 player.markSkill("shuoye_lx_anye_buff");
                 player.updateMark("shuoye_lx_anye_buff");
             } catch (e) {}
+            // X>2：记下本回合的结算，回合结束时由子技能处理
+            try {
+                if (x >= 3) {
+                    const phase = typeof _status !== "undefined" ? _status.currentPhase : null;
+                    player.storage.shuoye_lx_anye_reward = {
+                        pid: phase ? String(phase.playerid) : "",
+                        round: game.roundNumber,
+                        x: x,
+                    };
+                }
+            } catch (e) {}
         },
         init(player) {
             try {
@@ -14908,6 +14931,49 @@ const skills = {
                     player.addSkill("shuoye_lx_anye_buff");
                 }
             } catch (e) {}
+        },
+        subSkill: {
+            reward: {
+                charlotte: true,
+                nopop: true,
+                popup: false,
+                silent: true,
+                forced: true,
+                trigger: { global: "phaseAfter" },
+                filter(event, player) {
+                    if (!player.isAlive()) {
+                        return false;
+                    }
+                    const rec = player.storage && player.storage.shuoye_lx_anye_reward;
+                    if (!rec || !event.player) {
+                        return false;
+                    }
+                    return rec.round === game.roundNumber && rec.pid === String(event.player.playerid);
+                },
+                async content(event, trigger, player) {
+                    const rec = player.storage.shuoye_lx_anye_reward || {};
+                    delete player.storage.shuoye_lx_anye_reward;
+                    const x = Math.max(0, Number(rec.x) || 0);
+                    if (!player.isAlive()) {
+                        return;
+                    }
+                    try {
+                        await player.recover(1);
+                    } catch (e) {}
+                    try {
+                        await player.draw(1);
+                    } catch (e) {}
+                    if (!player.isAlive()) {
+                        return;
+                    }
+                    const num = Math.min(x, Math.max(0, player.maxHp - 1));
+                    if (num > 0) {
+                        try {
+                            await player.loseMaxHp(num);
+                        } catch (e) {}
+                    }
+                },
+            },
         },
     },
 //#noname-kit-end skill:shuoye_lx_anye
