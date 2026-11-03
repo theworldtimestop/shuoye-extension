@@ -14572,23 +14572,29 @@ const skills = {
             }
             return true;
         },
+        // 不要返回 null：十周年UI 的手牌点击逻辑会把「只选了一张」时的 viewAs 结果当牌读，
+        // 返回 null 会在 get.name(null) 处抛异常，打断 game.check，导致确定键永远不亮、还能继续点同名牌。
         viewAs(cards, player) {
-            if (!Array.isArray(cards) || cards.length !== 2) {
-                return null;
-            }
-            const names = cards.map((card) => get.name(card));
-            if (!names.includes("sha") || !names.includes("shan")) {
+            if (!Array.isArray(cards) || !cards.length) {
                 return null;
             }
             return { name: "shuoye_lx_shuiyan" };
+        },
+        // 真正的合法性校验放在这里：必须正好两张，且一张【杀】一张【闪】
+        filterOk() {
+            const cards = (ui.selected && ui.selected.cards) || [];
+            if (cards.length !== 2) {
+                return false;
+            }
+            const names = cards.map((card) => get.name(card));
+            return names.includes("sha") && names.includes("shan");
         },
         prompt: "将一张【杀】和一张【闪】当做一张【水淹七军】使用",
         check(card) {
             // 走到这一步说明 order 已经判定凑得齐，两张牌都给正分，保证能选满
             return 10 - get.value(card);
         },
-        // 兜底：选了两张同类牌时 viewAs 返回 null，引擎会回退到 useSkill，
-        // 这里给一个空内容，避免出现未定义行为的空事件
+        // 正常流程 filterOk 已拦住非法组合，这里是防未定义行为用的空内容
         async content(event, trigger, player) {},
         ai: {
             // AI 只在凑得齐一张【杀】和一张【闪】时才会点；凑不齐就不点，免得点进去再取消
