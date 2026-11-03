@@ -1893,6 +1893,12 @@ export function installLixinFx() {
 						if (lib.config && lib.config.background_speak === false) {
 							return;
 						}
+						// 绕过了引擎的 playAudio，录像的 addVideo 记录得自己补，否则回放里没这几句
+						if (options.addVideo !== false) {
+							try {
+								game.addVideo("playAudio", null, path);
+							} catch (e) {}
+						}
 						let parsed = path;
 						if (parsed.startsWith("ext:")) {
 							parsed = parsed.replace(/^ext:/, "extension/");
