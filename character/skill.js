@@ -14756,7 +14756,7 @@ const skills = {
                 .chooseBool(
                     "撕裂：你可以失去1点体力，将其手牌中一张【" +
                         get.translation(name) +
-                        "】无视防具、不可响应的对其使用；若其没有同名手牌，则令其随机重铸若干张牌"
+                        "】无视防具、不可响应的对其使用；若其没有同名手牌，则令其重铸一张牌"
                 )
                 .set(
                     "ai",
@@ -14781,19 +14781,10 @@ const skills = {
             }
             const pool = target.getCards("h", (card) => get.name(card, target) === name);
             if (!pool.length) {
-                // 没有同名牌：令其随机重铸 X 张，X 为本回合【暗影】触发次数
-                let x = 0;
-                try {
-                    if (lib.lsxFx && typeof lib.lsxFx.turnCounter === "function") {
-                        x = Number(lib.lsxFx.turnCounter(player, "anye", 0)) || 0;
-                    }
-                } catch (e) {
-                    x = 0;
-                }
-                const num = Math.max(0, Math.min(x, target.countCards("h")));
-                if (num > 0 && target.isAlive()) {
+                // 没有同名牌：令其随机重铸一张
+                if (target.isAlive() && target.countCards("h") > 0) {
                     try {
-                        const cards = target.getCards("h").randomGets(num);
+                        const cards = target.getCards("h").randomGets(1);
                         if (cards.length) {
                             await target.recast(cards);
                         }
