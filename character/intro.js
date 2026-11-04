@@ -40,7 +40,7 @@ const characterIntro = {
 	shuoye_weiershi: "万象在她眼底流转，祈愿凝成箭矢。<br>她许下的愿，从来不为自己。",
 	shuoye_yiguyoutai: "特级咒术师，里香的恋人，也是她的咒主。<br>纯爱为盾，具咒为刃——他的温柔，比诅咒更沉。",
 	shuoye_chengjinji: "坐杀博徒——抽奖开始前，没人知道他下一秒会变强还是变穷。<br>「来，赌一把。」",
-	shuoye_leinhaite: "银甲的守护者，在溃灭与冥府之间行走。<br>他把护甲铸成城墙，也铸成自己的软肋。",
+	shuoye_leinhaite: "当生命之盾无法阻挡亡魂！当大地之心不再纯洁不染！黑暗中，一位巨人倒下了！混沌地王莱茵哈特登场！",
 	shuoye_longyan: "龙契在身，红与黑皆是龙的语言。<br>阴阳随牌而转，鳞爪随势而张。",
 	shuoye_wuweijuezhe: "手牌恒为无，万物自去自来。<br>他不必出手，世界会替他出手。",
 	shuoye_xituo: "燃尽一切的破暗者，以烬灭与神咒回应诸神。<br>「烧起来吧。」",

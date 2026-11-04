@@ -5097,12 +5097,12 @@ const skills = {
                 },
                 locked: true,
                 filter(event, player) {
-                    return player.countMark('shuoye_shouheng') >= 2;
+                    return player.countMark('shuoye_shouheng') >= 3;
                 },
-                "prompt2": () => `你可以减少两层“电能”，摸一张牌并执行一个额外回合`,
+                "prompt2": () => `你可以减少三层“电能”，摸一张牌并执行一个额外回合`,
                 async content(event, trigger, player) {
-                    player.removeMark('shuoye_shouheng', 2, false);
-                    game.log(player, '移除了两层', '#g“电能”');
+                    player.removeMark('shuoye_shouheng', 3, false);
+                    game.log(player, '移除了三层', '#g“电能”');
                     await player.draw();
                     player.insertPhase();
                 },
@@ -11880,7 +11880,7 @@ const skills = {
                 const buffs = group.buffs || {};
                 const parts = [];
                 if (buffs.nodistance) parts.push("使用牌无距离限制");
-                if (buffs.norestrict) parts.push("使用牌无任何限制（次数与距离）");
+                if (buffs.norestrict) parts.push("使用牌无任何限制");
                 if (buffs.dmgup) parts.push("造成伤害+" + buffs.dmgup);
                 if (buffs.dmgdown) parts.push("受到伤害-" + buffs.dmgdown);
                 if (buffs.losedraw) parts.push("非因使用失去牌时摸" + get.cnNumber(buffs.losedraw) + "张牌");
@@ -14458,8 +14458,13 @@ const skills = {
 //#noname-kit-begin skill:shuoye_lx_liehua
     shuoye_lx_liehua: {
         audio: "ext:朔夜/audio/skill:2",
+        group: ["shuoye_lx_liehua_limit"],
         trigger: { player: ["useCardAfter", "respondAfter"] },
         filter(event, player) {
+            // 每回合限一次
+            if (player.storage.shuoye_lx_liehua_seq !== undefined && player.storage.shuoye_lx_liehua_used === player.storage.shuoye_lx_liehua_seq) {
+                return false;
+            }
             if (!_status.currentPhase || _status.currentPhase === player) {
                 return false;
             }
@@ -14485,6 +14490,7 @@ const skills = {
                 .forResult();
         },
         async content(event, trigger, player) {
+            player.storage.shuoye_lx_liehua_used = player.storage.shuoye_lx_liehua_seq;
             const current = _status.currentPhase;
             if (!current || !current.isAlive()) {
                 return;
@@ -14559,6 +14565,18 @@ const skills = {
         ai: {
             fireAttack: true,
             threaten: 1.4,
+        },
+        subSkill: {
+            limit: {
+                charlotte: true,
+                silent: true,
+                popup: false,
+                forced: true,
+                trigger: { global: "phaseBegin" },
+                content(event, trigger, player) {
+                    player.storage.shuoye_lx_liehua_seq = (Number(player.storage.shuoye_lx_liehua_seq) || 0) + 1;
+                },
+            },
         },
     },
 //#noname-kit-end skill:shuoye_lx_liehua
