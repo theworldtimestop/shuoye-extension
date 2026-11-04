@@ -14918,8 +14918,13 @@ const skills = {
         },
         init(player) {
             try {
-                if (player.storage.shuoye_lx_anye_stack > 0 && !player.hasSkill("shuoye_lx_anye_buff")) {
-                    player.addSkill("shuoye_lx_anye_buff");
+                if (player.storage.shuoye_lx_anye_stack > 0) {
+                    player.storage.shuoye_lx_anye_buff = player.storage.shuoye_lx_anye_stack;
+                    if (!player.hasSkill("shuoye_lx_anye_buff")) {
+                        player.addSkill("shuoye_lx_anye_buff");
+                    }
+                    player.markSkill("shuoye_lx_anye_buff");
+                    player.updateMark("shuoye_lx_anye_buff");
                 }
             } catch (e) {}
         },
@@ -15008,9 +15013,13 @@ const skills = {
             }
             trigger.directHit.addArray(others);
             player.storage.shuoye_lx_anye_stack = Math.max(0, (Number(player.storage.shuoye_lx_anye_stack) || 0) - 1);
+            // 标记数直接读 storage.shuoye_lx_anye_buff，消耗后必须同步，否则显示不会实时下降
+            player.storage.shuoye_lx_anye_buff = player.storage.shuoye_lx_anye_stack;
             try {
                 player.syncStorage("shuoye_lx_anye_buff");
                 if (player.storage.shuoye_lx_anye_stack > 0) {
+                    // markSkill 会把新数值广播给客机；只 updateMark 客机不会刷新
+                    player.markSkill("shuoye_lx_anye_buff");
                     player.updateMark("shuoye_lx_anye_buff");
                 } else {
                     player.removeSkill("shuoye_lx_anye_buff");
