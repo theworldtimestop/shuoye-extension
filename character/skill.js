@@ -10247,7 +10247,7 @@ const skills = {
             const liixiang = await game.addPlayerOL(player, "shuoye_liixiang", null, true, { source: player });
             if (!liixiang) return;
             game.broadcastAll(
-                (lx, master) => {
+                (lx, master, weaken) => {
                     lx.storage.shuoye_master_pid = master.playerid;
                     master.storage.shuoye_liixiang_pid = lx.playerid;
                     lx.storage.shuoye_summon = true;
@@ -10295,6 +10295,11 @@ const skills = {
                     try {
                         if (typeof lx.maxHp !== "number") lx.maxHp = 3;
                         if (typeof lx.hp !== "number") lx.hp = lx.maxHp;
+                        // 削弱武将：召唤时里香初始 2/2
+                        if (weaken) {
+                            lx.maxHp = 2;
+                            lx.hp = 2;
+                        }
                         for (const skill of ["shuoye_liixiang_chunai", "shuoye_lingzhou", "shuoye_chengfo", "shuoye_liixiang_ai"]) {
                             if (!lx.hasSkill(skill)) lx.addSkill(skill);
                         }
@@ -10355,7 +10360,8 @@ const skills = {
                     };
                 },
                 liixiang,
-                player
+                player,
+                !!lib.config.extension_朔夜_quhua
             );
             await liixiang.draw(4);
             game.log(player, "召唤了", liixiang);
@@ -11320,11 +11326,15 @@ const skills = {
                 lib.skill.shuoye_chunai.playMp3(player, "skill/shuoye_zhenyanxiangai1.mp3", 1);
                 lib.skill.shuoye_chunai.sayLong(player, "我们可是纯爱", 5000);
                 if (lx.hasSkill("shuoye_chengfo")) await lx.removeSkill("shuoye_chengfo");
-                game.broadcastAll((p) => {
-                    p.maxHp = 3;
-                    p.hp = 3;
-                    p.revive(3);
-                }, lx);
+                game.broadcastAll(
+                    (p, num) => {
+                        p.maxHp = num;
+                        p.hp = num;
+                        p.revive(num);
+                    },
+                    lx,
+                    lib.config.extension_朔夜_quhua ? 2 : 3
+                );
                 game.log(lx, "复活了");
                 return;
             }
@@ -11521,11 +11531,15 @@ const skills = {
         async revive(lx) {
             if (!lx) return;
             game.log(lx, "发动了", "【成佛】");
-            game.broadcastAll((p) => {
-                p.maxHp = 6;
-                p.hp = 6;
-                p.revive(6);
-            }, lx);
+            game.broadcastAll(
+                (p, num) => {
+                    p.maxHp = num;
+                    p.hp = num;
+                    p.revive(num);
+                },
+                lx,
+                lib.config.extension_朔夜_quhua ? 3 : 6
+            );
             lx.changeSkin({ characterName: "shuoye_liixiang" }, "shuoye_liixiang_fo");
             const records = lib.skill.shuoye_lingzhou.getRecords(lx);
             for (const skill of records) {
@@ -15289,9 +15303,6 @@ const skills = {
         locked: true,
         init(player) {
             try {
-                if (lib.config.extension_朔夜_quhua) {
-                    return;
-                }
                 if (!player.storage.shj_yin) {
                     player.storage.shj_yin = 0;
                 }
@@ -15317,9 +15328,6 @@ const skills = {
         silent: true,
         trigger: { player: "drawAfter" },
         forced: true,
-        filter(event, player) {
-            return !lib.config.extension_朔夜_quhua;
-        },
         async content(event, trigger, player) {
             // 按次计算：一次摸牌事件只加 1 点阳（不管摸了几张）
             lib.lsxFx.addTaiji(player, "yang", 1);
@@ -15336,9 +15344,6 @@ const skills = {
         trigger: { global: "damageAfter" },
         forced: true,
         filter(event, player) {
-            if (lib.config.extension_朔夜_quhua) {
-                return false;
-            }
             return event.player === player || event.source === player;
         },
         async content(event, trigger, player) {
@@ -15358,9 +15363,6 @@ const skills = {
         silent: true,
         trigger: { player: "phaseJieshu" },
         priority: -5,
-        filter(event, player) {
-            return !lib.config.extension_朔夜_quhua;
-        },
         async content(event, trigger, player) {
             const MAX = lib.lsxFx.TAIJI_MAX || 7;
             const inForm = !!lib.lsxFx.inForm(player);

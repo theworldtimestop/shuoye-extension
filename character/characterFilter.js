@@ -26,6 +26,7 @@ const quModeAllow = [
 	"shuoye_xituo",
 	"shuoye_fengchuanxiangzi",
 	"shuoye_lixin",
+	"shuoye_yiguyoutai",
 ];
 
 const characterFilters = {};
