@@ -87,6 +87,36 @@ function shuoyeInstallEmotion() {
 import { installLixinFx } from "./lixinfx.js";
 
 export async function precontent() {
+    // 【李信】光明神/弑杀神前缀：金色/暗红流光（对局内武将牌上显示名字时的前缀样式，
+    // 参考 REACGN「绝境」的 namePrefix 做法；CSS 动画做流光和呼吸光晕）
+    try {
+        if (typeof document !== "undefined" && document.head && !document.getElementById("shuoye-lixin-prefix-style")) {
+            const style = document.createElement("style");
+            style.id = "shuoye-lixin-prefix-style";
+            // 参考错乱时空「七宗罪鸽子精」的 blood_pulse_flow：流动渐变 + 阴影脉冲 + 星光 drop-shadow
+            style.innerHTML =
+                "@keyframes shuoye-prefix-gold-flow{0%{background-position:0% 50%}100%{background-position:500% 50%}}" +
+                "@keyframes shuoye-prefix-gold-flicker{0%,100%{text-shadow:0 0 1px rgba(255,215,0,.4),0 0 3px rgba(255,200,0,.18)}50%{text-shadow:0 0 4px rgba(255,230,120,.6),0 0 8px rgba(255,215,0,.32)}}" +
+                "@keyframes shuoye-prefix-gold-sparkle{0%{filter:drop-shadow(0 0 1px #fffbe0) drop-shadow(0 0 1px #ffd700)}50%{filter:drop-shadow(0 0 1.5px #ffffff) drop-shadow(0 0 3px #ffe680)}100%{filter:drop-shadow(0 0 1px #fff7cc) drop-shadow(0 0 2px #ffd700)}}" +
+                "@keyframes shuoye-prefix-red-flow{0%{background-position:0% 50%}100%{background-position:500% 50%}}" +
+                "@keyframes shuoye-prefix-red-flicker{0%,100%{text-shadow:0 0 1px rgba(183,28,28,.4),0 0 3px rgba(120,0,0,.2)}50%{text-shadow:0 0 4px rgba(229,57,53,.55),0 0 8px rgba(183,28,28,.3)}}" +
+                "@keyframes shuoye-prefix-red-sparkle{0%{filter:drop-shadow(0 0 1px #ffd76a) drop-shadow(0 0 1px #b71c1c)}50%{filter:drop-shadow(0 0 1.5px #ffffff) drop-shadow(0 0 3px #e53935)}100%{filter:drop-shadow(0 0 1px #ffd76a) drop-shadow(0 0 2px #c62828)}}" +
+                ".shuoye-prefix-gold{background:linear-gradient(90deg,#b8860b,#ffd700,#fff7cc,#ffd700,#b8860b,#ffd700);background-size:500% 100%;-webkit-background-clip:text;background-clip:text;color:transparent!important;-webkit-text-fill-color:transparent!important;-webkit-text-stroke:.8px #c9971c;animation:shuoye-prefix-gold-flow 10s linear infinite,shuoye-prefix-gold-flicker 9s ease-in-out infinite,shuoye-prefix-gold-sparkle 4.5s infinite alternate}" +
+                ".shuoye-prefix-darkred{background:linear-gradient(90deg,#4a0000,#8b0000,#d32f2f,#ff8a80,#d32f2f,#8b0000,#4a0000);background-size:500% 100%;-webkit-background-clip:text;background-clip:text;color:transparent!important;-webkit-text-fill-color:transparent!important;-webkit-text-stroke:.8px #d4912a;animation:shuoye-prefix-red-flow 10s linear infinite,shuoye-prefix-red-flicker 9s ease-in-out infinite,shuoye-prefix-red-sparkle 4.5s infinite alternate}";
+            document.head.appendChild(style);
+        }
+        if (lib.namePrefix) {
+            // 内联样式：防止十周年UI 等皮肤对 .name span 的 color/text-shadow 规则覆盖
+            lib.namePrefix.set("光明神·", {
+                getSpan: () => '<span class="shuoye-prefix-gold">光明神·</span>',
+            });
+            lib.namePrefix.set("弑杀神·", {
+                getSpan: () => '<span class="shuoye-prefix-darkred">弑杀神·</span>',
+            });
+        }
+    } catch (e) {
+        console.error("[朔夜] 李信名字前缀样式加载失败", e);
+    }
     try {
         installLixinFx();
     } catch (e) {

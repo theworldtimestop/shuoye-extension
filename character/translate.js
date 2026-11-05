@@ -3,7 +3,9 @@ const translates = {
     // =====【李信】一念神魔 =====
     shuoye_lixin: "李信",
     shuoye_lx_guang: "光明神·李信",
+    shuoye_lx_guang_prefix: "光明神·",
     shuoye_lx_an: "弑杀神·李信",
+    shuoye_lx_an_prefix: "弑杀神·",
 
     shuoye_lx_xiwang: "希望",
     shuoye_lx_xiwang_info: "瞬发技，每轮限一次，你可与一名角色各弃任意张牌，然后均摸牌至你手牌上限。若弃置牌数＜摸牌数，你可以使用一张牌。",

@@ -1962,6 +1962,63 @@ const skills = {
     shuoye_jingtian: {
         enable: "phaseUse",
         limited: true,
+        group: ["shuoye_jingtian_auto"],
+        subSkill: {
+            auto: {
+                charlotte: true,
+                silent: true,
+                popup: false,
+                forced: true,
+                trigger: {
+                    player: "phaseUseEnd",
+                },
+                filter(event, player) {
+                    // 只接管 BOSS 模式下的 AI：出牌阶段结束前必须发动一次惊天
+                    if (get.mode() != "boss") {
+                        return false;
+                    }
+                    if (player.isUnderControl()) {
+                        return false;
+                    }
+                    if (!player.hasSkill("shuoye_jingtian")) {
+                        return false;
+                    }
+                    return !player.getHistory("useSkill", evt => evt.skill == "shuoye_jingtian").length;
+                },
+                async content(event, trigger, player) {
+                    await player.useSkill("shuoye_jingtian");
+                    // 惊天补完牌后，AI 再判断一次有没有能用的牌：有就继续出，没有才结束。
+                    // 这里不在 phaseUse 里，cardUsable 会跳过次数限制，所以自己补一层 usable 检查。
+                    if (!player.isUnderControl()) {
+                        while (player.isAlive()) {
+                            const next = player.chooseToUse();
+                            next.set("type", "phase");
+                            next.set("filterCard", function (card, player2) {
+                                if (!lib.filter.filterCard.apply(this, arguments)) {
+                                    return false;
+                                }
+                                const info = get.info(card);
+                                if (info && info.usable !== undefined) {
+                                    let num = info.usable;
+                                    if (typeof num === "function") {
+                                        num = num(card, player2);
+                                    }
+                                    num = game.checkMod(card, player2, num, "cardUsable", player2);
+                                    if (typeof num === "number" && player2.countUsed(card) >= num) {
+                                        return false;
+                                    }
+                                }
+                                return true;
+                            });
+                            const result = await next.forResult();
+                            if (!result || !result.bool) {
+                                break;
+                            }
+                        }
+                    }
+                },
+            },
+        },
         async content(event, trigger, player) {
             // BOSS 模式下 limited 被置为 false，不进入限定技已发动状态，靠 usable 限制每回合一次
             if (lib.skill[event.name]?.limited) {
@@ -10413,7 +10470,7 @@ const skills = {
                 },
                 liixiang,
                 player,
-                !!lib.config.extension_朔夜_quhua
+                !!lib.config.extension_朔夜_qumoshi
             );
             await liixiang.draw(4);
             game.log(player, "召唤了", liixiang);
@@ -11385,7 +11442,7 @@ const skills = {
                         p.revive(num);
                     },
                     lx,
-                    lib.config.extension_朔夜_quhua ? 2 : 3
+                    lib.config.extension_朔夜_qumoshi ? 2 : 3
                 );
                 game.log(lx, "复活了");
                 return;
@@ -11590,7 +11647,7 @@ const skills = {
                     p.revive(num);
                 },
                 lx,
-                lib.config.extension_朔夜_quhua ? 3 : 6
+                lib.config.extension_朔夜_qumoshi ? 3 : 6
             );
             lx.changeSkin({ characterName: "shuoye_liixiang" }, "shuoye_liixiang_fo");
             const records = lib.skill.shuoye_lingzhou.getRecords(lx);
