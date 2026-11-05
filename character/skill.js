@@ -2383,12 +2383,18 @@ const skills = {
             }
             const cards = Array.isArray(card.cards) && card.cards.length ? card.cards : [card];
             if (_status.connectMode) {
+                // 联机下只靠 storage 同步：记录 cardid -> 获得时的回合号，按回合号判断。
+                // 不能只记「有没有获得过」，否则某端广播/清空没跟上时，
+                // 上回合获得的牌也会被当成「本回合获得」，无距离限制就失效了。
                 const gained = player.storage.shuoyechaoneng_gain;
-                if (Array.isArray(gained) && gained.length) {
-                    if (cards.some(c => c.cardid != null && gained.includes(c.cardid))) {
+                if (gained && !Array.isArray(gained) && typeof gained === "object") {
+                    if (cards.some(c => c.cardid != null && gained[c.cardid] === game.phaseNumber)) {
                         return false;
                     }
+                    return true;
                 }
+                // 旧格式（只存 cardid 的数组）无法判断是哪个回合获得的，直接忽略；
+                // 宁可把牌当成「非本回合获得」，也不要把旧牌误判成本回合获得。
                 return true;
             }
             const gains = player.getHistory("gain");
@@ -2412,7 +2418,7 @@ const skills = {
             }
         },
         init(player) {
-            player.storage.shuoyechaoneng_gain = [];
+            player.storage.shuoyechaoneng_gain = {};
         },
         group: ["shuoyechaoneng_gain", "shuoyechaoneng_damage"],
         subSkill: {
@@ -2437,16 +2443,22 @@ const skills = {
                     global: "phaseBegin",
                 },
                 content: function (event, trigger, player) {
+                    // phaseBegin 的 trigger 就是 phase 事件，本身没有 phase 属性；
+                    // 原先判断 trigger.phase == "phaseBegin" 永远不成立，storage 从不清空。
                     if (trigger.name == "gain") {
-                        const gained = player.storage.shuoyechaoneng_gain || (player.storage.shuoyechaoneng_gain = []);
+                        let gained = player.storage.shuoyechaoneng_gain;
+                        if (!gained || Array.isArray(gained) || typeof gained !== "object") {
+                            gained = {};
+                            player.storage.shuoyechaoneng_gain = gained;
+                        }
                         for (const card of trigger.cards || []) {
-                            if (card && card.cardid != null && !gained.includes(card.cardid)) {
-                                gained.push(card.cardid);
+                            if (card && card.cardid != null) {
+                                gained[card.cardid] = game.phaseNumber;
                             }
                         }
                         player.markSkill("shuoyechaoneng_gain");
-                    } else if (trigger.name == "phase" && trigger.phase == "phaseBegin") {
-                        player.storage.shuoyechaoneng_gain = [];
+                    } else if (trigger.name == "phase") {
+                        player.storage.shuoyechaoneng_gain = {};
                         player.markSkill("shuoyechaoneng_gain");
                     }
                 },
