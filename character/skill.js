@@ -15717,8 +15717,12 @@ const skills = {
         silent: true,
         popup: false,
         forced: true,
+        lastDo: true,
+        // 只监听 damageBegin4，并放在该时机的最后：此时古锭刀等加伤技能已在
+        // damageBegin1 结算完。若在 damageBegin1 就把 1 伤减到 0，引擎的 filterStop
+        // 会立即终止伤害事件，同阶段后续的加伤技能就再也没机会执行了。
         trigger: {
-            source: "damageBegin1",
+            source: "damageBegin4",
         },
         filter(event, player) {
             return !!event.card;
@@ -15954,7 +15958,7 @@ const skills = {
             const before = new Set(target.getCards("h").map(card => cardType(card))).size;
             await target.gain(chosen, "gain2");
             const after = new Set(target.getCards("h").map(card => cardType(card))).size;
-            const damage = Math.max(0, after - before);
+            const damage = Math.min(2, Math.max(0, after - before));
             let hurt = false;
             if (damage > 0) {
                 const hp = target.hp;

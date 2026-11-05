@@ -463,6 +463,6 @@ const translates = {
     shuoye_shengxie: "圣邪",
     shuoye_shengxie_info: "你弃置其他角色牌时，其中每有一张：基本，你摸一张牌；锦囊，该角色失去一点体力；装备，该角色本回合一个随机技能失效并弃置一张牌。",
     shuoye_cishenjiwujian: `<span class="shs-gold"><span style="color:#241830">此</span><span style="color:#33224a">身</span><span style="color:#503a6e">即</span><span style="color:#33224a">无</span><span style="color:#241830">间</span></span>`,
-    shuoye_cishenjiwujian_info: "每回合首次有三种类型牌进入弃牌堆时，你令一名角色获得其中不同种类各一张，然后令其受到手牌种类增加量的无来源伤害，若其未因此受伤则体力上限-1。一名角色因此死亡你体力上限+1并恢复一点体力。",
+    shuoye_cishenjiwujian_info: "每回合首次有三种类型牌进入弃牌堆时，你令一名角色获得其中不同种类各一张，然后令其受到手牌种类增加量（至多2）的无来源伤害，若其未因此受伤则体力上限-1。一名角色因此死亡你体力上限+1并恢复一点体力。",
 };
 export default translates;
