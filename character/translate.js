@@ -23,7 +23,7 @@ const translates = {
     shuoye_lx_anye_buff: "暗影·蓄势",
     shuoye_lx_anye_buff_info: "锁定技，你对其他角色使用的下一张牌无次数限制且不可响应（可叠加）。",
     shuoye_lx_huiren: "灰刃",
-    shuoye_lx_huiren_info: "出牌阶段，若本回合未有其他人体力值减少过，你可视为使用一张[决斗]然后摸一张牌，此牌不计入手牌上限，然后你可选择①摸一张牌②本回合造成伤害+1。",
+    shuoye_lx_huiren_info: "出牌阶段，若本回合未有其他人体力值减少过，你可视为使用一张[决斗]然后摸一张牌，此牌不计入手牌上限，然后你可选择与上次不同一项：①摸一张牌②本回合造成伤害+1。",
     shuoye_lx_huiren_nolimit: "灰刃·不占上限",
     shuoye_lx_huiren_nolimit_info: "因【灰刃】摸到的牌只要在你的手牌中，就不计入你的手牌上限。",
     shuoye_lx_huiren_dmg: "灰刃·增伤",
@@ -267,7 +267,7 @@ const translates = {
 
 
     "shuoye_diedai": "迭代",
-    "shuoye_diedai_info": "使命技，场上所有角色每累计受到五点伤害(游戏开始时场上人数不大于五，则改为三)，你摸一张牌，增加一点手牌上限与体力上限，出牌阶段出【杀】次数加一。成功:你累计迭代不小于三次，恢复一点体力，获得技能【革命】。 失败:成功达成使命前，进入濒死状态。",
+    "shuoye_diedai_info": `使命技，场上所有角色每累计受到五点伤害(游戏开始时场上人数不大于五，则改为三)，你摸一张牌，增加一点手牌上限与体力上限，出牌阶段出【杀】次数加一。成功:你累计迭代不小于三次，恢复一点体力，获得技能【${get.poptip("shuoye_geming")}】。 失败:成功达成使命前，进入濒死状态。`,
     "shuoye_geming": "革命",
     "shuoye_geming_info": `每回合限X次(X等于你${get.poptip("shuoye_diedai")}层数)，你使用牌指定其他角色为目标时，你可令其中一名目标选择一项:1本回合内非锁定技失效，且受到一点火焰伤害。2:交给你一张牌。你以此法获得的牌可以当做任意同种类牌使用或打出。若为装备牌，则使用时不会占据装备栏。`,
     "shuoye_shouheng": "守恒",
@@ -455,5 +455,14 @@ const translates = {
     shuoye_longyan: "龙琰",
     shuoye_longqi: "龙契",
     shuoye_longqi_info: "转换技，初始阴。你的红色牌均视为阴【万箭齐发】/阳【桃】，黑色牌均视为阴【闪】/阳【南蛮入侵】；使用或打出后摸一张牌（此牌本回合无法使用），然后切换形态。你的牌无视防具且只能指定单目标。",
+    shuoye_shengyuxieyan: "圣谕邪魇",
+    shuoye_xukong: "墟埪",
+    shuoye_xukong_info: "锁定技，你的牌不可被响应，无距离限制且伤害-1。对其他角色使用时，你选择其中一名目标随机弃置一张牌。",
+    shuoye_jingshi: "净世",
+    shuoye_jingshi_info: "出牌阶段限一次，你可弃置任意名其他角色区域内至多共X（你的手牌数）张牌，然后交给这些角色等量牌。",
+    shuoye_shengxie: "圣邪",
+    shuoye_shengxie_info: "你弃置其他角色牌时，其中每有一张：基本，你摸一张牌；锦囊，该角色失去一点体力；装备，该角色本回合一个随机技能失效并弃置一张牌。",
+    shuoye_cishenjiwujian: `<span class="shs-gold"><span style="color:#241830">此</span><span style="color:#33224a">身</span><span style="color:#503a6e">即</span><span style="color:#33224a">无</span><span style="color:#241830">间</span></span>`,
+    shuoye_cishenjiwujian_info: "每回合首次有三种类型牌进入弃牌堆时，你令一名角色获得其中不同种类各一张，然后令其受到手牌种类增加量的无来源伤害，若其未因此受伤则体力上限-1。一名角色因此死亡你体力上限+1并恢复一点体力。",
 };
 export default translates;

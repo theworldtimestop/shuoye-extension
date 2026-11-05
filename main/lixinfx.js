@@ -210,8 +210,8 @@ function animationOff() {
 }
 
 // ---------------------------------------------------------------- 音频
-// 台词音量倍率（1 = 原音量，2 = 翻倍，4 = 再翻倍）
-const VOICE_GAIN = 4;
+// 台词音量倍率（1 = 原音量；从 4 降到 3，即比原来小声四分之一）
+const VOICE_GAIN = 3;
 
 function audioBaseVolume() {
 	const setting = lib.config && lib.config.volumn_audio != null ? lib.config.volumn_audio : 8;
@@ -1084,16 +1084,16 @@ function syncButtons() {
 			return;
 		}
 		const alive = game.filterPlayer ? game.filterPlayer() : game.players || [];
-		// 客机兜底：game.broadcast 在联机房间里不一定送得到，
-		// 这里用本地 hp 快照自己判一次「本回合有其他角色体力减少」，写回 storage
+		// 本回合体力快照（只读兜底：只拍快照，不写 storage、不改按钮）
+		// 事件路径偶尔漏记时靠它兜底；只读不会造成状态翻转抖动。
 		try {
 			const phase = typeof _status !== "undefined" && _status.currentPhase;
-			const turnKey = phase ? String(phase.playerid) : "";
+			const turnKey = phase && phase.playerid != null ? String(phase.playerid) : (lib.lsxFx._huirenTurnKey || "");
 			if (!lib.lsxFx) {
 				lib.lsxFx = {};
 			}
-			if (lib.lsxFx._hpTickKey !== turnKey) {
-				lib.lsxFx._hpTickKey = turnKey;
+			if (lib.lsxFx._huirenTurnKey !== turnKey) {
+				lib.lsxFx._huirenTurnKey = turnKey;
 				const snap = {};
 				const all = (game.players || []).concat(game.dead || []);
 				for (const p of all) {
@@ -1101,44 +1101,7 @@ function syncButtons() {
 						snap[p.playerid] = p.hp;
 					}
 				}
-				lib.lsxFx._hpTickSnap = snap;
-				// 新回合：把上一回合的标记清掉（带回合戳，客机收不到主机的清空广播也靠这一步）
-				for (const p of all) {
-					if (!p || !p.storage) {
-						continue;
-					}
-					const rec = p.storage.shuoye_lx_hpdown;
-					if (!rec || rec.turn !== turnKey) {
-						p.storage.shuoye_lx_hpdown = { turn: turnKey, victims: {} };
-					}
-				}
-			} else {
-				const snap = lib.lsxFx._hpTickSnap || {};
-				const dropped = [];
-				const all = (game.players || []).concat(game.dead || []);
-				for (const p of all) {
-					if (!p) {
-						continue;
-					}
-					const before = snap[p.playerid];
-					if (typeof before === "number" && p.hp < before) {
-						dropped.push(p.playerid);
-					}
-				}
-				if (dropped.length) {
-					for (const p of all) {
-						if (!p || !p.storage || !p.skills || !p.skills.includes("shuoye_lx_huiren")) {
-							continue;
-						}
-						if (!p.storage.shuoye_lx_hpdown || !p.storage.shuoye_lx_hpdown.victims) {
-							p.storage.shuoye_lx_hpdown = { turn: turnKey, victims: {} };
-						}
-						p.storage.shuoye_lx_hpdown.turn = turnKey;
-						for (const vid of dropped) {
-							p.storage.shuoye_lx_hpdown.victims[vid] = true;
-						}
-					}
-				}
+				lib.lsxFx._huirenSnap = snap;
 			}
 		} catch (e) {}
 		const wanted = {};
@@ -1157,7 +1120,8 @@ function syncButtons() {
 					}
 				}
 			} catch (e) {}
-			// 灰刃：不满足条件时把技能面板和原生技能栏的按钮一起隐藏
+			// 灰刃：只在「可用 ↔ 不可用」翻转时刷新一次技能栏。
+			// 不要每个 tick 反复改 display、重建技能栏——十周年UI会重绘技能按钮，看起来就是一直在闪。
 			try {
 				if (p.skills && p.skills.includes("shuoye_lx_huiren")) {
 					const huiren = lib.skill.shuoye_lx_huiren;
@@ -1165,14 +1129,15 @@ function syncButtons() {
 					try {
 						can = huiren && typeof huiren.filter === "function" ? !!huiren.filter(null, p) : true;
 					} catch (e) {}
-					// 面板按钮（十周年UI）
-					const btns = document.querySelectorAll('[data-id="shuoye_lx_huiren"]');
-					for (let k = 0; k < btns.length; k++) {
-						btns[k].style.display = can ? "" : "none";
-					}
-					// 原生技能栏：状态变化时清缓存重算，否则按钮会残留
-					if (p._shjHuirenHidden !== !can) {
-						p._shjHuirenHidden = !can;
+					if (p._shjHuirenCan !== can) {
+						p._shjHuirenCan = can;
+						// 翻转时同步一次面板按钮；只做一次，不要每 tick 重复隐藏/显示
+						try {
+							const btns = document.querySelectorAll('[data-id="shuoye_lx_huiren"]');
+							for (let k = 0; k < btns.length; k++) {
+								btns[k].style.display = can ? "" : "none";
+							}
+						} catch (e) {}
 						try {
 							let evt = _status && _status.event;
 							while (evt && evt.name !== "chooseToUse") {
@@ -1396,23 +1361,23 @@ function markHpDown(victim) {
 		// 跨端记录：本地先写，再广播给另一端（客机上 broadcast 不会回传）
 		const run = function (vid) {
 			try {
+				const phase = typeof _status !== "undefined" && _status.currentPhase;
+				const turnKey = phase ? String(phase.playerid) : "";
 				const list = (game.players || []).concat(game.dead || []);
 				for (let i = 0; i < list.length; i++) {
 					const p = list[i];
-					if (!p || !p.storage || typeof p.hasSkill !== "function" || !p.hasSkill("shuoye_lx_huiren")) {
+					if (!p || !p.storage || typeof p.hasSkill !== "function") {
+						continue;
+					}
+					// 李信变成光/暗形态时没有【灰刃】，但变回来还要用掉血记录，所以任一形态都写
+					if (!p.hasSkill("shuoye_lx_huiren") && formKeyOf(p) === null) {
 						continue;
 					}
 					if (!p.storage.shuoye_lx_hpdown || !p.storage.shuoye_lx_hpdown.victims) {
 						p.storage.shuoye_lx_hpdown = { victims: {} };
 					}
+					p.storage.shuoye_lx_hpdown.turn = turnKey;
 					p.storage.shuoye_lx_hpdown.victims[vid] = true;
-				}
-				const me = game.me;
-				if (me && typeof me.hasSkill === "function" && me.hasSkill("shuoye_lx_huiren")) {
-					const btns = document.querySelectorAll('[data-id="shuoye_lx_huiren"]');
-					for (let i = 0; i < btns.length; i++) {
-						btns[i].style.display = "none";
-					}
 				}
 			} catch (e) {}
 		};
@@ -1471,17 +1436,17 @@ function hasOtherHpDown(player) {
 		const phaseKey = typeof _status !== "undefined" && _status.currentPhase ? String(_status.currentPhase.playerid) : "";
 		const rec = player.storage && player.storage.shuoye_lx_hpdown;
 		if (rec && rec.victims && (!rec.turn || rec.turn === phaseKey)) {
-			if (Object.keys(rec.victims).some((pid) => pid != player.playerid)) {
+			if (Object.keys(rec.victims).some((pid) => String(pid) !== String(player.playerid))) {
 				return true;
 			}
 		}
 		// ② 事件记录（changeHpAfter 捕获的）
 		const marked = (holder && holder._shjHpDown) || {};
-		if (Object.keys(marked).some((pid) => pid != player.playerid)) {
+		if (Object.keys(marked).some((pid) => String(pid) !== String(player.playerid))) {
 			return true;
 		}
-		// ② 体力快照比对
-		const snap = (holder && holder._shjHpSnap) || (lib.lsxFx && lib.lsxFx._hpSnap) || null;
+		// ③ 体力快照比对（回合开始时 resetHpSnap 拍的快照，只读不回写，状态稳定不会抖）
+		const snap = (holder && holder._shjHpSnap) || (lib.lsxFx && lib.lsxFx._hpSnap) || (lib.lsxFx && lib.lsxFx._huirenSnap) || null;
 		if (snap) {
 			const list = (game.players || []).concat(game.dead || []);
 			for (let i = 0; i < list.length; i++) {

@@ -57,6 +57,7 @@ const characters = {
         hujia: 3,
         group: "qun",
         skills: ["shuoyejinxuan", "shuoyekuangyan", "shuoyehuanghe"],
+        img: "extension/朔夜/image/character/shuoye_zhenshiqiaotelude.png",
         trashBin: [],
     },
 //#noname-kit-end character:shuoye_zhenshiqiaotelude
@@ -399,6 +400,16 @@ const characters = {
         trashBin: [],
     },
 //#noname-kit-end character:shuoye_lixin
+//#noname-kit-begin character:shuoye_shengyuxieyan
+    shuoye_shengyuxieyan: {
+        sex: "male",
+        hp: 3,
+        group: "wei",
+        skills: ["shuoye_xukong", "shuoye_jingshi", "shuoye_shengxie", "shuoye_cishenjiwujian"],
+        img: "extension/朔夜/image/character/shuoye_shengyuxieyan.jpg",
+        trashBin: [],
+    },
+//#noname-kit-end character:shuoye_shengyuxieyan
 
 };
 for (let i in characters) {

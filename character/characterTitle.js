@@ -16,5 +16,6 @@ const characterTitles = {
 	shuoye_dilutianfeng: "敕赦",
 	shuoye_leinhaite: "混沌地王",
 	shuoye_longyan: "虐龙古咒",
+	shuoye_shengyuxieyan: "堕神",
 };
 export default characterTitles;

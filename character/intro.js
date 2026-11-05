@@ -46,5 +46,6 @@ const characterIntro = {
 	shuoye_xituo: "燃尽一切的破暗者，以烬灭与神咒回应诸神。<br>「烧起来吧。」",
 	shuoye_qiaolienide: "古龙之王。骨里刻着上一个纪元的龙语，抬手便是劫天。",
 	shuoye_liixiang: "乙骨忧太的青梅竹马，车祸后化为特级咒灵「里香」。<br>「忧太，我们一起走吧。」",
+	shuoye_shengyuxieyan: "本是神明堕落后的形态，如今却成了邪影梦魇所追寻的终点。远古的血脉支撑着他身躯稳定的同时也在被两股予盾的力量不断消磨，但在崩坏的临界点到来之前，他还不会倒下。",
 };
 export default characterIntro;

@@ -2,6 +2,19 @@ import { lib, game, ui, get, ai, _status } from '../../../../noname.js'
 import update from "../update.js";
 import { EXTENSION_VERSION } from "../version.js";
 export async function content(config, pack) {
+    // 带样式的技能名（如【此身即无间】）：十周年UI 的技能栅会自己给名字套【】，
+    // 照【坐杀博徒】的办法：外层文字设为 0 号字只留 span，再补一个「：」
+    try {
+        if (typeof document !== "undefined" && document.head && !document.getElementById("shuoye-styled-skillname-style")) {
+            const style = document.createElement("style");
+            style.id = "shuoye-styled-skillname-style";
+            style.innerHTML =
+                ".xskill > div[data-color]:has(span.shs-gold){font-size:0 !important;}" +
+                ".xskill > div[data-color] span.shs-gold{font-size:16px !important;letter-spacing:0;}" +
+                ".xskill > div[data-color]:has(span.shs-gold)::after{content:'：';font-size:16px;color:#5a4a72;}";
+            document.head.appendChild(style);
+        }
+    } catch (e) {}
     // 【祈本里香】隐藏武将：不进选将池，仅由乙骨忧太【纯爱】召唤
     if (!lib.character["shuoye_liixiang"]) {
         lib.character["shuoye_liixiang"] = [
@@ -240,7 +253,7 @@ export async function content(config, pack) {
             "shuoye_yuanlv", "shuoye_diyabolo", "shuoye_fuhua", "shuoye_kongzhilvzhe",
             "shuoye_puqishenfu", "shuoye_xugouji", "shuoye_aertuoliya", "shuoye_zhende",
             "shuoye_huangquan", "shuoye_kongqirinai", "shuoye_wenyang", "shuoye_ying",
-            "shuoye_weiyue", "shuoye_huoguang", "shuoye_longyan",
+            "shuoye_weiyue", "shuoye_huoguang", "shuoye_longyan", "shuoye_shengyuxieyan",
         ],
         junk: ["shuoye_xingti", "shuoye_weiershi", "shuoye_ruolian"],
     };
