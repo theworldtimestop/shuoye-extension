@@ -501,6 +501,62 @@ export async function precontent() {
             } catch (e) {}
         };
     }
+    if (typeof lib.shuoyeDetachSummons !== "function") {
+        // 判定期间把召唤物临时从 game.players / game.dead 里摘出去，返回可直接交给
+        // lib.shuoyeRestoreSummons 的登记表；没有召唤物时返回 null。
+        lib.shuoyeDetachSummons = function () {
+            if (!Array.isArray(game.players) || !Array.isArray(game.dead)) return null;
+            const removed = [];
+            for (const list of [game.players, game.dead]) {
+                for (let i = list.length - 1; i >= 0; i--) {
+                    const p = list[i];
+                    if (shuoyeIsSummon(p)) {
+                        removed.push([list, i, p]);
+                        list.splice(i, 1);
+                    }
+                }
+            }
+            if (!removed.length) return null;
+            if (!Array.isArray(lib.shuoyeDetachedSummons)) lib.shuoyeDetachedSummons = [];
+            lib.shuoyeDetachedSummons.push(removed);
+            return removed;
+        };
+    }
+    if (typeof lib.shuoyeHasLivingRealAlly !== "function") {
+        // 召唤物所在阵营里是否还有“真实角色”活着（召唤物本身不算）
+        lib.shuoyeHasLivingRealAlly = function (p) {
+            if (!p || !Array.isArray(game.players)) return false;
+            let camp = null;
+            try {
+                camp = typeof lib.shuoyeCampOf === "function" ? lib.shuoyeCampOf(p) : null;
+            } catch (e) {}
+            return game.players.some((current) => {
+                if (!current || current === p) return false;
+                if (shuoyeIsSummon(current)) return false;
+                try {
+                    if (p.side !== undefined && p.side !== null) {
+                        return current.side !== undefined && current.side !== null && current.side === p.side;
+                    }
+                    if (camp && typeof lib.shuoyeCampOf === "function") return lib.shuoyeCampOf(current) === camp;
+                } catch (e) {}
+                return false;
+            });
+        };
+    }
+    if (typeof lib.shuoyeSummonDieAfter !== "function") {
+        // 里香：阵亡本身不参与胜负判定；但若她已经是本阵营最后一名
+        // （说明前面的结算被漏掉了），就把机会交给模式自己的 dieAfter。
+        lib.shuoyeSummonDieAfter = function (summon, source) {
+            try {
+                if (typeof lib.shuoyeHasLivingRealAlly === "function" && lib.shuoyeHasLivingRealAlly(summon)) return;
+                const proto = (lib.element && lib.element.Player && lib.element.Player.prototype) || (lib.element && lib.element.player);
+                if (proto && typeof proto.dieAfter === "function") return proto.dieAfter.call(summon, source);
+                if (typeof game.checkResult === "function") return game.checkResult();
+            } catch (e) {
+                console.error("[朔夜] 里香阵亡结算失败：", e);
+            }
+        };
+    }
     const shuoyeWrapSummonSafe = (fn) => {
         if (typeof fn !== "function" || fn._shuoyeSummonSafe) return fn;
         const wrapped = function () {
@@ -588,6 +644,58 @@ export async function precontent() {
     shuoyeInstallSummonResultTrap();
     if (lib.arenaReady) lib.arenaReady.push(shuoyeInstallSummonResultTrap);
 
+    // ==== 对决等“dieAfter 里自己数人头”的模式 ====
+    // 对决 2v2/3v3/4v4 的 dieAfter 直接遍历 game.players 找“同边还活着的人”，并不走
+    // checkResult/checkOnlineResult，所以上面的陷阱管不到：里香会被当成乙骨那边还活着的队友，
+    // 乙骨阵亡不结算；里香阵亡又不调 dieAfter，整局就卡死。
+    // 这里给模式的 dieAfter 再包一层：判定期间把召唤物临时摘出去，模式只看到真实角色；
+    // 若期间调用了 game.over，会先按 registry 把她放回去再出统计表。
+    // 召唤物自身的 dieAfter 仍是空函数（她本来就不参与胜负判定）。
+    if (typeof lib.shuoyeInstallDieAfterTrap !== "function") {
+        lib.shuoyeInstallDieAfterTrap = function () {
+            try {
+                const proto = (lib.element && lib.element.Player && lib.element.Player.prototype) || (lib.element && lib.element.player);
+                if (!proto) return;
+                const base = proto.dieAfter;
+                if (typeof base !== "function" || base._shuoyeSummonDieAfterTrap) return;
+                const wrapped = function () {
+                    let removed = null;
+                    try {
+                        removed = lib.shuoyeDetachSummons();
+                    } catch (e) {}
+                    try {
+                        return base.apply(this, arguments);
+                    } finally {
+                        if (removed) {
+                            try {
+                                const registry = lib.shuoyeDetachedSummons;
+                                const index = registry.indexOf(removed);
+                                if (index >= 0) registry.splice(index, 1);
+                                lib.shuoyeRestoreSummons(removed);
+                            } catch (e) {}
+                        }
+                    }
+                };
+                wrapped._shuoyeSummonDieAfterTrap = true;
+                // 别的扩展会靠原函数上的标记判断“是否已挂载”，照 shuoyeWrapSummonSafe 的做法保留
+                try {
+                    for (const key in base) {
+                        if (key === "_shuoyeSummonDieAfterTrap" || key in wrapped) continue;
+                        try {
+                            wrapped[key] = base[key];
+                        } catch (e2) {}
+                    }
+                } catch (e2) {}
+                try {
+                    wrapped.toString = () => base.toString();
+                } catch (e2) {}
+                proto.dieAfter = wrapped;
+            } catch (e) {}
+        };
+    }
+    lib.shuoyeInstallDieAfterTrap();
+    if (lib.arenaReady) lib.arenaReady.push(lib.shuoyeInstallDieAfterTrap);
+
     // ---- 战后统计要显示里香 ----
     // 判定期间她被临时摘出 game.players / game.dead，而 game.over 的统计表正是按这两个数组生成。
     // 这里在 game.over 真正出表前把她放回去；判定结束后再交给外层 finally 正常还原。
@@ -626,6 +734,7 @@ export async function precontent() {
     // （主人 pid 客机上本来就用不到：纯爱/灵咒/真赝相爱这些技能都在主机执行）
     const shuoyeApplySummonMarkers = () => {
         try {
+            if (typeof lib.shuoyeInstallDieAfterTrap === "function") lib.shuoyeInstallDieAfterTrap();
             const list = (game.players || []).concat(game.dead || []);
             for (const p of list) {
                 if (!p) continue;
@@ -634,7 +743,10 @@ export async function precontent() {
                 if (!p.storage.shuoye_summon) p.storage.shuoye_summon = true;
                 if (!p._shuoyeSummonDieAfter) {
                     p._shuoyeSummonDieAfter = true;
-                    p.dieAfter = function () {};
+                    // 召唤物阵亡不参与胜负判定；本阵营无真实角色时才交给模式补结算
+                    p.dieAfter = function (source) {
+                        if (typeof lib.shuoyeSummonDieAfter === "function") return lib.shuoyeSummonDieAfter(this, source);
+                    };
                     p.dieAfter2 = function (source) {
                         if (get.mode() !== "identity" || !source) return;
                         const identity = this.identity;
@@ -647,6 +759,15 @@ export async function precontent() {
                         }
                     };
                 }
+                // 重连后「友/敌」标记会按角色名重画：每个客机按自己的阵营算
+                try {
+                    if (get.mode() === "versus" && p.node && p.node.identity && typeof p.side !== "undefined") {
+                        const sameSide = !game.me || game.me === p || game.me.side === p.side;
+                        p.node.identity.firstChild.innerHTML = sameSide ? "友" : "敌";
+                        p.node.identity.dataset.color = get.translation(p.side + "Color");
+                    }
+                } catch (e) {}
+
             }
         } catch (e) {}
     };

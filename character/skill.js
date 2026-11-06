@@ -2706,7 +2706,8 @@ const skills = {
         forced: true,
         content: function () {
             "step 0"
-            var num = player.maxHp - player.hp;
+            // 恢复至1点体力（体力≤0时至少回1点），伤害量等于本次实际回复量
+            var num = Math.max(0, 1 - player.hp);
             player.recover(num);
             event.num = num;
             player.chooseTarget(get.prompt2("shuoye_rongguang"), 1, function (card, player, target) {
@@ -2717,7 +2718,7 @@ const skills = {
             });
             "step 1"
             if (result.bool) {
-                result.targets[0].damage(event.num);
+                if (event.num > 0) result.targets[0].damage(event.num);
                 player.restoreSkill("shuoye_qiyuan");
                 player.addSkill("shuoye_chudan");
                 player.removeSkill("shuoye_rongguang");
@@ -2813,15 +2814,19 @@ const skills = {
         filterTarget: function (card, player, target) {
             return player != target;
         },
-        prompt2: "令一名其他角色失去X点体力并增加X点护甲（X为此技能已发动次数，首次为1）；若其未因此死亡，则你的下个回合开始时刷新此技能",
+        prompt2: "令一名其他角色失去X点体力并增加X点护甲（X为此技能已发动次数，首次为1，之后递增，至多为目标体力值）；若其未因此死亡，则你的下个回合开始时刷新此技能",
         async content(event, trigger, player) {
             const target = event.target;
             player.awakenSkill("shuoye_qiyuan");
-            const num = (player.storage.shuoye_qiyuan_stack || 0) + 1;
-            player.storage.shuoye_qiyuan_stack = num;
-            game.log(player, "发动了", "【祈愿】", "（第", num, "次）");
-            await target.loseHp(num);
-            await target.changeHujia(num, null, true);
+            const times = (player.storage.shuoye_qiyuan_stack || 0) + 1;
+            player.storage.shuoye_qiyuan_stack = times;
+            // X 为此技能已发动次数，且不超过目标当前体力值
+            const num = Math.max(0, Math.min(times, target.hp));
+            game.log(player, "发动了", "【祈愿】", "（第", times, "次，X为", num, "）");
+            if (num > 0) {
+                await target.loseHp(num);
+                await target.changeHujia(num, null, true);
+            }
             if (!target.isAlive()) return;
             player.storage.shuoye_qiyuan_refresh = true;
             player.addSkill("shuoye_qiyuan_revive");
@@ -10355,19 +10360,21 @@ const skills = {
             } catch (e) {}
             const liixiang = await game.addPlayerOL(player, "shuoye_liixiang", null, true, { source: player });
             if (!liixiang) return;
+            // 对决等模式靠 dieAfter 自己数人头：确保“判定时摘掉召唤物”的补丁已经装上
+            try {
+                if (typeof lib.shuoyeInstallDieAfterTrap === "function") lib.shuoyeInstallDieAfterTrap();
+            } catch (e) {}
             game.broadcastAll(
                 (lx, master, weaken) => {
                     lx.storage.shuoye_master_pid = master.playerid;
                     master.storage.shuoye_liixiang_pid = lx.playerid;
                     lx.storage.shuoye_summon = true;
-                    // 召唤物阵亡不参与胜负结算：直接不调用模式的 dieAfter（空函数）。
-                    // 引擎各模式都在 dieAfter 里调 game.checkResult() / game.over()，跳过它就等于跳过结算。
-                    // 参考其他扩展的召唤物：苍翼默示录龙影、错乱时空傀儡是“同组全灭才调原 dieAfter”，
-                    // 活动武将连兵、一中杀召唤物则是直接 dieAfter = 空函数。
-                    // 注意：不要再“临时置空 game.checkResult / game.over 再还原”——只要别的扩展在这段时间里
-                    // 缓存了被置空的版本（傀儡/龙影/不死类技能都会先存后包），整局甚至整个页面就再也不结算，
-                    // 表现就是里香死后主公/对手/地主死了都不结束。
-                    lx.dieAfter = function () {};
+                    // 召唤物不参与胜负判定：模式结算时由 precontent 里的 dieAfter 补丁把她临时摘掉，
+                    // 别的角色阵亡该结束就结束；她自己阵亡时不单独触发结算，
+                    // 只有本阵营真实角色全灭后才交给模式补一次结算。
+                    lx.dieAfter = function (source) {
+                        if (typeof lib.shuoyeSummonDieAfter === "function") return lib.shuoyeSummonDieAfter(this, source);
+                    };
                     // 召唤物：击杀奖励只在身份场按身份发（不触发“主公杀忠臣”惩罚）。
                     // 其它模式不交还给原 dieAfter2：单挑/战棋的原版会“复活换将”（uninit 会把
                     // storage.shuoye_summon 清掉，她从此变成真玩家，结算又开始数她）；斗地主/对决
@@ -10418,8 +10425,16 @@ const skills = {
                     try {
                         lx.side = master.side;
                         if (mode === "versus" && lx.node && lx.node.identity) {
-                            lx.node.identity.firstChild.innerHTML = "友";
-                            lx.node.identity.dataset.color = (master.node && master.node.identity && master.node.identity.dataset.color) || lx.side + "zhu";
+                            // 友/敌是每个客机自己的视角：按本地阵营各算各的，不能把“友”广播给所有人
+                            const sameSide =
+                                !game.me ||
+                                game.me === lx ||
+                                (typeof game.me.side !== "undefined" && typeof lx.side !== "undefined" && game.me.side == lx.side);
+                            lx.node.identity.firstChild.innerHTML = sameSide ? "友" : "敌";
+                            lx.node.identity.dataset.color =
+                                typeof lx.side === "undefined"
+                                    ? (master.node && master.node.identity && master.node.identity.dataset.color) || "zhu"
+                                    : get.translation(lx.side + "Color");
                         }
                     } catch (e) {}
                     // 部分模式/皮肤（尤其是联机对决）下，召唤时的立绘可能没跟上：

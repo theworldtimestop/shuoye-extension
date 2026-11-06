@@ -377,7 +377,7 @@ const translates = {
     shuoye_wanxiang:'万象',
     shuoye_wanxiang_info: `①游戏开始时，你获得${get.poptip("shuoye_chudan")}。<br>②当其他角色死亡时，若你计算其的距离为：<br>1，你废除判定区；<br>2，你本局游戏造成伤害+1（可叠加）；<br>3，你本局游戏受到伤害时，增加1点体力上限，并摸1张牌，每回合限一次（可叠加）。`,
     shuoye_qiyuan:'祈愿',
-    shuoye_qiyuan_info:'限定技，出牌阶段，你令一名其他角色失去X点体力并增加X点护甲（X为此技能已发动次数，首次为1，之后递增）；若其未因此死亡，则你的下个回合开始时刷新此技能。',
+    shuoye_qiyuan_info:'限定技，出牌阶段，你令一名其他角色失去X点体力并增加X点护甲（X为此技能已发动次数，首次为1，之后递增，至多为目标体力值）；若其未因此死亡，则你的下个回合开始时刷新此技能。',
     shuoye_chudan:"初诞",
     shuoye_chudan_info: `你造成伤害+1，当你伤害类牌被响应后，此技能转化为${get.poptip("shuoye_mengya")}。`,
     shuoye_mengya:"萌芽",
@@ -385,7 +385,7 @@ const translates = {
     shuoye_fenzheng:"纷争",
     shuoye_fenzheng_info:`你的回合开始时，弃置所有判定区的牌，增加一点体力上限，获得一点护甲，此技能转化为${get.poptip("shuoye_rongguang")}。`,
     shuoye_rongguang:"荣光",
-    shuoye_rongguang_info:`当你进入濒死状态时，你将体力值恢复至体力上限，并对一名其他角色造成等同于恢复量的伤害，然后你重置技能${get.poptip("shuoye_qiyuan")}，此技能转化为${get.poptip("shuoye_chudan")}。`,
+    shuoye_rongguang_info:`当你进入濒死状态时，你将体力值恢复至1点，并对一名其他角色造成等同于恢复量的伤害，然后你重置技能${get.poptip("shuoye_qiyuan")}，此技能转化为${get.poptip("shuoye_chudan")}。`,
 
     shuoye_xiaotiqin: "小提琴",
     shuoye_xiaotiqin_info: `你的虚拟杀可以多指定一个目标。若装备者是远旅，则你可以弃置两张不同花色的【星】，视为使用一张无次数限制的雷【杀】。`,
