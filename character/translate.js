@@ -8,8 +8,6 @@ const translates = {
     shuoye_shouzhishuzi_info: "游戏开始时，你从中选择六种记录。本局游戏你可将两张手牌当做其中你本回合尚未使用过的一种牌名使用或打出。",
     shuoye_huangjinjuchang: `<span class="shs-gold" style="color:#B00000;-webkit-text-stroke:0.25px #D4AF37;text-shadow:0 0 2px rgba(212,175,55,.65),0 0 5px rgba(160,0,0,.75),0 0 10px rgba(90,0,0,.5);font-weight:700;">怀抱溶解的黄金剧场</span>`,
     shuoye_huangjinjuchang_info: "锁定技。每名角色的回合结束时，若其判定区没有【兽之七冠】，黄金之杯将一张【影】当做【兽之七冠】对其使用。判定区有【兽之七冠】的角色不能使用或打出与其点数不同的牌。",
-    shuoye_kill_line: "击杀",
-    shuoye_kill_line_info: "锁定技，你杀死其他角色时，播放击杀台词。",
     shuoye_nilu_debug: "调试",
     shuoye_nilu_debug_info: "黄金之杯调试：调整黄金之杯的剩余牌数。",
     shuoye_shouzhizhiguan: "兽之七冠",

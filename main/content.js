@@ -4,10 +4,16 @@ import { EXTENSION_VERSION } from "../version.js";
 export async function content(config, pack) {
     // 【尼禄】自定义势力「兽」
     try {
+        const shouGroupImage = "ext:朔夜/image/group_shou.png";
         if (!lib.group.includes("shou")) {
-            game.addGroup("shou", "兽", "兽");
-            lib.groupnature.shou = "firemm";
+            game.addGroup("shou", "兽", "兽", { image: shouGroupImage });
         }
+        lib.groupnature.shou = "firemm";
+        // addGroup 的钩子在这时可能已经收工，卡片图和势力名显式补上，原版/十周年UI 都从这里取
+        if (!lib.card["group_shou"] || !lib.card["group_shou"].image) {
+            lib.card["group_shou"] = { fullskin: true, image: shouGroupImage };
+        }
+        lib.translate["group_shou"] = "兽势力";
     } catch (e) {}
     // 【尼禄】调试开关：只有开了配置才把调试技能挂进武将技能表（没开时连名字和描述都不显示）
     try {
@@ -25,6 +31,7 @@ export async function content(config, pack) {
             lib.character.shuoye_nilu.dieAudios = ["ext:朔夜/audio/die/shuoye_nilu1", "ext:朔夜/audio/die/shuoye_nilu2"];
         }
     } catch (e) {}
+    // 【尼禄】击杀台词已并入黄金之杯子技能 shuoye_huangjinzhibei_kill，不再单独占技能位
     // 带样式的技能名（如【此身即无间】）：十周年UI 的技能栅会自己给名字套【】，
     // 照【坐杀博徒】的办法：外层文字设为 0 号字只留 span，再补一个「：」
     try {
@@ -105,26 +112,6 @@ export async function content(config, pack) {
     patchQhlyDie();
     if (lib.arenaReady) {
         lib.arenaReady.push(patchQhlyDie);
-    }
-    // 【尼禄】击杀台词只在详情页显示：千幻的台词面板会过滤 nopop，这里补回去
-    const patchQhlyKill = () => {
-        try {
-            if (typeof game.qhly_getViewSkills !== "function" || game.qhly_getViewSkills._shuoyeNiluPatched) return;
-            const originView = game.qhly_getViewSkills;
-            const patched = function (name) {
-                const list = originView.apply(this, arguments);
-                if (name === "shuoye_nilu" && Array.isArray(list) && !list.includes("shuoye_kill_line")) {
-                    list.push("shuoye_kill_line");
-                }
-                return list;
-            };
-            patched._shuoyeNiluPatched = true;
-            game.qhly_getViewSkills = patched;
-        } catch (e) {}
-    };
-    patchQhlyKill();
-    if (lib.arenaReady) {
-        lib.arenaReady.push(patchQhlyKill);
     }
     // 可复制的技能黑名单：某些技能被其他角色获得后会卡死/报错，直接不让【灵咒】记录。
     // 发现新的问题技能时，把技能 id 加进这个数组即可（联机两端都需要同版本）。

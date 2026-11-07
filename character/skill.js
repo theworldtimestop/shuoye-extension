@@ -16526,7 +16526,23 @@ const skills = {
                 } catch (e) {}
             }, 1500);
         },
-        group: ["shuoye_huangjinzhibei_phase", "shuoye_huangjinzhibei_draw", "shuoye_huangjinzhibei_empty", "shuoye_huangjinzhibei_initial", "shuoye_huangjinzhibei_gain"],
+        group: ["shuoye_huangjinzhibei_phase", "shuoye_huangjinzhibei_draw", "shuoye_huangjinzhibei_empty", "shuoye_huangjinzhibei_initial", "shuoye_huangjinzhibei_gain", "shuoye_huangjinzhibei_kill"],
+        subSkill: {
+            kill: {
+                charlotte: true,
+                nopop: true,
+                popup: false,
+                silent: true,
+                forced: true,
+                trigger: { global: "die" },
+                filter(event, player) {
+                    return event.player !== player && event.source === player;
+                },
+                content(event, trigger, player) {
+                    lib.shuoyeNilu.voice("shuoye_kill_line1.mp3", 0, 2);
+                },
+            },
+        },
     },
 //#noname-kit-end skill:shuoye_huangjinzhibei
 //#noname-kit-begin skill:shuoye_huangjinzhibei_phase
@@ -16862,23 +16878,6 @@ const skills = {
         },
     },
 //#noname-kit-end skill:shuoye_shouzhizhiguan_lock_off
-//#noname-kit-begin skill:shuoye_kill_line
-    shuoye_kill_line: {
-        charlotte: true,
-        nopop: true,
-        popup: false,
-        silent: true,
-        forced: true,
-        audio: "ext:朔夜/audio/skill:1",
-        trigger: {
-            global: "die",
-        },
-        filter(event, player) {
-            return event.player !== player && event.source === player;
-        },
-        content(event, trigger, player) {},
-    },
-//#noname-kit-end skill:shuoye_kill_line
 //#noname-kit-begin skill:shuoye_huangjinzhibei_initial
     shuoye_huangjinzhibei_initial: {
         charlotte: true,
