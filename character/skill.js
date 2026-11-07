@@ -50,13 +50,28 @@ if (!lib.shuoyeNilu) {
             } catch (e) {
                 try { lib.shuoyeNilu.shouguanLog("[回归] in(true) 异常 " + (e && e.message)); } catch (e2) {}
             }
-            // 兜底：别人只用 classList.add("out") 实现的离场，两端一起删
+            // 客机同步：in()/restEnd() 改的只是主机本地状态，必须按 playerid 广播过去。
+            // 注意不能在 in(true) 之后再判 isOut()——那时主机已经不在场，广播就永远发不出去。
+            // 无条件发，主机重复执行也无害（wasOut 为 false 时不会重复打日志）。
             try {
-                if (target.isOut()) {
-                    game.broadcastAll(function (p) {
-                        try { p.classList.remove("out"); } catch (e) {}
-                    }, target);
-                }
+                game.broadcastAll(function (pid2) {
+                    try {
+                        const p = (lib.playerOL && lib.playerOL[pid2]) || (game.playerMap && game.playerMap[pid2]);
+                        if (p) {
+                            const wasOut = !!(p.classList && p.classList.contains("out"));
+                            p.outCount = 0;
+                            delete p.outSkills;
+                            if (wasOut && p.classList) {
+                                p.classList.remove("out");
+                                try {
+                                    game.log(p, "进入游戏");
+                                } catch (e) {}
+                            }
+                        }
+                        if (_status.shuoye_jingtu_return && _status.shuoye_jingtu_return[pid2]) delete _status.shuoye_jingtu_return[pid2];
+                        if (_status._rest_return && _status._rest_return[pid2]) delete _status._rest_return[pid2];
+                    } catch (e) {}
+                }, target.playerid);
             } catch (e) {}
             try {
                 if (_status.shuoye_jingtu_return && _status.shuoye_jingtu_return[target.playerid]) delete _status.shuoye_jingtu_return[target.playerid];
