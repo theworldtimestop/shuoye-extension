@@ -16616,7 +16616,7 @@ const skills = {
         locked: true,
         mark: true,
         markimage: "extension/朔夜/image/shuoye_shouzhishuzi.png",
-        group: ["shuoye_shouzhishuzi_record", "shuoye_shouzhishuzi_reset"],
+        group: ["shuoye_shouzhishuzi_record", "shuoye_shouzhishuzi_reset", "shuoye_shouzhishuzi_caochuan"],
         intro: {
             content(storage) {
                 if (!storage || !storage.length) return "尚未记录牌名。";
@@ -16771,6 +16771,39 @@ const skills = {
             return lib.skill.shuoye_shouzhishuzi.getPool(player).includes(name);
         },
         subSkill: {
+            // 草船借箭不是「打出响应」牌：官方的 caochuan_skill 只在手上有实体草船借箭时，
+            // 于 useCardToBegin 让你「使用」它。兽之数字的转化牌没有实体牌，
+            // 所以必须在这里复刻同一条使用线，才能用来抵消伤害牌。
+            caochuan: {
+                charlotte: true,
+                nopop: true,
+                popup: false,
+                silent: true,
+                forced: true,
+                trigger: { target: "useCardToBegin" },
+                filter(event, player) {
+                    if (event.directHit) return false;
+                    if (!event.card || !get.tag(event.card, "damage")) return false;
+                    if (!["basic", "trick"].includes(get.type(event.card))) return false;
+                    // 官方 caochuan_skill 已注册时交给它处理（它的 hasUsableCard 会通过 hiddenCard 放行兽之数字）
+                    if (Array.isArray(lib.skill.global) && lib.skill.global.includes("caochuan_skill")) return false;
+                    // 手上有实体【草船借箭】时也交给官方那条线，避免同一张牌弹两次
+                    if (player.hasCard((card) => get.name(card) === "caochuan", "h")) return false;
+                    if (player.countCards("h") < 2) return false;
+                    return lib.skill.shuoye_shouzhishuzi.getPool(player).includes("caochuan");
+                },
+                async content(event, trigger, player) {
+                    const next = player.chooseToUse();
+                    next.set(
+                        "prompt",
+                        "是否将两张手牌当做【草船借箭】响应" + get.translation(trigger.player) + "使用的" + get.translation(trigger.card) + "？"
+                    );
+                    next.set("filterCard", (card, player2) => get.name(card) === "caochuan" && lib.filter.cardEnabled(card, player2, "forceEnable"));
+                    next.set("respondTo", [trigger.player, trigger.card]);
+                    next.set("goon", -get.effect(player, trigger.card, trigger.player, player));
+                    next.set("ai1", () => _status.event.goon);
+                },
+            },
             record: {
                 charlotte: true,
                 nopop: true,
