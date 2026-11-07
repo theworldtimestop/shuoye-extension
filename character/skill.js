@@ -133,7 +133,12 @@ if (!lib.shuoyeNilu) {
             } catch (e) {}
         },
         // 开局演出：全屏静音播喝彩视频，同时换背景、换 BGM
+        // 返回 Promise：主机的视频播完（或 6 秒保底）时 resolve，方便调用方「先演出再选牌名」
         cheer(player) {
+            let resolveDone;
+            const done = new Promise(function (resolve) {
+                resolveDone = resolve;
+            });
             try {
                 // BGM 循环
                 game.broadcastAll(function () {
@@ -191,8 +196,8 @@ if (!lib.shuoyeNilu) {
                         }
                     } catch (e) {}
                 });
-                // 全屏静音视频（参考乙骨忧太）
-                game.broadcastAll(function () {
+                // 全屏静音视频（参考乙骨忧太）：主机本地播并回调 resolve，客机各自播
+                const runVideo = function (onDone) {
                     try {
                         const video = document.createElement("video");
                         video.autoplay = true;
@@ -211,27 +216,55 @@ if (!lib.shuoyeNilu) {
                         game.pause();
                         document.body.appendChild(video);
                         let closed = false;
+                        let pauseGuard = null;
                         const closeVideo = function () {
                             if (closed) return;
                             closed = true;
+                            if (pauseGuard) {
+                                try {
+                                    clearTimeout(pauseGuard);
+                                } catch (e) {}
+                            }
                             try {
                                 if (video.parentNode) video.parentNode.removeChild(video);
                             } catch (e) {}
                             try {
                                 game.resume();
                             } catch (e) {}
+                            if (typeof onDone === "function") {
+                                try {
+                                    onDone();
+                                } catch (e) {}
+                            }
                         };
+                        // 保险：视频加载/播放异常时最多 6 秒也会恢复
+                        pauseGuard = setTimeout(closeVideo, 6000);
                         video.onended = closeVideo;
                         video.onerror = closeVideo;
                         video.onloadedmetadata = function () {
                             const ms = Math.max(3000, (video.duration || 0) * 1000 + 1000);
-                            setTimeout(closeVideo, ms);
+                            setTimeout(closeVideo, Math.min(ms, 6000));
                         };
                         const p = video.play();
                         if (p && p.catch) p.catch(closeVideo);
-                    } catch (e) {}
-                });
-            } catch (e) {}
+                    } catch (e) {
+                        if (typeof onDone === "function") {
+                            try {
+                                onDone();
+                            } catch (e2) {}
+                        }
+                    }
+                };
+                runVideo(resolveDone);
+                try {
+                    game.broadcast(runVideo, null);
+                } catch (e) {}
+            } catch (e) {
+                try {
+                    resolveDone();
+                } catch (e2) {}
+            }
+            return done;
         },
         // 尼禄的常驻特效：四周锯齿轮射红光 + 武将牌内血雨（参考李信 aura）
         aura(player) {
@@ -16562,6 +16595,9 @@ const skills = {
             global: "gameStart",
         },
         async content(event, trigger, player) {
+            try {
+                if (lib.shuoyeNilu && lib.shuoyeNilu.shouguanLog) lib.shuoyeNilu.shouguanLog("[开局] 黄金之杯 gameStart content 开始 player=" + get.translation(player) + " online=" + game.online + " connect=" + _status.connectMode);
+            } catch (e) {}
             player.storage.shuoye_huangjinzhibei = 666;
             if (typeof player.syncStorage === "function") player.syncStorage("shuoye_huangjinzhibei");
             player.markSkill("shuoye_huangjinzhibei");
@@ -16569,8 +16605,10 @@ const skills = {
                 lib.shuoyeNilu.aura(player);
             } catch (e) {}
             lib.shuoyeNilu.attach(player);
+            // 先播开场演出再选牌名。chooseButton 自己会 game.pause()，
+            // 和视频的 game.pause() 抢同一个 Deferred，所以 cheer 要等视频结束（或 6 秒保底）才返回。
             try {
-                lib.shuoyeNilu.cheer(player);
+                await lib.shuoyeNilu.cheer(player);
             } catch (e) {}
             try {
                 await lib.skill.shuoye_shouzhishuzi.chooseNames(player);
@@ -16703,31 +16741,48 @@ const skills = {
             return names.filter((name) => !used.has(name));
         },
         async chooseNames(player) {
-            const pool = lib.skill.shuoye_shouzhishuzi.getSelectablePool();
-            const num = Math.min(6, pool.length);
-            if (!num) return;
-            const list = pool.map((name) => {
-                const type = get.type(name);
-                return [type === "basic" ? "基本" : "锦囊", "", name];
-            });
-            const result = await player
-                .chooseButton([`兽之数字：选择${get.cnNumber(num)}种牌名`, [list, "vcard"]])
-                .set("selectButton", [num, num])
-                .set("forced", true)
-                .set("ai", (button) => {
-                    const name = button.link[2];
-                    if (["sha", "shan", "tao", "wuxie"].includes(name)) return 8 + Math.random();
-                    if (["juedou", "huogong", "shuoye_shouzhizhiguan"].includes(name)) return 6 + Math.random();
-                    return 3 + Math.random();
-                })
-                .forResult();
-            if (result.bool && result.links && result.links.length) {
-                player.setStorage(
-                    "shuoye_shouzhishuzi",
-                    result.links.map((link) => (link && link.link ? link.link[2] : link && link[2])).filter(Boolean)
-                );
-                player.markSkill("shuoye_shouzhishuzi");
-                lib.shuoyeNilu.voice("shuoye_shouzhishuzi1.mp3", 0);
+            const log = (text) => {
+                try {
+                    if (lib.shuoyeNilu && lib.shuoyeNilu.shouguanLog) lib.shuoyeNilu.shouguanLog("[选名] " + text);
+                } catch (e) {}
+            };
+            try {
+                log("开始 player=" + (player && player.name) + " online=" + game.online + " paused=" + _status.paused + " connect=" + _status.connectMode);
+                // 不在这里 game.resume()：chooseButton 自己会 game.pause()，
+                // 而开场视频的 closeVideo 也会全局 resume，两边的暂停会互相顶掉，
+                // 表现为选牌界面刚出现就被关掉。让视频先结束（最多 6 秒保底）再弹选牌名。
+                const pool = lib.skill.shuoye_shouzhishuzi.getSelectablePool();
+                const num = Math.min(6, pool.length);
+                if (!num) {
+                    log("候选池为空，跳过");
+                    return;
+                }
+                const list = pool.map((name) => {
+                    const type = get.type(name);
+                    return [type === "basic" ? "基本" : "锦囊", "", name];
+                });
+                const result = await player
+                    .chooseButton([`兽之数字：选择${get.cnNumber(num)}种牌名`, [list, "vcard"]])
+                    .set("selectButton", [num, num])
+                    .set("forced", true)
+                    .set("ai", (button) => {
+                        const name = button.link[2];
+                        if (["sha", "shan", "tao", "wuxie"].includes(name)) return 8 + Math.random();
+                        if (["juedou", "huogong", "shuoye_shouzhizhiguan"].includes(name)) return 6 + Math.random();
+                        return 3 + Math.random();
+                    })
+                    .forResult();
+                log("结果 bool=" + (result && result.bool) + " links=" + (result && result.links && result.links.length));
+                if (result.bool && result.links && result.links.length) {
+                    player.setStorage(
+                        "shuoye_shouzhishuzi",
+                        result.links.map((link) => (link && link.link ? link.link[2] : link && link[2])).filter(Boolean)
+                    );
+                    player.markSkill("shuoye_shouzhishuzi");
+                    lib.shuoyeNilu.voice("shuoye_shouzhishuzi1.mp3", 0);
+                }
+            } catch (e) {
+                log("异常 " + (e && e.message));
             }
         },
         // 不能叫 available：引擎 finishSkill 会以 (mode) 调用 skill.available 做模式检查，撞名即崩
