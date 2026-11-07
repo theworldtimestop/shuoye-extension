@@ -198,6 +198,9 @@ if (!lib.shuoyeNilu) {
                 });
                 // 全屏静音视频（参考乙骨忧太）：主机本地播并回调 resolve，客机各自播
                 const runVideo = function (onDone) {
+                    // 只有主机暂停游戏。客机暂停后没有可选的操作时机，
+                    // 视频事件万一来不齐就会一直停在暂停状态，所以客机只播画面、不阻塞。
+                    const isHost = !game.online;
                     try {
                         const video = document.createElement("video");
                         video.autoplay = true;
@@ -213,7 +216,7 @@ if (!lib.shuoyeNilu) {
                             video.style.opacity = "1";
                         };
                         video.src = lib.assetURL + "extension/朔夜/audio/nilu_cheer.mp4";
-                        game.pause();
+                        if (isHost) game.pause();
                         document.body.appendChild(video);
                         let closed = false;
                         let pauseGuard = null;
@@ -228,9 +231,11 @@ if (!lib.shuoyeNilu) {
                             try {
                                 if (video.parentNode) video.parentNode.removeChild(video);
                             } catch (e) {}
-                            try {
-                                game.resume();
-                            } catch (e) {}
+                            if (isHost) {
+                                try {
+                                    game.resume();
+                                } catch (e) {}
+                            }
                             if (typeof onDone === "function") {
                                 try {
                                     onDone();
@@ -248,6 +253,11 @@ if (!lib.shuoyeNilu) {
                         const p = video.play();
                         if (p && p.catch) p.catch(closeVideo);
                     } catch (e) {
+                        if (isHost) {
+                            try {
+                                game.resume();
+                            } catch (e2) {}
+                        }
                         if (typeof onDone === "function") {
                             try {
                                 onDone();
@@ -256,6 +266,7 @@ if (!lib.shuoyeNilu) {
                     }
                 };
                 runVideo(resolveDone);
+                // 客机也播一遍，但不 pause（见 runVideo 里的 isHost）
                 try {
                     game.broadcast(runVideo, null);
                 } catch (e) {}
