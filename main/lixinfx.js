@@ -1851,7 +1851,7 @@ export function installLixinFx() {
 					const path = String(options.path || "");
 					// 李信系列语音：技能是 shuoye_lx_*，本体阵亡是 shuoye_lixin1；
 					// 详情页/皮肤页给的路径不带扩展名（引擎会自己补 .mp3），所以只认音频目录，后缀自己补
-					if (/(?:shuoye_lx|shuoye_lixin)/i.test(path) && /(?:^|\/)(?:skill|die)\//i.test(path)) {
+					if (/(?:shuoye_lx|shuoye_lixin|shuoye_nilu|shuoye_huangjin|shuoye_shouzhishuzi|shuoye_shouzhizhiguan|shuoye_kill_line)/i.test(path) && /(?:^|\/)(?:skill|die)\//i.test(path)) {
 						if (_status.video && !options.video) {
 							return;
 						}

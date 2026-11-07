@@ -186,7 +186,7 @@ export async function precontent() {
             console.error("Error:『朔夜』扩展导入失败" + err.message);
         });
 
-    game.playshuoyeMP4 = function (name, time, book, player) {
+    game.playshuoyeMP4 = function (name, time, book, player, mute) {
         if (!game.getFileList || !player || !player.node || !player.node.avatar) return;
         let gameOn = false;
         if (game.me && game.me.name) gameOn = true;
@@ -201,6 +201,10 @@ export async function precontent() {
         }
         let video = document.createElement("video");
         video.setAttribute("autoplay", "autoplay");
+        if (mute) {
+            video.muted = true;
+            video.volume = 0;
+        }
         video.src = lib.assetURL + "extension/朔夜/" + name + ".mp4?t=" + Date.now();
         player.node.avatar.appendChild(video);
         video.style.margin = "0";
@@ -281,6 +285,7 @@ export async function precontent() {
             if (ui.backgroundMusic) {
                 try {
                     ui.backgroundMusic.playbackRate = 1;
+                    ui.backgroundMusic.loop = false;
                 } catch (e) {}
             }
             return shuoyePlayBgm.apply(this, arguments);

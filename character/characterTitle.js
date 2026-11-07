@@ -17,5 +17,6 @@ const characterTitles = {
 	shuoye_leinhaite: "混沌地王",
 	shuoye_longyan: "虐龙古咒",
 	shuoye_shengyuxieyan: "堕神",
+	shuoye_nilu: '<span style="color:#AA0000;-webkit-text-stroke:0.6px #e8c25a;text-shadow:0 0 3px rgba(232,194,90,.9),0 0 9px rgba(200,150,30,.55),0 0 18px rgba(160,120,20,.35);font-weight:700;">所多玛之兽</span>',
 };
 export default characterTitles;

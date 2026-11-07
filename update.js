@@ -13,6 +13,7 @@ const LOCAL_ONLY = [
 	/(^|\/)backup(\/|$)/i,
 	/\.bak$/i,
 	/(^|\/)assets(\/|$)/i,
+	/(^|\/)audio\/nilu_(bgm|cheer)/i,
 	/^genManifest\.js$/,
 	/^noname-kit\.history\.json$/,
 ];

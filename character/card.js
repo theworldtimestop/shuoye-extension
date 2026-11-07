@@ -154,5 +154,97 @@ const cards = {
         },
     },
 //#noname-kit-end card:shuoye_lx_shuiyan
+//#noname-kit-begin card:shuoye_shouzhizhiguan
+    shuoye_shouzhizhiguan: {
+        fullskin: true,
+        image: "ext:朔夜/image/shuoye_shouzhizhiguan.jpg",
+        type: "delay",
+        enable: true,
+        filterTarget(card, player, target) {
+            return target != player && lib.filter.judge(card, player, target);
+        },
+        judge(card) {
+            const num = get.number(card);
+            return typeof num === "number" && num % 3 === 0 ? 1 : -2;
+        },
+        judge2(result) {
+            return result.bool === false;
+        },
+        async content(event, trigger, player) {
+            const target = event.target;
+            const cards = event.cards || [];
+            let num = get.number(event.card);
+            if (typeof num !== "number") {
+                if (cards.length > 1) {
+                    num = cards.reduce((sum, one) => sum + (get.number(one) || 0), 0);
+                } else if (cards.length) {
+                    num = get.number(cards[0]) || 0;
+                } else {
+                    num = 0;
+                }
+            }
+            num = Math.max(0, Math.min(13, num || 0));
+            let judgeTarget = target;
+            const outs = game.players.filter((current) => current != player && current.isOut() && !current.isDead());
+            if (outs.length) {
+                const list = outs.map((current) => [current, get.translation(current)]);
+                const result = await player
+                    .chooseButton(["是否令一名离开游戏或修整的角色回归？", [list, "player"]])
+                    .set("ai", (button) => (get.attitude(get.player(), button.link) > 0 ? 1 : 0))
+                    .forResult();
+                if (result.bool && result.links && result.links.length) {
+                    const revived = result.links[0];
+                    const bool = await lib.card.shuoye_shouzhizhiguan.revive(revived);
+                    if (bool) {
+                        judgeTarget = revived;
+                        await revived.draw();
+                    }
+                }
+            }
+            lib.shuoyeNilu.voice("shuoye_shouzhizhiguan3.mp3");
+            await judgeTarget.addJudge({ name: "shuoye_shouzhizhiguan", number: num }, cards);
+            judgeTarget.addSkill("shuoye_shouzhizhiguan_lock");
+        },
+        async revive(target) {
+            try {
+                if (!target || target.isDead()) return false;
+                if (typeof target.restEnd === "function" && target.isRest && target.isRest()) {
+                    await target.restEnd();
+                } else {
+                    target.in();
+                }
+                if (_status._rest_return && _status._rest_return[target.playerid]) {
+                    delete _status._rest_return[target.playerid];
+                }
+                return true;
+            } catch (e) {
+                return false;
+            }
+        },
+        async effect(event, trigger, player) {
+            const result = event._result || {};
+            const judgeCard = result.card;
+            if (result.bool) {
+                lib.shuoyeNilu.voice("shuoye_shouzhizhiguan1.mp3", 0);
+                if (judgeCard && !get.owner(judgeCard)) await player.gain(judgeCard, "gain2");
+            } else {
+                lib.shuoyeNilu.voice("shuoye_shouzhizhiguan2.mp3", 0);
+                await player.damage(1, "fire");
+            }
+        },
+        ai: {
+            basic: {
+                order: 2,
+                useful: 3,
+                value: 5,
+            },
+            result: {
+                target(player, target) {
+                    return -1;
+                },
+            },
+        },
+    },
+//#noname-kit-end card:shuoye_shouzhizhiguan
 };
 export default cards;

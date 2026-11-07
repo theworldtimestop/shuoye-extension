@@ -2,6 +2,29 @@ import { lib, game, ui, get, ai, _status } from '../../../../noname.js'
 import update from "../update.js";
 import { EXTENSION_VERSION } from "../version.js";
 export async function content(config, pack) {
+    // 【尼禄】自定义势力「兽」
+    try {
+        if (!lib.group.includes("shou")) {
+            game.addGroup("shou", "兽", "兽");
+            lib.groupnature.shou = "firemm";
+        }
+    } catch (e) {}
+    // 【尼禄】调试开关：只有开了配置才把调试技能挂进武将技能表（没开时连名字和描述都不显示）
+    try {
+        const niluChar = lib.character && lib.character.shuoye_nilu;
+        if (niluChar && Array.isArray(niluChar[3])) {
+            const debugOn = !!lib.config["extension_朔夜_nilu_debug"];
+            const idx = niluChar[3].indexOf("shuoye_nilu_debug");
+            if (debugOn && idx < 0) niluChar[3].push("shuoye_nilu_debug");
+            if (!debugOn && idx >= 0) niluChar[3].splice(idx, 1);
+        }
+    } catch (e) {}
+    // 【尼禄】阵亡语音：显式指向扩展目录，否则引擎默认找 audio/die/shuoye_nilu.mp3（不存在）
+    try {
+        if (lib.character && lib.character.shuoye_nilu) {
+            lib.character.shuoye_nilu.dieAudios = ["ext:朔夜/audio/die/shuoye_nilu1", "ext:朔夜/audio/die/shuoye_nilu2"];
+        }
+    } catch (e) {}
     // 带样式的技能名（如【此身即无间】）：十周年UI 的技能栅会自己给名字套【】，
     // 照【坐杀博徒】的办法：外层文字设为 0 号字只留 span，再补一个「：」
     try {
@@ -11,7 +34,14 @@ export async function content(config, pack) {
             style.innerHTML =
                 ".xskill > div[data-color]:has(span.shs-gold){font-size:0 !important;}" +
                 ".xskill > div[data-color] span.shs-gold{font-size:16px !important;letter-spacing:0;}" +
-                ".xskill > div[data-color]:has(span.shs-gold)::after{content:'：';font-size:16px;color:#5a4a72;}";
+                ".xskill > div[data-color]:has(span.shs-gold)::after{content:'：';font-size:16px;color:#5a4a72;}" +
+                "@keyframes snfGlowPulse{0%,100%{opacity:.5;transform:scale(.97);}50%{opacity:.9;transform:scale(1.04);}}" +
+                "@keyframes snfSpikePulse{0%,100%{opacity:.18;}50%{opacity:.95;}}" +
+                "@keyframes snfRain{from{background-position:0 -120px;}to{background-position:0 0;}}" +
+                ".shuoye-nilu-fx{position:absolute;pointer-events:none;z-index:2;overflow:visible;}" +
+                ".shuoye-nilu-fx .snf-glow{position:absolute;inset:-8px;border-radius:8px;background:radial-gradient(circle at 50% 50%,rgba(255,40,40,.22) 0%,rgba(255,20,20,.1) 45%,rgba(180,0,0,0) 70%);filter:blur(4px);animation:snfGlowPulse 2.6s ease-in-out infinite;}" +
+                ".shuoye-nilu-fx .snf-spike{position:absolute;width:8px;clip-path:polygon(50% 0%,88% 100%,12% 100%);background:linear-gradient(180deg,rgba(255,90,80,.95),rgba(220,20,20,.5) 60%,rgba(180,0,0,0));transform-origin:50% 100%;animation:snfSpikePulse 2.4s ease-in-out infinite;}" +
+                ".shuoye-nilu-fx .snf-rain{position:absolute;inset:0;border-radius:6px;overflow:hidden;background-image:url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72' height='120' viewBox='0 0 72 120'%3E%3Cg fill='%238a0a0a'%3E%3Cpath d='M8 6c0 0-1.6 11-1.6 13.4a1.6 1.6 0 0 0 3.2 0C9.6 17 8 6 8 6z'/%3E%3Cpath d='M40 34c0 0-1.3 9-1.3 11a1.3 1.3 0 0 0 2.6 0C41.3 43 40 34 40 34z'/%3E%3Cpath d='M62 70c0 0-1.5 10.4-1.5 12.7a1.5 1.5 0 0 0 3 0C63.5 80.4 62 70 62 70z'/%3E%3Cpath d='M24 88c0 0-1.2 8.4-1.2 10.2a1.2 1.2 0 0 0 2.4 0C25.2 96.4 24 88 24 88z'/%3E%3C/g%3E%3C/svg%3E\");background-size:72px 120px;background-repeat:repeat;animation:snfRain 1.8s linear infinite;opacity:.9;}";
             document.head.appendChild(style);
         }
     } catch (e) {}
@@ -53,10 +83,59 @@ export async function content(config, pack) {
     if (lib.arenaReady) {
         lib.arenaReady.push(patchWuxie);
     }
+    // 【尼禄】千幻的阵亡按钮只取 dieAudios 第一句，这里改成随机播两句之一
+    const patchQhlyDie = () => {
+        try {
+            if (typeof window.qhly_playDieAudio !== "function" || window.qhly_playDieAudio._shuoyeNiluPatched) return;
+            const originDie = window.qhly_playDieAudio;
+            const patchedDie = function (name) {
+                if (name === "shuoye_nilu") {
+                    try {
+                        const list = ["ext:朔夜/audio/die/shuoye_nilu1.mp3", "ext:朔夜/audio/die/shuoye_nilu2.mp3"];
+                        game.playAudio(list[Math.floor(Math.random() * list.length)]);
+                        return;
+                    } catch (e) {}
+                }
+                return originDie.apply(this, arguments);
+            };
+            patchedDie._shuoyeNiluPatched = true;
+            window.qhly_playDieAudio = patchedDie;
+        } catch (e) {}
+    };
+    patchQhlyDie();
+    if (lib.arenaReady) {
+        lib.arenaReady.push(patchQhlyDie);
+    }
+    // 【尼禄】击杀台词只在详情页显示：千幻的台词面板会过滤 nopop，这里补回去
+    const patchQhlyKill = () => {
+        try {
+            if (typeof game.qhly_getViewSkills !== "function" || game.qhly_getViewSkills._shuoyeNiluPatched) return;
+            const originView = game.qhly_getViewSkills;
+            const patched = function (name) {
+                const list = originView.apply(this, arguments);
+                if (name === "shuoye_nilu" && Array.isArray(list) && !list.includes("shuoye_kill_line")) {
+                    list.push("shuoye_kill_line");
+                }
+                return list;
+            };
+            patched._shuoyeNiluPatched = true;
+            game.qhly_getViewSkills = patched;
+        } catch (e) {}
+    };
+    patchQhlyKill();
+    if (lib.arenaReady) {
+        lib.arenaReady.push(patchQhlyKill);
+    }
     // 可复制的技能黑名单：某些技能被其他角色获得后会卡死/报错，直接不让【灵咒】记录。
     // 发现新的问题技能时，把技能 id 加进这个数组即可（联机两端都需要同版本）。
     if (!Array.isArray(lib.shuoyeCopyBlacklist)) {
         lib.shuoyeCopyBlacklist = [];
+    }
+    // 尼禄的技能依赖黄金之杯的私有存储，被复制后没有意义且会改掉对方的阶段表
+    for (const skill of ["shuoye_huangjinzhibei", "shuoye_shouzhishuzi", "shuoye_huangjinjuchang"]) {
+        if (!lib.shuoyeCopyBlacklist.includes(skill)) {
+            lib.shuoyeCopyBlacklist.push(skill);
+        }
     }
 
     // 召唤物（里香）的友敌判定：除了在 lx.ai 上挂 mod，再给 get.attitude 加一层
@@ -245,7 +324,7 @@ export async function content(config, pack) {
     }
     // 评级：SSS -> legend，SS -> epic，S -> rare，A -> junk
     const shuoyeRarity = {
-        legend: ["shuoye_u_aoerjiamali", "shuoye_taikongyishitaer", "shuoye_shuoye", "shuoye_zhenshiqiaotelude", "shuoye_yiguyoutai", "shuoye_lixin", "shuoye_shengyuxieyan"],
+        legend: ["shuoye_u_aoerjiamali", "shuoye_taikongyishitaer", "shuoye_shuoye", "shuoye_zhenshiqiaotelude", "shuoye_yiguyoutai", "shuoye_lixin", "shuoye_shengyuxieyan", "shuoye_nilu"],
         epic: ["shuoye_chengjinji", "shuoye_miaoshitiannv", "shuoye_tianqixinghun", "shuoye_xituo", "shuoye_qiaolienide", "shuoye_chongtiansiling", "shuoye_luxi", "shuoye_wuweijuezhe", "shuoye_kongyuanxingzhe", "shuoye_wuxinchan", "shuoye_dilutianfeng", "shuoye_lx_guang", "shuoye_lx_an"],
         rare: [
             "shuoye_zuguoren", "shuoye_ailisi", "shuoye_feiniaomashi", "shuoye_fengchuanxiangzi",

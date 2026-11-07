@@ -5,6 +5,378 @@ import { lib, game, ui, get, ai, _status } from "noname";
 // 改成 false 后，记得把 translate.js 里 shuoye_fazhou_info 的「体力上限」改回「体力值」。
 const DILU_FAZHOU_USE_MAXHP = true;
 
+// ===== 【尼禄】黄金之杯 / 兽冠 / 语音公共入口 =====
+// 这些函数会被 content 里的 StepCompiler 编译后调用，必须挂在 lib 上（全局作用域），
+// 不能依赖模块闭包，否则联机客机重建函数时找不到。
+if (!lib.shuoyeNilu) {
+    lib.shuoyeNilu = {
+        voiceLast: 0,
+        // 播放技能台词：默认 2 秒内不重复触发；gain 为增益倍数（默认 1.5）
+        voice(files, gap, gain) {
+            try {
+                if (game.online) return;
+                if (!files) return;
+                const now = Date.now();
+                const limit = typeof gap === "number" ? gap : 2000;
+                if (now - lib.shuoyeNilu.voiceLast < limit) return;
+                lib.shuoyeNilu.voiceLast = now;
+                const list = (Array.isArray(files) ? files : [files]).filter(Boolean);
+                if (!list.length) return;
+                const boost = typeof gain === "number" && gain > 0 ? gain : 1.5;
+                const urls = list.map((file) => lib.assetURL + "extension/朔夜/audio/skill/" + file);
+                const run = function (list2, boost2) {
+                    try {
+                        if (lib.config && lib.config.background_speak === false) return;
+                        if (typeof Audio === "undefined") return;
+                        const audio = new Audio(list2[0]);
+                        const base = lib.config && typeof lib.config.volumn_audio === "number" ? lib.config.volumn_audio / 8 : 1;
+                        audio.volume = Math.max(0, Math.min(1, base));
+                        // 照【李信】playBoosted 的做法：AudioContext + GainNode 把台词放大 1.5 倍
+                        let ctx = null;
+                        try {
+                            const Ctx = typeof window !== "undefined" && (window.AudioContext || window.webkitAudioContext);
+                            if (Ctx) {
+                                ctx = new Ctx();
+                                if (ctx.state === "suspended") {
+                                    try {
+                                        ctx.resume();
+                                    } catch (e) {}
+                                }
+                                const src = ctx.createMediaElementSource(audio);
+                                const gainNode = ctx.createGain();
+                                gainNode.gain.value = boost2;
+                                src.connect(gainNode);
+                                gainNode.connect(ctx.destination);
+                            }
+                        } catch (e) {
+                            try {
+                                if (ctx) ctx.close();
+                            } catch (e2) {}
+                            ctx = null;
+                        }
+                        if (!ctx) {
+                            try {
+                                audio.volume = Math.min(1, Math.max(0, base) * boost2);
+                            } catch (e) {}
+                        }
+                        const close = function () {
+                            try {
+                                if (ctx && ctx.state !== "closed") ctx.close();
+                            } catch (e) {}
+                        };
+                        if (ctx) {
+                            audio.addEventListener("ended", close);
+                            setTimeout(close, 30000);
+                        }
+                        const p = audio.play && audio.play();
+                        if (p && p.catch) p.catch(() => {});
+                    } catch (e) {}
+                };
+                game.broadcast(run, urls, boost);
+                run(urls, boost);
+            } catch (e) {}
+        },
+        // 开局演出：全屏静音播喝彩视频，同时换背景、换 BGM
+        cheer(player) {
+            try {
+                // BGM 循环
+                game.broadcastAll(function () {
+                    try {
+                        const bgm = ui.backgroundMusic;
+                        if (!bgm) return;
+                        bgm.loop = true;
+                        bgm.src = lib.assetURL + "extension/朔夜/audio/nilu_bgm.mp3";
+                        bgm.volume = lib.config.volumn_background / 8;
+                        // BGM 音量翻倍：元素音量上限 1，走 WebAudio 增益（参考 playBgmOnce）
+                        let bgmGain = bgm._shuoyeGain;
+                        if (!bgmGain) {
+                            try {
+                                const Ctx = window.AudioContext || window.webkitAudioContext;
+                                if (Ctx) {
+                                    const ctx = new Ctx();
+                                    if (ctx.state === "running") {
+                                        const src = ctx.createMediaElementSource(bgm);
+                                        const gn = ctx.createGain();
+                                        gn.gain.value = 1;
+                                        src.connect(gn);
+                                        gn.connect(ctx.destination);
+                                        bgm._shuoyeCtx = ctx;
+                                        bgm._shuoyeGain = bgmGain = gn;
+                                    } else {
+                                        try {
+                                            ctx.close();
+                                        } catch (e) {}
+                                    }
+                                }
+                            } catch (e) {}
+                        }
+                        if (bgmGain) {
+                            try {
+                                bgmGain.gain.value = 2;
+                            } catch (e) {}
+                        } else {
+                            try {
+                                bgm.volume = Math.min(1, (lib.config.volumn_background / 8) * 2);
+                            } catch (e) {}
+                        }
+                        const p = bgm.play();
+                        if (p && p.catch) p.catch(() => {});
+                    } catch (e) {}
+                });
+                // 背景铺满
+                game.broadcastAll(function () {
+                    try {
+                        if (ui.background && ui.background.setBackgroundImage) {
+                            ui.background.setBackgroundImage("extension/朔夜/image/nilu_bg.jpg");
+                            if (ui.background.style) {
+                                ui.background.style.backgroundSize = "cover";
+                                ui.background.style.backgroundPosition = "50% 50%";
+                            }
+                        }
+                    } catch (e) {}
+                });
+                // 全屏静音视频（参考乙骨忧太）
+                game.broadcastAll(function () {
+                    try {
+                        const video = document.createElement("video");
+                        video.autoplay = true;
+                        video.loop = false;
+                        video.muted = true;
+                        video.playsInline = true;
+                        video.preload = "auto";
+                        video.style.cssText = "position:fixed;left:0;top:0;width:100%;height:100%;object-fit:contain;background:#000;z-index:2147483647;pointer-events:none;opacity:0;transition:opacity .2s linear;";
+                        video.oncanplay = function () {
+                            video.style.opacity = "1";
+                        };
+                        video.onplaying = function () {
+                            video.style.opacity = "1";
+                        };
+                        video.src = lib.assetURL + "extension/朔夜/audio/nilu_cheer.mp4";
+                        game.pause();
+                        document.body.appendChild(video);
+                        let closed = false;
+                        const closeVideo = function () {
+                            if (closed) return;
+                            closed = true;
+                            try {
+                                if (video.parentNode) video.parentNode.removeChild(video);
+                            } catch (e) {}
+                            try {
+                                game.resume();
+                            } catch (e) {}
+                        };
+                        video.onended = closeVideo;
+                        video.onerror = closeVideo;
+                        video.onloadedmetadata = function () {
+                            const ms = Math.max(3000, (video.duration || 0) * 1000 + 1000);
+                            setTimeout(closeVideo, ms);
+                        };
+                        const p = video.play();
+                        if (p && p.catch) p.catch(closeVideo);
+                    } catch (e) {}
+                });
+            } catch (e) {}
+        },
+        // 尼禄的常驻特效：四周锯齿轮射红光 + 武将牌内血雨（参考李信 aura）
+        aura(player) {
+            try {
+                if (!player || !player.node || !player.node.avatar) return;
+                const pid = player.playerid;
+                const run = function (pid2) {
+                    try {
+                        const player2 = (lib.playerOL && lib.playerOL[pid2]) || game.playerMap[pid2];
+                        if (!player2 || !player2.node || !player2.node.avatar) return;
+                        const host = player2;
+                        const av = player2.node.avatar;
+                        const pr = host.getBoundingClientRect();
+                        const ar = av.getBoundingClientRect();
+                        if (!pr.width) return;
+                        const scale = host.offsetWidth / pr.width;
+                        let box = host.querySelector(".shuoye-nilu-fx");
+                        if (!box) {
+                            box = document.createElement("div");
+                            box.className = "shuoye-nilu-fx";
+                            const glow = document.createElement("div");
+                            glow.className = "snf-glow";
+                            box.appendChild(glow);
+                            const lowPerf = !!(lib.config && lib.config.low_performance);
+                            const spikeCount = lowPerf ? 6 : 10;
+                            const aw = av.offsetWidth || 100;
+                            const ah = av.offsetHeight || 140;
+                            for (let i = 0; i < spikeCount; i++) {
+                                const spike = document.createElement("div");
+                                spike.className = "snf-spike";
+                                const angle = Math.random() * 360;
+                                const h = 28 + Math.random() * 26;
+                                const dist = aw * 0.42 + Math.random() * aw * 0.22;
+                                const rad = (angle * Math.PI) / 180;
+                                const x = 50 + ((Math.cos(rad) * dist) / aw) * 100;
+                                const y = 50 + ((Math.sin(rad) * dist) / ah) * 100;
+                                spike.style.height = h + "px";
+                                spike.style.marginTop = -h + "px";
+                                spike.style.left = x.toFixed(1) + "%";
+                                spike.style.top = y.toFixed(1) + "%";
+                                spike.style.transform = "rotate(" + (angle + 90).toFixed(1) + "deg)";
+                                spike.style.animationDelay = (Math.random() * 2).toFixed(2) + "s";
+                                box.appendChild(spike);
+                            }
+                            const rain = document.createElement("div");
+                            rain.className = "snf-rain";
+                            box.appendChild(rain);
+                            host.appendChild(box);
+                        }
+                        box.style.left = (ar.left - pr.left) * scale + "px";
+                        box.style.top = (ar.top - pr.top) * scale + "px";
+                        box.style.width = ar.width * scale + "px";
+                        box.style.height = ar.height * scale + "px";
+                    } catch (e) {}
+                };
+                game.broadcast(run, pid);
+                run(pid);
+            } catch (e) {}
+        },
+        // 给尼禄挂上私有牌库（摸牌/判定改为从黄金之杯取牌）
+        attach(player) {
+            try {
+                const install = function (player2) {
+                    if (!player2) return;
+                    player2.getTopCards = function (num) {
+                        if (typeof num !== "number" || isNaN(num)) num = 1;
+                        const cards = [];
+                        const key = "shuoye_huangjinzhibei";
+                        if (!this.storage || typeof this.storage[key] !== "number") return cards;
+                        const suits = ["spade", "heart", "club", "diamond"];
+                        let left = this.storage[key];
+                        for (let i = 0; i < num; i++) {
+                            if (left <= 0) break;
+                            try {
+                                cards.push(game.createCard("ying", suits[left % 4], 6));
+                            } catch (e) {
+                                break;
+                            }
+                            left--;
+                        }
+                        if (left !== this.storage[key]) {
+                            this.storage[key] = left;
+                            if (typeof this.syncStorage === "function") this.syncStorage(key);
+                            if (typeof this.updateMarks === "function") this.updateMarks();
+                        }
+                        return cards;
+                    };
+                };
+                game.broadcast(install, player);
+                install(player);
+            } catch (e) {}
+        },
+        // 开局倒入黄金之杯的动画：牌一张接一张从屏幕中央飞向武将牌上的金杯标记
+        pourAnim(player) {
+            try {
+                if (!player || !player.node) return;
+                const run = function (player2) {
+                    try {
+                        if (!player2 || !player2.node) return;
+                        if (typeof setTimeout !== "function") return;
+                        const parent = player2.parentNode;
+                        if (!parent || !parent.getBoundingClientRect) return;
+                        let mark = null;
+                        try {
+                            const mk = player2.marks || {};
+                            for (const key in mk) {
+                                if (key.indexOf("shuoye_huangjinzhibei") === 0) {
+                                    mark = mk[key];
+                                    break;
+                                }
+                            }
+                        } catch (e) {}
+                        if (!mark) mark = player2.node.avatar;
+                        if (!mark) return;
+                        const prect = parent.getBoundingClientRect();
+                        const sx = (parent.offsetWidth || prect.width || 1) / (prect.width || 1);
+                        const sy = (parent.offsetHeight || prect.height || 1) / (prect.height || 1);
+                        const mrect = mark.getBoundingClientRect();
+                        const cx = (mrect.left - prect.left) * sx + (mrect.width * sx) / 2;
+                        const cy = (mrect.top - prect.top) * sy + (mrect.height * sy) / 2;
+                        const baseX = (parent.offsetWidth || prect.width) / 2 - 52;
+                        const baseY = (parent.offsetHeight || prect.height) / 2 - 52;
+                        let count = 0;
+                        const total = 80;
+                        const step = function () {
+                            if (count >= total) return;
+                            count++;
+                            try {
+                                const node = ui.create.div(".card.thrown.drawingcard");
+                                node.classList.add("infoflip");
+                                node.classList.add("infohidden");
+                                node.fixed = true;
+                                node.style.position = "absolute";
+                                node.style.zIndex = "80";
+                                const jx = (Math.random() - 0.5) * 16;
+                                const jy = (Math.random() - 0.5) * 16;
+                                node.style.left = baseX + jx + "px";
+                                node.style.top = baseY + jy + "px";
+                                node.style.opacity = "0.95";
+                                parent.appendChild(node);
+                                node.style.transitionDuration = "0.7s";
+                                ui.refresh(node);
+                                const dx = cx - (baseX + 52 + jx);
+                                const dy = cy - (baseY + 52 + jy);
+                                node.style.transform = "translate(" + dx + "px," + dy + "px) scale(0.72)";
+                                setTimeout(function () {
+                                    try {
+                                        node.delete();
+                                    } catch (e) {}
+                                }, 860);
+                            } catch (e) {}
+                            setTimeout(step, 52);
+                        };
+                        setTimeout(step, 60);
+                    } catch (e) {}
+                };
+                if (typeof game !== "undefined" && game.broadcastAll) game.broadcastAll(run, player);
+                else run(player);
+            } catch (e) {}
+        },
+        // 从黄金之杯取牌
+        take(player, num) {
+            try {
+                if (!player || typeof player.getTopCards !== "function") return [];
+                return player.getTopCards(num);
+            } catch (e) {
+                return [];
+            }
+        },
+        // 杯空即死
+        checkEmpty(player) {
+            try {
+                if (!player || !player.isAlive || !player.isAlive()) return null;
+                if (!player.storage || typeof player.storage.shuoye_huangjinzhibei !== "number") return null;
+                if (player.storage.shuoye_huangjinzhibei > 0) return null;
+                if (player.storage.shuoye_nilu_empty) return null;
+                player.storage.shuoye_nilu_empty = true;
+                if (typeof player.syncStorage === "function") player.syncStorage("shuoye_nilu_empty");
+                lib.shuoyeNilu.voice("shuoye_huangjinzhibei2.mp3", 0);
+                return player.die();
+            } catch (e) {
+                return null;
+            }
+        },
+        // 读判定区里兽冠的点数（虚拟牌带 number）
+        crownNumber(player) {
+            try {
+                if (!player || typeof player.getVCards !== "function") return null;
+                for (const vcard of player.getVCards("j")) {
+                    const name = vcard.viewAs || vcard.name;
+                    if (name === "shuoye_shouzhizhiguan") {
+                        const num = get.number(vcard);
+                        return typeof num === "number" ? num : null;
+                    }
+                }
+            } catch (e) {}
+            return null;
+        },
+    };
+}
+
 /** @type { importCharacterConfig['skill'] } */
 const skills = {
     //怒涛沧岚
@@ -16114,6 +16486,496 @@ const skills = {
         },
     },
 //#noname-kit-end skill:shuoye_lx_huiren_reset
+//#noname-kit-begin skill:shuoye_huangjinzhibei
+    shuoye_huangjinzhibei: {
+        nobracket: true,
+        audio: "ext:朔夜/audio/skill:1",
+        forced: true,
+        locked: true,
+        mark: true,
+        markimage: "extension/朔夜/image/shuoye_huangjinzhibei.png",
+        intro: {
+            content(storage) {
+                return `剩余 ${storage || 0} 张`;
+            },
+            markcount(storage) {
+                return storage || 0;
+            },
+        },
+        trigger: {
+            global: "gameStart",
+        },
+        async content(event, trigger, player) {
+            player.storage.shuoye_huangjinzhibei = 666;
+            if (typeof player.syncStorage === "function") player.syncStorage("shuoye_huangjinzhibei");
+            player.markSkill("shuoye_huangjinzhibei");
+            try {
+                lib.shuoyeNilu.aura(player);
+            } catch (e) {}
+            lib.shuoyeNilu.attach(player);
+            try {
+                lib.shuoyeNilu.cheer(player);
+            } catch (e) {}
+            try {
+                await lib.skill.shuoye_shouzhishuzi.chooseNames(player);
+            } catch (e) {}
+            game.log(player, "的黄金之杯开始涌入【影】");
+            setTimeout(() => {
+                try {
+                    lib.shuoyeNilu.pourAnim(player);
+                } catch (e) {}
+            }, 1500);
+        },
+        group: ["shuoye_huangjinzhibei_phase", "shuoye_huangjinzhibei_draw", "shuoye_huangjinzhibei_empty", "shuoye_huangjinzhibei_initial", "shuoye_huangjinzhibei_gain"],
+    },
+//#noname-kit-end skill:shuoye_huangjinzhibei
+//#noname-kit-begin skill:shuoye_huangjinzhibei_phase
+    shuoye_huangjinzhibei_phase: {
+        charlotte: true,
+        nopop: true,
+        popup: false,
+        silent: true,
+        forced: true,
+        trigger: {
+            player: "phaseBefore",
+        },
+        filter(event, player) {
+            return typeof player.storage.shuoye_huangjinzhibei === "number";
+        },
+        content(event, trigger, player) {
+            if (!trigger.phaseList || !trigger.phaseList.length) {
+                trigger.phaseList = ["phaseJudge", "phaseUse", "phaseDiscard"];
+                return;
+            }
+            const std = ["phaseZhunbei", "phaseJudge", "phaseDraw", "phaseUse", "phaseDiscard", "phaseJieshu"];
+            if (trigger.phaseList.length === std.length && std.every((phase, index) => trigger.phaseList[index] === phase)) {
+                trigger.phaseList = ["phaseJudge", "phaseUse", "phaseDiscard"];
+            }
+        },
+    },
+//#noname-kit-end skill:shuoye_huangjinzhibei_phase
+//#noname-kit-begin skill:shuoye_huangjinzhibei_draw
+    shuoye_huangjinzhibei_draw: {
+        charlotte: true,
+        nopop: true,
+        popup: false,
+        silent: true,
+        forced: true,
+        trigger: {
+            player: "phaseUseBegin",
+        },
+        filter(event, player) {
+            return typeof player.storage.shuoye_huangjinzhibei === "number";
+        },
+        async content(event, trigger, player) {
+            const left = player.storage.shuoye_huangjinzhibei;
+            if (left > 0) await player.draw(Math.min(6, left));
+            await lib.shuoyeNilu.checkEmpty(player);
+        },
+    },
+//#noname-kit-end skill:shuoye_huangjinzhibei_draw
+//#noname-kit-begin skill:shuoye_huangjinzhibei_empty
+    shuoye_huangjinzhibei_empty: {
+        charlotte: true,
+        nopop: true,
+        popup: false,
+        silent: true,
+        forced: true,
+        trigger: {
+            player: "judge",
+        },
+        filter(event, player) {
+            return typeof player.storage.shuoye_huangjinzhibei === "number" && player.storage.shuoye_huangjinzhibei <= 0;
+        },
+        async content(event, trigger, player) {
+            await lib.shuoyeNilu.checkEmpty(player);
+        },
+    },
+//#noname-kit-end skill:shuoye_huangjinzhibei_empty
+//#noname-kit-begin skill:shuoye_shouzhishuzi
+    shuoye_shouzhishuzi: {
+        nobracket: true,
+        audio: false,
+        forced: true,
+        locked: true,
+        mark: true,
+        markimage: "extension/朔夜/image/shuoye_shouzhishuzi.png",
+        group: ["shuoye_shouzhishuzi_record", "shuoye_shouzhishuzi_reset"],
+        intro: {
+            content(storage) {
+                if (!storage || !storage.length) return "尚未记录牌名。";
+                return "已记录牌名：" + storage.map((name) => "【" + get.translation(name) + "】").join("、");
+            },
+            markcount(storage) {
+                return storage && storage.length ? storage.length : 0;
+            },
+        },
+        // 开局选名的候选池
+        getSelectablePool() {
+            return [
+                "sha", "shan", "tao", "jiu", "huogong", "tiesuo", "juedou", "wuxie",
+                "jiedao", "guohe", "shunshou", "binglinchengxiax", "tiaojiyanmei",
+                "shuiyanqijuny", "yuanjiao", "qizhengxiangsheng", "jiejia", "chuqibuyi",
+                "caochuan", "lianjunshengyan", "shuoye_shouzhizhiguan",
+            ].filter((name) => !!(lib.card && lib.card[name]));
+        },
+        // 本回合已经使用过的牌名（storage + syncStorage，联机客机也能读到）
+        getUsed(player) {
+            return player.getStorage("shuoye_shouzhishuzi_used", []);
+        },
+        // 已记录、且本回合尚未使用过的牌名
+        getPool(player) {
+            const names = player.getStorage("shuoye_shouzhishuzi");
+            if (!names || !names.length) return [];
+            const used = new Set(lib.skill.shuoye_shouzhishuzi.getUsed(player));
+            return names.filter((name) => !used.has(name));
+        },
+        async chooseNames(player) {
+            const pool = lib.skill.shuoye_shouzhishuzi.getSelectablePool();
+            const num = Math.min(6, pool.length);
+            if (!num) return;
+            const list = pool.map((name) => {
+                const type = get.type(name);
+                return [type === "basic" ? "基本" : "锦囊", "", name];
+            });
+            const result = await player
+                .chooseButton([`兽之数字：选择${get.cnNumber(num)}种牌名`, [list, "vcard"]])
+                .set("selectButton", [num, num])
+                .set("forced", true)
+                .set("ai", (button) => {
+                    const name = button.link[2];
+                    if (["sha", "shan", "tao", "wuxie"].includes(name)) return 8 + Math.random();
+                    if (["juedou", "huogong", "shuoye_shouzhizhiguan"].includes(name)) return 6 + Math.random();
+                    return 3 + Math.random();
+                })
+                .forResult();
+            if (result.bool && result.links && result.links.length) {
+                player.setStorage(
+                    "shuoye_shouzhishuzi",
+                    result.links.map((link) => (link && link.link ? link.link[2] : link && link[2])).filter(Boolean)
+                );
+                player.markSkill("shuoye_shouzhishuzi");
+                lib.shuoyeNilu.voice("shuoye_shouzhishuzi1.mp3", 0);
+            }
+        },
+        // 不能叫 available：引擎 finishSkill 会以 (mode) 调用 skill.available 做模式检查，撞名即崩
+        canUseName(event, player, name) {
+            if (name === "chuqibuyi") {
+                const count = {};
+                for (const card of player.getCards("h")) {
+                    const suit = get.suit(card);
+                    count[suit] = (count[suit] || 0) + 1;
+                    if (count[suit] >= 2) return event.filterCard({ name: name }, player, event);
+                }
+                return false;
+            }
+            return event.filterCard({ name: name }, player, event);
+        },
+        enable: ["chooseToUse", "chooseToRespond"],
+        filter(event, player) {
+            if (player.countCards("h") < 2) return false;
+            const pool = lib.skill.shuoye_shouzhishuzi.getPool(player);
+            return pool.some((name) => lib.skill.shuoye_shouzhishuzi.canUseName(event, player, name));
+        },
+        chooseButton: {
+            dialog(event, player) {
+                const pool = lib.skill.shuoye_shouzhishuzi.getPool(player);
+                const S = lib.skill.shuoye_shouzhishuzi;
+                const list = [];
+                for (const name of pool) {
+                    if (name === "sha") {
+                        if (event.filterCard({ name: "sha" }, player, event)) list.push(["基本", "", "sha"]);
+                        for (const nature of lib.inpile_nature || []) {
+                            if (event.filterCard({ name: "sha", nature: nature }, player, event)) list.push(["基本", "", "sha", nature]);
+                        }
+                    } else if (S.canUseName(event, player, name)) {
+                        list.push([get.type(name) === "basic" ? "基本" : "锦囊", "", name]);
+                    }
+                }
+                const dialog = list.length ? ui.create.dialog("兽之数字", [list, "vcard"]) : ui.create.dialog("兽之数字", "本回合没有可转化的牌名。");
+                dialog.direct = true;
+                return dialog;
+            },
+            check(button) {
+                const player = get.player();
+                const name = button.link[2];
+                if (name === "chuqibuyi") return 3 + Math.random();
+                const parent = get.event().getParent();
+                if (parent && (parent.type === "phase" || parent.name === "phaseUse")) {
+                    const value = player.getUseValue({ name: name });
+                    return value > 0 ? value + 1 : 0.1;
+                }
+                return 1 + Math.random();
+            },
+            backup(links, player) {
+                const name = links[0][2];
+                const nature = links[0][3];
+                const isChuqibuyi = name === "chuqibuyi";
+                return {
+                    selectCard: 2,
+                    position: "h",
+                    filterCard(card) {
+                        if (!isChuqibuyi) return true;
+                        if (!ui.selected.cards.length) return true;
+                        return get.suit(card) === get.suit(ui.selected.cards[0]);
+                    },
+                    viewAs: {
+                        name: name,
+                        nature: nature,
+                        storage: { shuoye_shouzhishuzi: true },
+                    },
+                    prompt: "将两张手牌当做" + (nature ? get.translation(nature) : "") + get.translation(name) + "使用或打出",
+                    check(card) {
+                        return 8 - get.value(card);
+                    },
+                    async precontent(event2, trigger2, player2) {
+                        player2.logSkill("shuoye_shouzhishuzi");
+                        // 转化牌不写点数：兽冠只锁实体牌，虚拟牌放行
+                        const useCard = (event2 && event2.result && event2.result.card) || (event2 && event2.card) || null;
+                        const cardName = useCard && useCard.name ? useCard.name : "";
+                        lib.shuoyeNilu.voice("shuoye_shouzhishuzi_" + cardName + ".mp3", 2000, 2.25);
+                    },
+                };
+            },
+            prompt(links) {
+                return "将两张手牌当做" + get.translation(links[0][2]) + "使用或打出";
+            },
+        },
+        ai: {
+            order: 1,
+            respondSha: true,
+            respondShan: true,
+            respondWuxie: true,
+            skillTagFilter(player) {
+                return player.countCards("h") >= 2 && lib.skill.shuoye_shouzhishuzi.getPool(player).length > 0;
+            },
+        },
+        hiddenCard(player, name) {
+            if (player.countCards("h") < 2) return false;
+            return lib.skill.shuoye_shouzhishuzi.getPool(player).includes(name);
+        },
+        subSkill: {
+            record: {
+                charlotte: true,
+                nopop: true,
+                popup: false,
+                silent: true,
+                forced: true,
+                trigger: { player: "useCard" },
+                content(event, trigger, player) {
+                    const name = trigger.card ? get.name(trigger.card) : "";
+                    if (!name) return;
+                    const names = player.getStorage("shuoye_shouzhishuzi_used", []).slice(0);
+                    if (names.includes(name)) return;
+                    names.push(name);
+                    player.setStorage("shuoye_shouzhishuzi_used", names);
+                },
+            },
+            reset: {
+                charlotte: true,
+                nopop: true,
+                popup: false,
+                silent: true,
+                forced: true,
+                trigger: { global: "phaseBefore" },
+                content(event, trigger, player) {
+                    if (player.getStorage("shuoye_shouzhishuzi_used", []).length) {
+                        player.setStorage("shuoye_shouzhishuzi_used", []);
+                    }
+                },
+            },
+        },
+    },
+//#noname-kit-end skill:shuoye_shouzhishuzi
+//#noname-kit-begin skill:shuoye_huangjinjuchang
+    shuoye_huangjinjuchang: {
+        nobracket: true,
+        audio: "ext:朔夜/audio/skill:2",
+        forced: true,
+        locked: true,
+        trigger: {
+            global: "phaseEnd",
+        },
+        filter(event, player) {
+            const target = event.player;
+            if (!target || target.isDead()) return false;
+            if (target.hasJudge("shuoye_shouzhizhiguan")) return false;
+            if (!player.isAlive()) return false;
+            return typeof player.storage.shuoye_huangjinzhibei === "number" && player.storage.shuoye_huangjinzhibei > 0;
+        },
+        async content(event, trigger, player) {
+            const target = trigger.player;
+            const cards = lib.shuoyeNilu.take(player, 1);
+            if (!cards || !cards.length) return;
+            const num = get.number(cards[0], player);
+            await target.addJudge({ name: "shuoye_shouzhizhiguan", number: typeof num === "number" ? num : 6 }, cards);
+            target.addSkill("shuoye_shouzhizhiguan_lock");
+            await lib.shuoyeNilu.checkEmpty(player);
+        },
+    },
+//#noname-kit-end skill:shuoye_huangjinjuchang
+//#noname-kit-begin skill:shuoye_shouzhizhiguan_lock
+    shuoye_shouzhizhiguan_lock: {
+        charlotte: true,
+        nopop: true,
+        popup: false,
+        silent: true,
+        mod: {
+            cardEnabled(card, player) {
+                const num = lib.shuoyeNilu.crownNumber(player);
+                if (num === null) return;
+                const cardNum = get.number(card);
+                if (typeof cardNum === "number" && cardNum !== num) return false;
+            },
+            cardRespondable(card, player) {
+                const num = lib.shuoyeNilu.crownNumber(player);
+                if (num === null) return;
+                const cardNum = get.number(card);
+                if (typeof cardNum === "number" && cardNum !== num) return false;
+            },
+            cardSavable(card, player) {
+                const num = lib.shuoyeNilu.crownNumber(player);
+                if (num === null) return;
+                const cardNum = get.number(card);
+                if (typeof cardNum === "number" && cardNum !== num) return false;
+            },
+        },
+        group: ["shuoye_shouzhizhiguan_lock_off"],
+    },
+//#noname-kit-end skill:shuoye_shouzhizhiguan_lock
+//#noname-kit-begin skill:shuoye_shouzhizhiguan_lock_off
+    shuoye_shouzhizhiguan_lock_off: {
+        charlotte: true,
+        nopop: true,
+        popup: false,
+        silent: true,
+        forced: true,
+        trigger: {
+            player: ["loseAfter", "loseAsyncAfter"],
+        },
+        filter(event, player) {
+            if (event.player && event.player !== player) return false;
+            return !player.hasJudge("shuoye_shouzhizhiguan");
+        },
+        content(event, trigger, player) {
+            player.removeSkill("shuoye_shouzhizhiguan_lock");
+        },
+    },
+//#noname-kit-end skill:shuoye_shouzhizhiguan_lock_off
+//#noname-kit-begin skill:shuoye_kill_line
+    shuoye_kill_line: {
+        charlotte: true,
+        nopop: true,
+        popup: false,
+        silent: true,
+        forced: true,
+        audio: "ext:朔夜/audio/skill:1",
+        trigger: {
+            global: "die",
+        },
+        filter(event, player) {
+            return event.player !== player && event.source === player;
+        },
+        content(event, trigger, player) {},
+    },
+//#noname-kit-end skill:shuoye_kill_line
+//#noname-kit-begin skill:shuoye_huangjinzhibei_initial
+    shuoye_huangjinzhibei_initial: {
+        charlotte: true,
+        nopop: true,
+        popup: false,
+        silent: true,
+        forced: true,
+        trigger: {
+            global: "phaseBefore",
+        },
+        filter(event, player) {
+            if (!player.hasSkill("shuoye_huangjinzhibei")) return false;
+            if (player.storage.shuoye_nilu_initial_fixed) return false;
+            if (typeof player.storage.shuoye_huangjinzhibei !== "number") return false;
+            return player.getCards("h").some((card) => card.name !== "ying");
+        },
+        async content(event, trigger, player) {
+            player.storage.shuoye_nilu_initial_fixed = true;
+            if (typeof player.syncStorage === "function") player.syncStorage("shuoye_nilu_initial_fixed");
+            const hs = player.getCards("h").filter((card) => card.name !== "ying");
+            if (!hs.length) return;
+            const num = hs.length;
+            await player.lose(hs, ui.special).set("getlx", false);
+            const suits = ["spade", "heart", "club", "diamond"];
+            const cards = [];
+            for (let i = 0; i < num; i++) {
+                cards.push(game.createCard("ying", suits[i % 4], 6));
+            }
+            await player.gain(cards, "gain2");
+            game.log(player, "将初始手牌换成了黄金之杯的【影】");
+        },
+    },
+//#noname-kit-end skill:shuoye_huangjinzhibei_initial
+//#noname-kit-begin skill:shuoye_huangjinzhibei_gain
+    shuoye_huangjinzhibei_gain: {
+        charlotte: true,
+        nopop: true,
+        popup: false,
+        silent: true,
+        forced: true,
+        trigger: {
+            player: "gainAfter",
+        },
+        filter(event, player) {
+            if (!player.hasSkill("shuoye_huangjinzhibei")) return false;
+            if (typeof player.storage.shuoye_huangjinzhibei !== "number") return false;
+            if (player.storage.shuoye_nilu_replace_lock) return false;
+            if (typeof event.getg !== "function") return false;
+            return event.getg(player).some((card) => card && card.name !== "ying");
+        },
+        async content(event, trigger, player) {
+            const cards = trigger.getg(player).filter((card) => card && card.name !== "ying");
+            if (!cards.length) return;
+            player.storage.shuoye_nilu_replace_lock = true;
+            if (typeof player.syncStorage === "function") player.syncStorage("shuoye_nilu_replace_lock");
+            await player.lose(cards, ui.special).set("getlx", false);
+            const fresh = lib.shuoyeNilu.take(player, cards.length);
+            if (fresh.length) await player.gain(fresh, "gain2");
+            player.storage.shuoye_nilu_replace_lock = false;
+            if (typeof player.syncStorage === "function") player.syncStorage("shuoye_nilu_replace_lock");
+            await lib.shuoyeNilu.checkEmpty(player);
+        },
+    },
+//#noname-kit-end skill:shuoye_huangjinzhibei_gain
+//#noname-kit-begin skill:shuoye_nilu_debug
+    shuoye_nilu_debug: {
+        enable: ["phaseUse"],
+        popup: false,
+        silent: true,
+        filter(event, player) {
+            return !!lib.config["extension_朔夜_nilu_debug"] && player.hasSkill("shuoye_huangjinzhibei");
+        },
+        async content(event, trigger, player) {
+            const cur = player.storage.shuoye_huangjinzhibei || 0;
+            const choices = ["+100", "+10", "+1", "-1", "-10", "清零"];
+            const result = await player
+                .chooseControl(choices)
+                .set("prompt", "黄金之杯调试：当前 " + cur + " 张")
+                .set("ai", () => "+10")
+                .forResult();
+            if (!result || !result.control) return;
+            const map = { "+100": 100, "+10": 10, "+1": 1, "-1": -1, "-10": -10 };
+            let next = cur + (map[result.control] || 0);
+            if (result.control === "清零") next = 0;
+            next = Math.max(0, next);
+            player.storage.shuoye_huangjinzhibei = next;
+            if (typeof player.syncStorage === "function") player.syncStorage("shuoye_huangjinzhibei");
+            player.updateMarks();
+            game.log(player, "黄金之杯数量调整为", next);
+            await lib.shuoyeNilu.checkEmpty(player);
+        },
+        ai: {
+            order: 0,
+            result: { player: 0 },
+        },
+    },
+//#noname-kit-end skill:shuoye_nilu_debug
 };
 
 export default skills;

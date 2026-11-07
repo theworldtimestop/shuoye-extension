@@ -410,6 +410,9 @@ const characters = {
         trashBin: [],
     },
 //#noname-kit-end character:shuoye_shengyuxieyan
+//#noname-kit-begin character:shuoye_nilu
+    shuoye_nilu: ["female", "shou", 6, ["shuoye_huangjinzhibei", "shuoye_shouzhishuzi", "shuoye_huangjinjuchang", "shuoye_kill_line"], ["ext:朔夜/image/shuoye_nilu.jpg"]],
+//#noname-kit-end character:shuoye_nilu
 
 };
 for (let i in characters) {
