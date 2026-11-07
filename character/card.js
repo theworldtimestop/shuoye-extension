@@ -160,8 +160,12 @@ const cards = {
         image: "ext:朔夜/image/shuoye_shouzhizhiguan.jpg",
         type: "delay",
         enable: true,
+        // 允许把离开游戏/修整中的角色选为目标（结算时先令其回归）
+        includeOut: true,
         filterTarget(card, player, target) {
-            return target != player && lib.filter.judge(card, player, target);
+            if (target === player) return false;
+            if (target.isOut() && !target.isDead()) return true;
+            return lib.filter.judge(card, player, target);
         },
         judge(card) {
             const num = get.number(card);
@@ -173,6 +177,9 @@ const cards = {
         async content(event, trigger, player) {
             const target = event.target;
             const cards = event.cards || [];
+            if (lib.shuoyeNilu && lib.shuoyeNilu.shouguanLog) {
+                lib.shuoyeNilu.shouguanLog("[content] 兽之七冠结算开始 target=" + get.translation(target) + " isOut=" + target.isOut() + " isIn=" + target.isIn() + " isDead=" + target.isDead());
+            }
             let num = get.number(event.card);
             if (typeof num !== "number") {
                 if (cards.length > 1) {
@@ -184,39 +191,45 @@ const cards = {
                 }
             }
             num = Math.max(0, Math.min(13, num || 0));
-            let judgeTarget = target;
-            const outs = game.players.filter((current) => current != player && current.isOut() && !current.isDead());
-            if (outs.length) {
-                const list = outs.map((current) => [current, get.translation(current)]);
-                const result = await player
-                    .chooseButton(["是否令一名离开游戏或修整的角色回归？", [list, "player"]])
-                    .set("ai", (button) => (get.attitude(get.player(), button.link) > 0 ? 1 : 0))
-                    .forResult();
-                if (result.bool && result.links && result.links.length) {
-                    const revived = result.links[0];
-                    const bool = await lib.card.shuoye_shouzhizhiguan.revive(revived);
-                    if (bool) {
-                        judgeTarget = revived;
-                        await revived.draw();
-                    }
-                }
+            // 目标离开游戏或处于修整状态：先令其回归
+            if (target.isOut() && !target.isDead()) {
+                await lib.card.shuoye_shouzhizhiguan.revive(target);
             }
+            if (!target.isIn() || target.isDead()) {
+                if (lib.shuoyeNilu && lib.shuoyeNilu.shouguanLog) {
+                    lib.shuoyeNilu.shouguanLog("[content] 目标没回到场上，中止结算 isOut=" + target.isOut() + " isIn=" + target.isIn());
+                }
+                return;
+            }
+            // 被使用即摸一张牌（无论是否刚刚回归）
+            await target.draw();
             lib.shuoyeNilu.voice("shuoye_shouzhizhiguan3.mp3");
-            await judgeTarget.addJudge({ name: "shuoye_shouzhizhiguan", number: num }, cards);
-            judgeTarget.addSkill("shuoye_shouzhizhiguan_lock");
+            // 照官方延时锦囊的写法：仍然在使用区（位置 "o"）的实体牌跟兽冠一起扣置到判定区，
+            // 影也能正常进去；只有实体牌已经不在使用区时才退回虚拟牌。
+            const judgeCards = cards.filter((one) => get.name(one) === "shuoye_shouzhizhiguan" || get.position(one, true) === "o");
+            if (judgeCards.length) {
+                await target.addJudge({ name: "shuoye_shouzhizhiguan", number: num }, judgeCards);
+            } else {
+                await target.addJudge({ name: "shuoye_shouzhizhiguan", number: num });
+            }
+            target.addSkill("shuoye_shouzhizhiguan_lock");
         },
         async revive(target) {
             try {
                 if (!target || target.isDead()) return false;
+                // 统一走 lib.shuoyeNilu.shouguanReturn：修整走 restEnd，离场用 in(true) 清空离场来源
+                if (lib.shuoyeNilu && typeof lib.shuoyeNilu.shouguanReturn === "function") {
+                    return await lib.shuoyeNilu.shouguanReturn(target);
+                }
+                // 兜底：公共入口没挂上时按老办法处理（in(true) 才是能真回来的写法）
                 if (typeof target.restEnd === "function" && target.isRest && target.isRest()) {
                     await target.restEnd();
-                } else {
-                    target.in();
                 }
+                if (target.isOut()) target.in(true);
                 if (_status._rest_return && _status._rest_return[target.playerid]) {
                     delete _status._rest_return[target.playerid];
                 }
-                return true;
+                return target.isIn();
             } catch (e) {
                 return false;
             }
@@ -240,6 +253,7 @@ const cards = {
             },
             result: {
                 target(player, target) {
+                    if (target.isOut && target.isOut() && !target.isDead()) return 2;
                     return -1;
                 },
             },

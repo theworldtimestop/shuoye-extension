@@ -11,7 +11,7 @@ const translates = {
     shuoye_nilu_debug: "调试",
     shuoye_nilu_debug_info: "黄金之杯调试：调整黄金之杯的剩余牌数。",
     shuoye_shouzhizhiguan: "兽之七冠",
-    shuoye_shouzhizhiguan_info: "延时锦囊。出牌阶段对其他角色使用。使用时可指定一名离开游戏或修整的角色，令其回归并摸一张牌，然后兽冠置入其判定区。目标于判定阶段进行判定：若判定牌点数为3的倍数，其获得判定牌；否则受到1点火焰伤害。",
+    shuoye_shouzhizhiguan_info: "延时锦囊。出牌阶段对其他角色使用。目标摸一张牌（若其离开游戏或处于修整状态，则先令其回归），然后将兽冠置入其判定区。目标于判定阶段进行判定：若判定牌点数为3的倍数，其获得判定牌；否则受到1点火焰伤害。",
     // =====【李信】一念神魔 =====
     shuoye_lixin: "李信",
     shuoye_lx_guang: "光明神·李信",

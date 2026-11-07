@@ -11,6 +11,62 @@ const DILU_FAZHOU_USE_MAXHP = true;
 if (!lib.shuoyeNilu) {
     lib.shuoyeNilu = {
         voiceLast: 0,
+        // 【兽之七冠】调试日志：写 extension/朔夜/backup/shouguan.log，验证完可整段删掉
+        shouguanLog(text) {
+            try {
+                if (!lib.shuoyeShouguanDebug) lib.shuoyeShouguanDebug = [];
+                lib.shuoyeShouguanDebug.push(new Date().toLocaleTimeString() + " " + text);
+                if (lib.shuoyeShouguanDebug.length > 200) lib.shuoyeShouguanDebug.shift();
+                if (typeof game.writeFile === "function") {
+                    game.writeFile(lib.shuoyeShouguanDebug.join("\n"), "extension/朔夜/backup/", "shouguan.log", function () {});
+                }
+            } catch (e) {}
+        },
+        // 【兽之七冠】把离开游戏/修整中的角色拉回场上；返回是否真的回到了场上。
+        // in() 不带参数只清 outCount，outSkills 里还留着别的技能的离场记录时回不来，
+        // 所以照鸽府包 forceIn 的写法传 true（清空全部离场来源），再兜底删一次 out 类。
+        async shouguanReturn(target) {
+            if (!target || target.isDead()) return false;
+            try {
+                lib.shuoyeNilu.shouguanLog(
+                    "[回归] 前 " + get.translation(target) +
+                    " isOut=" + target.isOut() +
+                    " isIn=" + target.isIn() +
+                    " isRest=" + !!(target.isRest && target.isRest()) +
+                    " isDead=" + target.isDead() +
+                    " outCount=" + target.outCount +
+                    " outSkills=" + JSON.stringify(target.outSkills || null)
+                );
+            } catch (e) {}
+            // 修整：走引擎的 restEnd，才会恢复体力并清掉 _status._rest_return
+            try {
+                if (target.isRest && target.isRest()) await target.restEnd();
+            } catch (e) {
+                try { lib.shuoyeNilu.shouguanLog("[回归] restEnd 异常 " + (e && e.message)); } catch (e2) {}
+            }
+            // 离开游戏：in(true) 清空全部离场来源后移除 out 类
+            try {
+                if (target.isOut()) target.in(true);
+            } catch (e) {
+                try { lib.shuoyeNilu.shouguanLog("[回归] in(true) 异常 " + (e && e.message)); } catch (e2) {}
+            }
+            // 兜底：别人只用 classList.add("out") 实现的离场，两端一起删
+            try {
+                if (target.isOut()) {
+                    game.broadcastAll(function (p) {
+                        try { p.classList.remove("out"); } catch (e) {}
+                    }, target);
+                }
+            } catch (e) {}
+            try {
+                if (_status.shuoye_jingtu_return && _status.shuoye_jingtu_return[target.playerid]) delete _status.shuoye_jingtu_return[target.playerid];
+                if (_status._rest_return && _status._rest_return[target.playerid]) delete _status._rest_return[target.playerid];
+            } catch (e) {}
+            try {
+                lib.shuoyeNilu.shouguanLog("[回归] 后 " + get.translation(target) + " isOut=" + target.isOut() + " isIn=" + target.isIn());
+            } catch (e) {}
+            return target.isIn();
+        },
         // 播放技能台词：默认 2 秒内不重复触发；gain 为增益倍数（默认 1.5）
         voice(files, gap, gain) {
             try {
@@ -16748,7 +16804,35 @@ const skills = {
                         player2.logSkill("shuoye_shouzhishuzi");
                         // 转化牌不写点数：兽冠只锁实体牌，虚拟牌放行
                         const useCard = (event2 && event2.result && event2.result.card) || (event2 && event2.card) || null;
+                        // 两张同花色的实体牌转化时补上共同花色：
+                        // 否则 get.suit(多张牌) 固定返回 "none"，【出其不意】等按花色结算的牌会误判。
+                        try {
+                            const source = (event2 && event2.result && event2.result.cards) || (useCard && useCard.cards) || [];
+                            if (useCard && source.length > 1) {
+                                const suits = [];
+                                for (const one of source) {
+                                    const suit = get.suit(one);
+                                    if (suit && suit !== "none" && !suits.includes(suit)) suits.push(suit);
+                                }
+                                if (suits.length === 1) useCard.suit = suits[0];
+                            }
+                        } catch (e) {}
                         const cardName = useCard && useCard.name ? useCard.name : "";
+                        // 【兽之七冠】目标里有离开游戏/修整的角色：使用前先拉回来，
+                        // 否则等牌结算时目标已经不在场，判定区根本贴不上。
+                        try {
+                            if (cardName === "shuoye_shouzhizhiguan") {
+                                const targets = (event2 && event2.result && event2.result.targets) || (event2 && event2.targets) || [];
+                                if (lib.shuoyeNilu && lib.shuoyeNilu.shouguanLog) {
+                                    lib.shuoyeNilu.shouguanLog("[precontent] 转化兽冠 targets=" + targets.map((target) => get.translation(target) + "(out=" + (target && target.isOut ? target.isOut() : "?") + ")").join("、"));
+                                }
+                                for (const target of targets) {
+                                    if (target && target.isOut && target.isOut() && !target.isDead()) {
+                                        await lib.shuoyeNilu.shouguanReturn(target);
+                                    }
+                                }
+                            }
+                        } catch (e) {}
                         lib.shuoyeNilu.voice("shuoye_shouzhishuzi_" + cardName + ".mp3", 2000, 2.25);
                     },
                 };

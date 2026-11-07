@@ -502,6 +502,54 @@ export async function content(config, pack) {
         }
     } catch (e) {}
 
+    // 【兽之七冠】对离开游戏/修整中的角色使用时，先把目标拉回场上。
+    // 等牌自己的 content 再回归的话，目标不在场会让判定区操作失败、牌直接进弃牌堆。
+    try {
+        // 不在这里建 lib.shuoyeNilu：character/skill.js 会整体初始化它，
+        // 先建一个空对象会让 skill.js 的 if (!lib.shuoyeNilu) 跳过初始化（voice/take 全丢）。
+        const installShouguanReturn = () => {
+            try {
+                if (!lib.skill.shuoye_shouzhiguan_return) {
+                    lib.skill.shuoye_shouzhiguan_return = {
+                        charlotte: true,
+                        nopop: true,
+                        popup: false,
+                        silent: true,
+                        forced: true,
+                        trigger: { global: "useCard" },
+                        filter(event, player) {
+                            if (!event || !event.card || get.name(event.card) !== "shuoye_shouzhizhiguan") return false;
+                            const targets = event.targets || (event.target ? [event.target] : []);
+                            const need = targets.some((target) => target && target.isOut && target.isOut() && !target.isDead());
+                            if (need && lib.shuoyeNilu && lib.shuoyeNilu.shouguanLog) {
+                                lib.shuoyeNilu.shouguanLog("[useCard] 回归全局技触发 targets=" + targets.map((target) => get.translation(target) + "(out=" + target.isOut() + ")").join("、"));
+                            }
+                            return need;
+                        },
+                        async content(event, trigger, player) {
+                            const targets = trigger.targets || (trigger.target ? [trigger.target] : []);
+                            for (const target of targets) {
+                                if (target && target.isOut && target.isOut() && !target.isDead()) {
+                                    await lib.shuoyeNilu.shouguanReturn(target);
+                                }
+                            }
+                        },
+                    };
+                }
+                if (lib.skill.global && !lib.skill.global.includes("shuoye_shouzhiguan_return")) {
+                    game.addGlobalSkill("shuoye_shouzhiguan_return");
+                }
+                if (lib.shuoyeNilu && lib.shuoyeNilu.shouguanLog) {
+                    lib.shuoyeNilu.shouguanLog("[加载] 兽冠回归全局技已注册 global=" + (lib.skill.global && lib.skill.global.includes("shuoye_shouzhiguan_return")));
+                }
+            } catch (e) {}
+        };
+        installShouguanReturn();
+        if (lib.arenaReady) {
+            lib.arenaReady.push(installShouguanReturn);
+        }
+    } catch (e) {}
+
     // 启动时静默检查线上更新（手动关闭或联机中不检查）
     if (lib.config.extension_朔夜_auto_update !== false && navigator.onLine && !_status.connectMode) {
         update(false, EXTENSION_VERSION).catch(() => {});
