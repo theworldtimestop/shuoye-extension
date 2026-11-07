@@ -372,6 +372,136 @@ export async function content(config, pack) {
         game.saveConfig("extension_朔夜_update_source_migrated", true);
     }
 
+    // 【兼容 1.11.5】史纪包【奇正相生】的老式 step content 在同一 step 里同步读 result，
+    // 选完标记时 result 还是 undefined，抛错后响应与后续伤害/获得牌全都不结算。
+    // 检测到旧式写法就换成等价的异步实现；1.11.6 的官方 async 版本不会命中。
+    try {
+        const patchQizheng = () => {
+            try {
+                const info = lib.card && lib.card.qizhengxiangsheng;
+                if (!info || typeof info.content !== "function") return;
+                if (info.content._shuoyeQizhengPatch) return;
+                if (!/"step 0"/.test(String(info.content))) return;
+                info.content = async function (event, trigger, player) {
+                    const { card, target } = event;
+                    if (!event.qizheng_name) {
+                        if (!player.isIn()) return;
+                        const e1 = 1.5 * get.sgn(get.damageEffect(target, player, target));
+                        let e2 = 0;
+                        if (target.countGainableCards(player, "h") > 0 && !target.hasSkillTag("noh")) {
+                            e2 = -1;
+                        }
+                        const es = target.getGainableCards(player, "e");
+                        if (es.length) {
+                            let max = 0;
+                            for (const current of es) {
+                                max = Math.max(max, get.value(current, target));
+                            }
+                            e2 = Math.min(e2, -max / 4);
+                        }
+                        let choice = "正兵";
+                        if (Math.abs(e1 - e2) <= 0.3) {
+                            choice = Math.random() < 0.5 ? "奇兵" : "正兵";
+                        } else if (e1 < e2) {
+                            choice = "奇兵";
+                        }
+                        const controlResult = await player
+                            .chooseControl({
+                                controls: ["奇兵", "正兵"],
+                                prompt: `请选择${get.translation(target)}的标记`,
+                            })
+                            .set("choice", choice)
+                            .set("ai", () => _status.event.choice)
+                            .forResult();
+                        if (controlResult.control) {
+                            event.qizheng_name = controlResult.control;
+                        }
+                    }
+                    let responseResult = { bool: false };
+                    if (!event.directHit) {
+                        const responseChoice = (() => {
+                            if (target.hasSkillTag("useShan")) {
+                                return "shan";
+                            }
+                            if (typeof event.qizheng_aibuff === "boolean") {
+                                const shas = target.getCards("h", "sha");
+                                const shans = target.getCards("h", "shan");
+                                if (event.qizheng_aibuff) {
+                                    if (shas.length >= Math.max(1, shans.length)) {
+                                        return "shan";
+                                    }
+                                    if (shans.length > shas.length) {
+                                        return "sha";
+                                    }
+                                    return false;
+                                }
+                                if (!shas.length || !shans.length) {
+                                    return false;
+                                }
+                            }
+                            const e1 = 1.5 * get.sgn(get.damageEffect(target, player, target));
+                            let e2 = 0;
+                            if (target.countGainableCards(player, "h") > 0 && !target.hasSkillTag("noh")) {
+                                e2 = -1;
+                            }
+                            const es = target.getGainableCards(player, "e");
+                            if (es.length) {
+                                let max = 0;
+                                for (const current of es) {
+                                    max = Math.max(max, get.value(current, target));
+                                }
+                                e2 = Math.min(e2, -max / 4);
+                            }
+                            if (e1 - e2 >= 0.3) {
+                                return "shan";
+                            }
+                            if (e2 - e1 >= 0.3) {
+                                return "sha";
+                            }
+                            return "all";
+                        })();
+                        responseResult = await target
+                            .chooseToRespond({
+                                prompt: "请打出一张杀或闪响应奇正相生",
+                                filterCard: (card2) => {
+                                    const name2 = get.name(card2);
+                                    return name2 === "sha" || name2 === "shan";
+                                },
+                                ai: (card2) => {
+                                    if (_status.event.choice === "all") {
+                                        const rand = get.rand("qizhengxiangsheng");
+                                        if (rand > 0.5) {
+                                            return 0;
+                                        }
+                                        return 1 + Math.random();
+                                    }
+                                    if (get.name(card2) === _status.event.choice) {
+                                        return get.order(card2);
+                                    }
+                                    return 0;
+                                },
+                            })
+                            .set("respondTo", [player, card])
+                            .set("choice", responseChoice)
+                            .forResult();
+                    }
+                    const name = responseResult && responseResult.bool && responseResult.card ? responseResult.card.name : null;
+                    const require2 = event.qizheng_name;
+                    if (require2 === "奇兵" && name !== "sha") {
+                        await target.damage();
+                    } else if (require2 === "正兵" && name !== "shan" && target.countGainableCards(player, "he") > 0) {
+                        await player.gainPlayerCard({ target, forced: true, position: "he" });
+                    }
+                };
+                info.content._shuoyeQizhengPatch = true;
+            } catch (e) {}
+        };
+        patchQizheng();
+        if (lib.arenaReady) {
+            lib.arenaReady.push(patchQizheng);
+        }
+    } catch (e) {}
+
     // 启动时静默检查线上更新（手动关闭或联机中不检查）
     if (lib.config.extension_朔夜_auto_update !== false && navigator.onLine && !_status.connectMode) {
         update(false, EXTENSION_VERSION).catch(() => {});
