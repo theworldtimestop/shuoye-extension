@@ -15,6 +15,30 @@ export async function content(config, pack) {
         }
         lib.translate["group_shou"] = "兽势力";
     } catch (e) {}
+    // 【尼禄】黄金之杯的【影】依赖 jsrg 包里的 ying 卡定义；
+    // 若本局没有启用 jsrg 包，补一份最小的类型/名称定义用于显示。
+    // 销毁只由黄金之杯自己创建的影补 destroyed（见 skill.js 的 getTopCards/initial），
+    // 不改动其他来源的 ying 卡。
+    try {
+        const yingInfo = lib.card && lib.card.ying;
+        if (!yingInfo) {
+            lib.card.ying = {
+                audio: true,
+                fullskin: true,
+                type: "basic",
+                cardcolor: "spade",
+                enable: false,
+                getYing(count) {
+                    const list = [];
+                    if (typeof count !== "number") count = 1;
+                    while (count--) list.push(game.createCard("ying", "spade", 1));
+                    return list;
+                },
+                ai: { basic: { useful: 0, value: 0 } },
+            };
+        }
+        if (!lib.translate.ying) lib.translate.ying = "影";
+    } catch (e) {}
     // 【尼禄】调试开关：只有开了配置才把调试技能挂进武将技能表（没开时连名字和描述都不显示）
     try {
         const niluChar = lib.character && lib.character.shuoye_nilu;
@@ -312,7 +336,7 @@ export async function content(config, pack) {
     // 评级：SSS -> legend，SS -> epic，S -> rare，A -> junk
     const shuoyeRarity = {
         legend: ["shuoye_u_aoerjiamali", "shuoye_taikongyishitaer", "shuoye_shuoye", "shuoye_zhenshiqiaotelude", "shuoye_yiguyoutai", "shuoye_lixin", "shuoye_shengyuxieyan", "shuoye_nilu"],
-        epic: ["shuoye_chengjinji", "shuoye_miaoshitiannv", "shuoye_tianqixinghun", "shuoye_xituo", "shuoye_qiaolienide", "shuoye_chongtiansiling", "shuoye_luxi", "shuoye_wuweijuezhe", "shuoye_kongyuanxingzhe", "shuoye_wuxinchan", "shuoye_dilutianfeng", "shuoye_lx_guang", "shuoye_lx_an"],
+        epic: ["shuoye_chengjinji", "shuoye_miaoshitiannv", "shuoye_tianqixinghun", "shuoye_xituo", "shuoye_qiaolienide", "shuoye_chongtiansiling", "shuoye_luxi", "shuoye_wuweijuezhe", "shuoye_kongyuanxingzhe", "shuoye_wuxinchan", "shuoye_dilutianfeng", "shuoye_lx_guang", "shuoye_lx_an", "shuoye_richekuanjian", "shuoye_mankanshizhenzi"],
         rare: [
             "shuoye_zuguoren", "shuoye_ailisi", "shuoye_feiniaomashi", "shuoye_fengchuanxiangzi",
             "shuoye_nutaocanglan", "shuoye_wujishengwu", "shuoye_wutiaowu", "shuoye_xier",
@@ -320,9 +344,19 @@ export async function content(config, pack) {
             "shuoye_puqishenfu", "shuoye_xugouji", "shuoye_aertuoliya", "shuoye_zhende",
             "shuoye_huangquan", "shuoye_kongqirinai", "shuoye_wenyang", "shuoye_ying",
             "shuoye_weiyue", "shuoye_huoguang", "shuoye_longyan",
+            "shuoye_majunke", "shuoye_yuantoushanwo", "shuoye_shebengnainyin", "shuoye_quanmoutianbaohuo",
+            "shuoye_luotong", "shuoye_yizhisilang",
         ],
         junk: ["shuoye_xingti", "shuoye_weiershi", "shuoye_ruolian"],
     };
+    // 返回菜单时清理日车宽见的首轮演出（BGM、背景、视频）
+    try {
+        lib.onfree.push(function () {
+            try {
+                if (lib.shuoyeRicheStopShow) lib.shuoyeRicheStopShow();
+            } catch (e) {}
+        });
+    } catch (e) {}
     // 返回菜单时清理坐杀博徒的残留演出（循环 BGM、金光、视频层）
     try {
         lib.onfree.push(function () {
@@ -547,6 +581,41 @@ export async function content(config, pack) {
         installShouguanReturn();
         if (lib.arenaReady) {
             lib.arenaReady.push(installShouguanReturn);
+        }
+    } catch (e) {}
+
+    // 【影】兜底销毁（只处理黄金之杯生成的影）：
+    // 这些影创建时带 shuoye_huangjin 标记；个别模式/UI 覆写可能让
+    // destroy: "discardPile" 没生效而直接留在弃牌堆，这里在弃牌/失去牌
+    // 结算后再扫一遍事件涉及的牌。其他来源的 ying 不受影响。
+    try {
+        const installYingCleanup = () => {
+            if (!lib.skill.shuoye_ying_cleanup) {
+                lib.skill.shuoye_ying_cleanup = {
+                    charlotte: true,
+                    nopop: true,
+                    popup: false,
+                    silent: true,
+                    forced: true,
+                    trigger: { global: ["cardsDiscardAfter", "loseAfter", "loseAsyncAfter"] },
+                    filter(event, player) {
+                        return (event.cards || []).some(card => card && card.shuoye_huangjin === true && get.name(card, false) === "ying" && get.position(card, true) === "d" && !card._selfDestroyed);
+                    },
+                    async content(event, trigger, player) {
+                        const list = (trigger.cards || []).filter(card => card && card.shuoye_huangjin === true && get.name(card, false) === "ying" && get.position(card, true) === "d" && !card._selfDestroyed);
+                        for (const card of list) {
+                            card.selfDestroy(trigger);
+                        }
+                    },
+                };
+            }
+            if (lib.skill.global && !lib.skill.global.includes("shuoye_ying_cleanup")) {
+                game.addGlobalSkill("shuoye_ying_cleanup");
+            }
+        };
+        installYingCleanup();
+        if (lib.arenaReady) {
+            lib.arenaReady.push(installYingCleanup);
         }
     } catch (e) {}
 

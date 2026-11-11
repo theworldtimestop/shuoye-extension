@@ -968,6 +968,53 @@ const shunfa = {
 	drag: null,
 };
 
+// 把瞬发技排进事件队列：联机时由主机在「当前结算结束之后」执行。
+// 不能在客机点击时让主机直接 doAction —— 主机如果正在等另一个选择，
+// 新的事件会和当前选择并发，客机收不到新提示，表现就是卡住到托管。
+function shunfaQueue(player, skillname) {
+	try {
+		const skill = lib.skill[skillname];
+		if (!player || !skill || typeof skill.doAction !== "function") {
+			return false;
+		}
+		if (!player.storage) {
+			player.storage = {};
+		}
+		if (!player.storage.shj_shunfa_cd) {
+			player.storage.shj_shunfa_cd = 1;
+			syncButtons();
+		}
+		const evt = game.createEvent("shj_shunfa_exec", false);
+		evt.player = player;
+		evt.skillname = skillname;
+		evt.setContent(async function (event, trigger, pl) {
+			try {
+				const sk = lib.skill[skillname];
+				if (sk && typeof sk.doAction === "function" && pl.isAlive && pl.isAlive()) {
+					await sk.doAction(pl);
+				}
+			} catch (e) {
+			} finally {
+				try {
+					pl.storage.shj_shunfa_cd = 0;
+				} catch (e) {}
+				syncButtons();
+			}
+		});
+		// 没有正在运行的结算事件（例如界面空闲）时，createEvent 不会挂到父事件上，
+		// 需要手动启动，否则事件永远不会执行、按钮也会一直锁着。
+		if (!evt.parent && typeof evt.start === "function") {
+			evt.start();
+		}
+		return true;
+	} catch (e) {
+		try {
+			player.storage.shj_shunfa_cd = 0;
+		} catch (e2) {}
+		return false;
+	}
+}
+
 function shunfaClick(btn) {
 	try {
 		const pid = btn._playerid;
@@ -997,10 +1044,21 @@ function shunfaClick(btn) {
 			} catch (e) {}
 		};
 		if (game.online && !lib.node) {
+			// 客机只负责发请求，真正的执行与排队都在主机
 			try {
 				game.send("shuoye_lx_shunfa_click", pid, skillname);
 			} catch (e) {}
 			setTimeout(done, 1200);
+			return;
+		}
+		// 联机主机：排队等当前结算结束再执行（单机保持原来的即时执行）。
+		// 单机 Electron 也有 lib.node，所以以「确实有客户端连进来」为准。
+		const hostingOnline = !!(lib.node && Array.isArray(lib.node.clients) && lib.node.clients.length > 0);
+		if (game.online || hostingOnline) {
+			if (shunfaQueue(player, skillname)) {
+				return;
+			}
+			done();
 			return;
 		}
 		let run;
@@ -1884,7 +1942,7 @@ export function installLixinFx() {
 		}
 	} catch (e) {}
 
-	// 联机：客机点击瞬发技按钮后，由主机执行
+	// 联机：客机点击瞬发技按钮后，由主机排队执行
 	try {
 		lib.message.server.shuoye_lx_shunfa_click = function (playerid, skillname) {
 			try {
@@ -1910,25 +1968,8 @@ export function installLixinFx() {
 						return;
 					}
 				}
-				player.storage.shj_shunfa_cd = 1;
-				const done = () => {
-					try {
-						player.storage.shj_shunfa_cd = 0;
-						syncButtons();
-					} catch (e) {}
-				};
-				let run;
-				try {
-					run = skill.doAction(player);
-				} catch (e) {
-					done();
-					return;
-				}
-				if (run && typeof run.then === "function") {
-					run.then(done, done);
-				} else {
-					done();
-				}
+				// 不直接 doAction：排进事件队列，等当前结算结束后再由主机执行。
+				shunfaQueue(player, skillname);
 			} catch (e) {}
 		};
 	} catch (e) {}

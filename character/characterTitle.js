@@ -18,5 +18,13 @@ const characterTitles = {
 	shuoye_longyan: "虐龙古咒",
 	shuoye_shengyuxieyan: "堕神",
 	shuoye_nilu: '<span style="color:#AA0000;-webkit-text-stroke:0.6px #e8c25a;text-shadow:0 0 3px rgba(232,194,90,.9),0 0 9px rgba(200,150,30,.55),0 0 18px rgba(160,120,20,.35);font-weight:700;">所多玛之兽</span>',
+    shuoye_majunke: "M风纪委员长",
+    shuoye_yuantoushanwo: "超越天赋",
+    shuoye_shebengnainyin: "单恋者",
+    shuoye_quanmoutianbaohuo: "投了下一把",
+    shuoye_mankanshizhenzi: "暂时的二星",
+    shuoye_luotong: "勤政爱民",
+    shuoye_yizhisilang: "小裁缝",
+    shuoye_richekuanjian: "律师审判长",
 };
 export default characterTitles;

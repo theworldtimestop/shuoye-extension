@@ -413,6 +413,87 @@ const characters = {
 //#noname-kit-begin character:shuoye_nilu
     shuoye_nilu: ["female", "shou", 6, ["shuoye_huangjinzhibei", "shuoye_shouzhishuzi", "shuoye_huangjinjuchang"], ["ext:朔夜/image/shuoye_nilu.jpg"]],
 //#noname-kit-end character:shuoye_nilu
+//#noname-kit-begin character:shuoye_majunke
+    shuoye_majunke: {
+        sex: "male",
+        hp: 5,
+        group: "qun",
+        skills: ["shuoye_sifu", "shuoye_woxin"],
+        img: "extension/朔夜/image/shuoye_majunke.jpg",
+        trashBin: [],
+    },
+//#noname-kit-end character:shuoye_majunke
+//#noname-kit-begin character:shuoye_yuantoushanwo
+    shuoye_yuantoushanwo: {
+        sex: "male",
+        hp: 4,
+        group: "qun",
+        skills: ["shuoye_tianxin", "shuoye_kaiyan"],
+        img: "extension/朔夜/image/shuoye_yuantoushanwo.jpg",
+        trashBin: [],
+    },
+//#noname-kit-end character:shuoye_yuantoushanwo
+//#noname-kit-begin character:shuoye_shebengnainyin
+    shuoye_shebengnainyin: {
+        sex: "female",
+        hp: 3,
+        group: "qun",
+        skills: ["shuoye_hezou", "shuoye_yuyin"],
+        img: "extension/朔夜/image/shuoye_shebengnainyin.jpg",
+        trashBin: [],
+    },
+//#noname-kit-end character:shuoye_shebengnainyin
+//#noname-kit-begin character:shuoye_quanmoutianbaohuo
+    shuoye_quanmoutianbaohuo: {
+        sex: "male",
+        hp: 3,
+        group: "qun",
+        skills: ["shuoye_tanzhuang", "shuoye_jiuli"],
+        img: "extension/朔夜/image/shuoye_quanmoutianbaohuo.jpg",
+        trashBin: [],
+    },
+//#noname-kit-end character:shuoye_quanmoutianbaohuo
+//#noname-kit-begin character:shuoye_mankanshizhenzi
+    shuoye_mankanshizhenzi: {
+        sex: "female",
+        hp: 4,
+        group: "qun",
+        skills: ["shuoye_zongyu", "shuoye_youji"],
+        img: "extension/朔夜/image/shuoye_mankanshizhenzi.jpg",
+        trashBin: [],
+    },
+//#noname-kit-end character:shuoye_mankanshizhenzi
+//#noname-kit-begin character:shuoye_luotong
+    shuoye_luotong: {
+        sex: "female",
+        hp: 4,
+        group: "wu",
+        skills: ["shuoye_qinzheng", "shuoye_renkang"],
+        img: "extension/朔夜/image/shuoye_luotong.jpg",
+        trashBin: [],
+    },
+//#noname-kit-end character:shuoye_luotong
+//#noname-kit-begin character:shuoye_yizhisilang
+    shuoye_yizhisilang: {
+        sex: "male",
+        hp: 3,
+        hujia: 1,
+        group: "qun",
+        skills: ["shuoye_zhiyi", "shuoye_caiyan"],
+        img: "extension/朔夜/image/shuoye_yizhisilang.jpg",
+        trashBin: [],
+    },
+//#noname-kit-end character:shuoye_yizhisilang
+//#noname-kit-begin character:shuoye_richekuanjian
+    shuoye_richekuanjian: {
+        sex: "male",
+        hp: 4,
+        group: "wu",
+        skills: ["shuoye_zonglan", "shuoye_fuzhu", "shuoye_cisi"],
+        img: "extension/朔夜/image/shuoye_richekuanjian.jpg",
+        trashBin: [],
+    },
+//#noname-kit-end character:shuoye_richekuanjian
 
 };
 for (let i in characters) {

@@ -249,6 +249,296 @@ export async function precontent() {
         return video
     };
 
+    // ===== 日车宽见：首轮演出 / 限定技视频 =====
+    lib.shuoyeRichePlayVideo = function (path, options) {
+        if (game.online) return Promise.resolve();
+        options = options || {};
+        const pauseBgm = !!options.pauseBgm;
+        if (pauseBgm) {
+            try {
+                game.broadcastAll(function () {
+                    const audio = window._shuoyeRicheBgm;
+                    if (audio) audio.pause();
+                });
+            } catch (e) {}
+        }
+        return new Promise(function (resolve) {
+            let resolved = false;
+            const done = function () {
+                if (resolved) return;
+                resolved = true;
+                if (pauseBgm) {
+                    try {
+                        game.broadcastAll(function () {
+                            const audio = window._shuoyeRicheBgm;
+                            if (audio) {
+                                const p = audio.play();
+                                if (p && p.catch) p.catch(function () {});
+                            }
+                        });
+                    } catch (e) {}
+                }
+                resolve();
+            };
+            const run = function (onDone, path2) {
+                try {
+                    const isHost = !game.online;
+                    if (isHost) {
+                        try { game.pause(); } catch (e) {}
+                    }
+                    const video = document.createElement("video");
+                    video.autoplay = true;
+                    video.playsInline = true;
+                    video.preload = "auto";
+                    video.muted = false;
+                    video.style.cssText = "position:fixed;left:0;top:0;width:100%;height:100%;object-fit:cover;background:#000;z-index:-1;pointer-events:none;opacity:0;transition:opacity .2s linear;";
+                    video.oncanplay = function () { video.style.opacity = "1"; };
+                    video.onplaying = function () { video.style.opacity = "1"; };
+                    video.src = lib.assetURL + path2 + "?t=" + Date.now();
+                    document.body.appendChild(video);
+                    let closed = false;
+                    const close = function () {
+                        if (closed) return;
+                        closed = true;
+                        try { if (video.parentNode) video.parentNode.removeChild(video); } catch (e) {}
+                        if (isHost) {
+                            try { game.resume(); } catch (e) {}
+                        }
+                        if (typeof onDone === "function") {
+                            try { onDone(); } catch (e) {}
+                        }
+                    };
+                    const timer = setTimeout(close, 14000);
+                    video.onended = function () { clearTimeout(timer); close(); };
+                    video.onerror = function () { clearTimeout(timer); close(); };
+                    const p = video.play();
+                    if (p && p.catch) p.catch(function () {
+                        try {
+                            video.muted = true;
+                            const p2 = video.play();
+                            if (p2 && p2.catch) p2.catch(close);
+                        } catch (e) { close(); }
+                    });
+                } catch (e) {
+                    if (!game.online) {
+                        try { game.resume(); } catch (e2) {}
+                    }
+                    if (typeof onDone === "function") {
+                        try { onDone(); } catch (e2) {}
+                    }
+                }
+            };
+            try { game.broadcast(run, null, path); } catch (e) {}
+            run(done, path);
+        });
+    };
+
+    lib.shuoyeRicheRound1 = async function (player) {
+        if (game.online) return;
+        try {
+            game.broadcastAll(function () {
+                try {
+                    const bg = ui.background;
+                    if (bg) {
+                        if (!window._shuoyeRicheBg) {
+                            window._shuoyeRicheBg = {
+                                image: bg.style.backgroundImage,
+                                size: bg.style.backgroundSize,
+                                position: bg.style.backgroundPosition,
+                            };
+                        }
+                        if (bg.setBackgroundImage) bg.setBackgroundImage("extension/朔夜/image/shuoye_richekuanjian_bg.jpg");
+                        bg.style.backgroundSize = "cover";
+                        bg.style.backgroundPosition = "50% 50%";
+                    }
+                    const old = ui.backgroundMusic;
+                    if (old) {
+                        if (!window._shuoyeRicheOldBgm) {
+                            window._shuoyeRicheOldBgm = { muted: old.muted, volume: old.volume };
+                        }
+                        old.pause();
+                        old.muted = true;
+                        old.volume = 0;
+                    }
+                } catch (e) {}
+            });
+            await lib.shuoyeRichePlayVideo("extension/朔夜/video/shuoye_richekuanjian_round1.mp4", { pauseBgm: false });
+            game.broadcastAll(function () {
+                try {
+                    const old = window._shuoyeRicheBgm;
+                    if (old) {
+                        old.pause();
+                        try { old.src = ""; } catch (e) {}
+                    }
+                    const audio = new Audio(lib.assetURL + "extension/朔夜/audio/skill/shuoye_richekuanjian_bgm1.mp3");
+                    audio.loop = true;
+                    const base = lib.config.volumn_background / 8;
+                    audio.volume = Math.min(1, base);
+                    let ctx = null;
+                    let gain = null;
+                    try {
+                        const Ctx = window.AudioContext || window.webkitAudioContext;
+                        if (Ctx) {
+                            ctx = new Ctx();
+                            if (ctx.state === "running") {
+                                const src = ctx.createMediaElementSource(audio);
+                                gain = ctx.createGain();
+                                gain.gain.value = 2;
+                                src.connect(gain);
+                                gain.connect(ctx.destination);
+                            } else {
+                                try { ctx.close(); } catch (e) {}
+                                ctx = null;
+                            }
+                        }
+                    } catch (e) {
+                        ctx = null;
+                        gain = null;
+                    }
+                    if (gain) audio._shuoyeGain = gain;
+                    else audio.volume = Math.min(1, base * 2);
+                    if (ctx) audio._shuoyeCtx = ctx;
+                    const p = audio.play();
+                    if (p && p.catch) p.catch(function () {});
+                    window._shuoyeRicheBgm = audio;
+                } catch (e) {}
+            });
+        } catch (e) {}
+    };
+
+    lib.shuoyeRicheStopShow = function () {
+        try {
+            game.broadcastAll(function () {
+                try {
+                    const audio = window._shuoyeRicheBgm;
+                    if (audio) {
+                        audio.pause();
+                        try { audio.src = ""; } catch (e) {}
+                        if (audio._shuoyeCtx) {
+                            try { audio._shuoyeCtx.close(); } catch (e) {}
+                        }
+                        if (audio._shuoyeGain) {
+                            try { audio._shuoyeGain.gain.value = 1; } catch (e) {}
+                        }
+                    }
+                    window._shuoyeRicheBgm = null;
+                    const old = ui.backgroundMusic;
+                    const saved = window._shuoyeRicheOldBgm;
+                    if (old && saved) {
+                        old.muted = saved.muted;
+                        old.volume = saved.volume;
+                    }
+                    const bg = ui.background;
+                    const bgs = window._shuoyeRicheBg;
+                    if (bg && bgs) {
+                        bg.style.backgroundImage = bgs.image;
+                        bg.style.backgroundSize = bgs.size;
+                        bg.style.backgroundPosition = bgs.position;
+                    }
+                    window._shuoyeRicheBg = null;
+                    window._shuoyeRicheOldBgm = null;
+                } catch (e) {}
+            });
+        } catch (e) {}
+    };
+
+    // ===== 强制濒死补丁（模仿一中杀）：dying(reason, true) 即使体力>0也进入濒死 =====
+    // 有人出桃/回血时，changeHp 会 finish 掉 _save 和 dying，目标存活；没人救才会死亡（与一中杀一致）。
+    // 同时兼容 minHp_yzs 体力下限；第三步的全局历史判断只是“救援牌不回复体力”时的兜底。
+    lib.element.player.dying = function (reason, forceDying) {
+        const minHp = this.storage?.minHp_yzs || 0;
+        if (this.nodying || (this.hp > minHp && !forceDying) || this.isDying()) return;
+        const next = game.createEvent("dying");
+        next.player = this;
+        next.reason = reason;
+        next.forceDying = !!forceDying;
+        next.minHp = minHp;
+        if (reason && reason.source) next.source = reason.source;
+        next.setContent("dying");
+        next.filterStop = function () {
+            if ((this.player.hp > minHp && !forceDying) || this.player.nodying) {
+                delete this.filterStop;
+                return true;
+            }
+        };
+        return next;
+    };
+    lib.element.content.dying = [
+        async (event, trigger, player) => {
+            event.forceDie = true;
+            const minHp = typeof event.minHp == "number" ? event.minHp : 0;
+            if (player.isDying() || (player.hp > minHp && !event.forceDying)) {
+                event.finish();
+                return;
+            }
+            _status.dying.unshift(player);
+            game.broadcast(list => {
+                _status.dying = list;
+            }, _status.dying);
+            await event.trigger("dying");
+            game.log(player, "濒死");
+        },
+        async (event, trigger, player) => {
+            delete event.filterStop;
+            const minHp = typeof event.minHp == "number" ? event.minHp : 0;
+            if ((player.hp > minHp && !event.forceDying) || event.nodying) {
+                _status.dying.remove(player);
+                game.broadcast(list => {
+                    _status.dying = list;
+                }, _status.dying);
+                event.finish();
+                return;
+            }
+            if (event.skipTao) return;
+            let start = null;
+            for (const current of [_status.currentPhase, event.source, event.player, game.me, game.players[0]]) {
+                if (get.itemtype(current) == "player" && game.players.concat(game.dead).includes(current)) {
+                    start = game.players.slice().sortBySeat(current).find(i => !i.isOut());
+                    if (start) break;
+                }
+            }
+            event._shuoyeBeforeHp = player.hp;
+            if (start) {
+                const next = game.createEvent("_save");
+                next.player = start;
+                next._trigger = event;
+                next.triggername = "_save";
+                next.forceDie = true;
+                next.setContent("_save");
+                event._shuoyeSave = next;
+                await next;
+            }
+        },
+        async (event, trigger, player) => {
+            _status.dying.remove(player);
+            game.broadcast(list => {
+                _status.dying = list;
+            }, _status.dying);
+            if (player.isDead() || player.nodying || event.nodying) return;
+            const minHp = typeof event.minHp == "number" ? event.minHp : 0;
+            if (event.forceDying) {
+                const beforeHp = typeof event._shuoyeBeforeHp == "number" ? event._shuoyeBeforeHp : player.hp;
+                const save = event._shuoyeSave;
+                const saved =
+                    player.hp > beforeHp ||
+                    (save &&
+                        game.getGlobalHistory("useCard", evt2 => {
+                            const parent = evt2.getParent && evt2.getParent("_save");
+                            return parent === save && !!evt2.targets && evt2.targets.includes(player);
+                        }).length > 0);
+                if (!saved) await player.die(event.reason);
+                return;
+            }
+            if (player.hp <= minHp) await player.die(event.reason);
+        },
+    ];
+    // 供朔夜技能调用：走上面的全局 dying 补丁，forceDying 进入濒死
+    lib.shuoyeForcedDying = async function (target, reason) {
+        if (!target || !target.isIn() || target.isDead() || target.nodying || target.isDying()) return;
+        if (_status.dying.includes(target)) return;
+        await target.dying(reason, true);
+    };
+
     // 联机选将：候选里出现《朔夜》武将时，1/4 概率把其中一个朔夜武将位换成【乙骨忧太】
     // （只影响 chooseCharacter 事件里的候选抽取，不影响牌堆/判定等其它 randomGets）
     if (Array.prototype.randomGets && !Array.prototype.randomGets._shuoyeBoosted) {
@@ -324,6 +614,18 @@ export async function precontent() {
         const shuoyeCreateTrigger = game.createTrigger;
         const shuoyeCreateTriggerPatched = function (name2, skill, player, trigger, indexedData) {
             let owner = null;
+            let caiyanHit = null;
+            try {
+                if (!game.online && lib.shuoyeCaiyanActive && typeof skill === "string" && player && player.getCards) {
+                    if (player.getCards("e").some(card => {
+                        const info = lib.card[card.name];
+                        return info && Array.isArray(info.skills) && info.skills.includes(skill);
+                    })) {
+                        const owners = game.filterPlayer(p => p.hasSkill("shuoye_caiyan"));
+                        if (owners.length) caiyanHit = { owners, skill };
+                    }
+                }
+            } catch (e) {}
             try {
                 const mofangList = player && player.storage && player.storage.shuoye_mofang_skills;
                 if (Array.isArray(mofangList) && mofangList.length && typeof skill === "string") {
@@ -343,6 +645,23 @@ export async function precontent() {
                 }
             } catch (e) {}
             const result = shuoyeCreateTrigger.apply(this, arguments);
+            try {
+                if (caiyanHit) {
+                    const fire = async () => {
+                        try {
+                            if (result && Array.isArray(result.childEvents) && !result.childEvents.some(evt => evt && typeof evt.name === "string" && evt.name === caiyanHit.skill)) {
+                                return;
+                            }
+                            for (const p of caiyanHit.owners) {
+                                const info = lib.skill.shuoye_caiyan;
+                                if (info && typeof info.record === "function") await info.record(p, caiyanHit.skill);
+                            }
+                        } catch (e) {}
+                    };
+                    if (result && typeof result.then === "function") result.then(fire);
+                    else fire();
+                }
+            } catch (e) {}
             try {
                 if (!result || !owner) {
                     return result;

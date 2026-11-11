@@ -48,5 +48,13 @@ const characterIntro = {
 	shuoye_liixiang: "乙骨忧太的青梅竹马，车祸后化为特级咒灵「里香」。<br>「忧太，我们一起走吧。」",
 	shuoye_shengyuxieyan: "本是神明堕落后的形态，如今却成了邪影梦魇所追寻的终点。远古的血脉支撑着他身躯稳定的同时也在被两股予盾的力量不断消磨，但在崩坏的临界点到来之前，他还不会倒下。",
 	shuoye_nilu: "被某个平行世界的迦勒底打倒的第六之兽——的一角。<br>自『堕落』之理诞生之物。<br>据说当该时代繁荣到顶峰的都市腐败之时，就会为了品尝其恶性滋味而出现。<br>其名为所多玛之兽。<br>乃是新约圣经中毁灭了巴比伦的兽。",
+    shuoye_majunke: "学园四天王之一，掌管风纪部的严厉风纪委员长。",
+    shuoye_yuantoushanwo: "学园四天王之一，统领运动部，曾是北关东番长联盟总头目。",
+    shuoye_shebengnainyin: "四天王中唯一女性，掌管文化部，性格高傲毒舌的音乐指挥家。",
+    shuoye_quanmoutianbaohuo: "学园四天王之一，担任情报战略部委员长的天才黑客。",
+    shuoye_mankanshizhenzi: "缠流子的挚友，性格天然呆却能使用“超速嘴炮”助人脱困。",
+    shuoye_yizhisilang: "本能字学园裁缝部部长，负责极制服研发改良与神衣制作。",
+    shuoye_luotong: "三国时期东吴名臣，官至偏将军、濡须督，以仁惠治理著称。",
+    shuoye_richekuanjian: "原为天才律师，后觉醒为术师，以司法审判为术式核心。",
 };
 export default characterIntro;

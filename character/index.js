@@ -33,6 +33,7 @@ game.import("character", function () {
 			shuoye_puqishenfu: [["shuoye_puqishenfu_tianzao", ["ext:朔夜/image/character/shuoye_puqishenfu_tianzao.png"]]],
 			shuoye_yiguyoutai: [["shuoye_yiguyoutai_2", ["ext:朔夜/image/shuoye_yiguyoutai_2.jpg"]]],
 			shuoye_liixiang: [["shuoye_liixiang_fo", ["ext:朔夜/image/shuoye_liixiang_fo.jpg"]]],
+			shuoye_yuantoushanwo: [["shuoye_yuantoushanwo_awaken", ["ext:朔夜/image/shuoye_yuantoushanwo_awaken.jpg"]]],
 		},
 		dynamicTranslate: { ...dynamicTranslates },
 		characterIntro: { ...characterIntros },

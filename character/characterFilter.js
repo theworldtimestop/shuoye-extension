@@ -28,6 +28,14 @@ const quModeAllow = [
 	"shuoye_lixin",
 	"shuoye_yiguyoutai",
 	"shuoye_nilu",
+	"shuoye_majunke",
+	"shuoye_yuantoushanwo",
+	"shuoye_shebengnainyin",
+	"shuoye_quanmoutianbaohuo",
+	"shuoye_mankanshizhenzi",
+	"shuoye_luotong",
+	"shuoye_yizhisilang",
+	"shuoye_richekuanjian",
 ];
 
 const characterFilters = {};
