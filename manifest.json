@@ -1,6 +1,6 @@
 {
   "version": "0.1.37",
-  "update": "新增蟆郡苛，猿投山涡，蛇崩乃音，犬牟田宝火，满舰饰真子，萝统，伊织糸郎，日车宽见。修复一些已知bug。增强暗信。",
+  "update": "",
   "files": {
     "audio/die/shuoye_lixin1.mp3": "38f6358fb73b555f59238043602e0066c78fd674",
     "audio/die/shuoye_lx_an1.mp3": "0c78aa46f7779b35b9bf0d16e6a51f2c90c5a45c",
@@ -194,7 +194,7 @@
     "character/index.js": "32fc995f7f126a274ca409c53d798cb8b84799cc",
     "character/intro.js": "1c58249f5635742c3b848a77eb3d102d7f8062a2",
     "character/pinyin.js": "4cb0d048cc9d37faa4971734298251d1d0f4ce16",
-    "character/skill.js": "6606560526be1a090fd2ad3011cb0a794905e703",
+    "character/skill.js": "252eb1be265d7b30fd624ae4d895086842f2b469",
     "character/skill.js.bak-nilu-anim": "0ca573b31e2359403c692043b2a9d7cf996476cb",
     "character/skill.js.bak-nilu-anim2": "67cabbd602699bc5dd1f19dc9f2c4e5f9313343d",
     "character/skillPatch.js": "f6b50867d3c162a8f824ef1f4b2fbed067574be2",

@@ -18377,6 +18377,9 @@ const skills = {
             if (max <= 0 || list.length !== 1) return;
             const target = game.players.find(p => p.playerid == list[0]);
             if (!target || !target.isIn()) return;
+            // 唯一最多被选择角色：先播 3 秒台词对话框（全端可见），播完再进入后续（赐死选项或结算）
+            lib.skill.shuoye_chunai.sayLong(target, "万万没有此事啊！啊~！", 3000);
+            await new Promise(resolve => setTimeout(resolve, 3000));
             if (player.hasSkill("shuoye_cisi") && !player.storage.shuoye_cisi) {
                 const result = await player.chooseBool("###伏诛###是否发动【赐死】？").set("ai", () => true).forResult();
                 if (result.bool) {
@@ -18452,6 +18455,9 @@ const skills = {
                     return t.hp > get.event().x;
                 }).set("x", x).forResult();
                 if (result.bool) {
+                    // 选择失去体力令其重新展示：目标先播 3 秒台词对话框（全端可见），播完再扣体力
+                    lib.skill.shuoye_chunai.sayLong(target, "万万没有此事啊！啊~！", 3000);
+                    await new Promise(resolve => setTimeout(resolve, 3000));
                     await target.loseHp(x);
                     if (target.isDead()) {
                         player.restoreSkill("shuoye_cisi");
