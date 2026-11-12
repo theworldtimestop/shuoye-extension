@@ -16953,6 +16953,13 @@ const skills = {
                     check(card) {
                         return 8 - get.value(card);
                     },
+                    // AI 选完牌名后还要自己挑两张手牌：这时 event.ai1 仍是引擎默认的 get.cacheOrder，
+                    // 而【影】的 ai.basic 只有 useful/value、没有 order，get.order 恒为 -1，
+                    // AI 会一张都选不出来，同样 cancel 并拉黑。这里显式给两张影正分。
+                    ai1(card) {
+                        if (!card || typeof card === "string") return 0;
+                        return 8 - get.value(card);
+                    },
                     async precontent(event2, trigger2, player2) {
                         player2.logSkill("shuoye_shouzhishuzi");
                         // 转化牌不写点数：兽冠只锁实体牌，虚拟牌放行
@@ -17001,6 +17008,30 @@ const skills = {
             respondWuxie: true,
             skillTagFilter(player) {
                 return player.countCards("h") >= 2 && lib.skill.shuoye_shouzhishuzi.getPool(player).length > 0;
+            },
+            // 引擎对「没有 viewAs 的 chooseButton 技能」会先做一次目标校验：
+            // ui.click.skill 里 event.backup(skill) 会把 filterTarget 清空，
+            // ai.basic.chooseTarget 于是退化成 check() > 0，check 是默认的 ai2（get.cacheEffectUse）。
+            // get.effect_use 没有 target/card 时会拿 event.skill 当牌名去读本技能的 ai.result，
+            // 没有 result 就恒为 0，AI 会在弹出牌名选择前直接 cancel 并把技能拉黑到本回合。
+            // 这里按「池子里是否存在真能打出去的牌名」给正分；一个都没有就返回 0，让 AI 老实结束出牌。
+            result: {
+                player(player) {
+                    try {
+                        const S = lib.skill.shuoye_shouzhishuzi;
+                        if (!player || (player.isAlive && !player.isAlive())) return 0;
+                        if (player.countCards("h") < 2) return 0;
+                        let best = 0;
+                        for (const name of S.getPool(player)) {
+                            if (!lib.card[name]) continue;
+                            const value = player.getUseValue({ name: name, isCard: true });
+                            if (value > best) best = value;
+                        }
+                        return best > 0 ? Math.min(8, best) : 0;
+                    } catch (e) {
+                        return 0;
+                    }
+                },
             },
         },
         hiddenCard(player, name) {
