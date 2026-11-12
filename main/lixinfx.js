@@ -1187,6 +1187,17 @@ function syncButtons() {
 					try {
 						can = huiren && typeof huiren.filter === "function" ? !!huiren.filter(null, p) : true;
 					} catch (e) {}
+					// 不能发动时每次同步都把按钮藏住（十周年UI 重绘技能栏后新节点会重新显示）；只在不一致时才改，不会反复闪
+					if (!can) {
+						try {
+							const huirenBtns = document.querySelectorAll('[data-id="shuoye_lx_huiren"]');
+							for (let k = 0; k < huirenBtns.length; k++) {
+								if (huirenBtns[k].style.display !== "none") {
+									huirenBtns[k].style.display = "none";
+								}
+							}
+						} catch (e) {}
+					}
 					if (p._shjHuirenCan !== can) {
 						p._shjHuirenCan = can;
 						// 翻转时同步一次面板按钮；只做一次，不要每 tick 重复隐藏/显示

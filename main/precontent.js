@@ -257,8 +257,10 @@ export async function precontent() {
         if (pauseBgm) {
             try {
                 game.broadcastAll(function () {
-                    const audio = window._shuoyeRicheBgm;
-                    if (audio) audio.pause();
+                    // 视频期间暂停当前 BGM（演出 BGM 或原版），播完再接着放
+                    const bgm = ui.backgroundMusic;
+                    window._shuoyeVideoBgmPaused = !!(bgm && !bgm.paused);
+                    if (bgm && !bgm.paused) bgm.pause();
                 });
             } catch (e) {}
         }
@@ -270,9 +272,10 @@ export async function precontent() {
                 if (pauseBgm) {
                     try {
                         game.broadcastAll(function () {
-                            const audio = window._shuoyeRicheBgm;
-                            if (audio) {
-                                const p = audio.play();
+                            const bgm = ui.backgroundMusic;
+                            if (bgm && window._shuoyeVideoBgmPaused) {
+                                window._shuoyeVideoBgmPaused = false;
+                                const p = bgm.play();
                                 if (p && p.catch) p.catch(function () {});
                             }
                         });
@@ -353,56 +356,14 @@ export async function precontent() {
                     }
                     const old = ui.backgroundMusic;
                     if (old) {
-                        if (!window._shuoyeRicheOldBgm) {
-                            window._shuoyeRicheOldBgm = { muted: old.muted, volume: old.volume };
-                        }
+                        // 视频期间先停原版 BGM；之后由 playBgmOnce 直接替换 ui.backgroundMusic，播完由引擎还原
                         old.pause();
-                        old.muted = true;
-                        old.volume = 0;
                     }
                 } catch (e) {}
             });
             await lib.shuoyeRichePlayVideo("extension/朔夜/video/shuoye_richekuanjian_round1.mp4", { pauseBgm: false });
-            game.broadcastAll(function () {
-                try {
-                    const old = window._shuoyeRicheBgm;
-                    if (old) {
-                        old.pause();
-                        try { old.src = ""; } catch (e) {}
-                    }
-                    const audio = new Audio(lib.assetURL + "extension/朔夜/audio/skill/shuoye_richekuanjian_bgm1.mp3");
-                    audio.loop = true;
-                    const base = lib.config.volumn_background / 8;
-                    audio.volume = Math.min(1, base);
-                    let ctx = null;
-                    let gain = null;
-                    try {
-                        const Ctx = window.AudioContext || window.webkitAudioContext;
-                        if (Ctx) {
-                            ctx = new Ctx();
-                            if (ctx.state === "running") {
-                                const src = ctx.createMediaElementSource(audio);
-                                gain = ctx.createGain();
-                                gain.gain.value = 2;
-                                src.connect(gain);
-                                gain.connect(ctx.destination);
-                            } else {
-                                try { ctx.close(); } catch (e) {}
-                                ctx = null;
-                            }
-                        }
-                    } catch (e) {
-                        ctx = null;
-                        gain = null;
-                    }
-                    if (gain) audio._shuoyeGain = gain;
-                    else audio.volume = Math.min(1, base * 2);
-                    if (ctx) audio._shuoyeCtx = ctx;
-                    const p = audio.play();
-                    if (p && p.catch) p.catch(function () {});
-                    window._shuoyeRicheBgm = audio;
-                } catch (e) {}
-            });
+            // 直接替换 ui.backgroundMusic（和乙骨「纯爱」的 playBgmOnce 同一套）：只播一遍，播完由引擎自动还原原版 BGM；音量跟着引擎的音乐音量走
+            lib.skill.shuoye_chunai.playBgmOnce(player, "skill/shuoye_richekuanjian_bgm1.mp3", 1, 2, false);
         } catch (e) {}
     };
 
@@ -410,23 +371,19 @@ export async function precontent() {
         try {
             game.broadcastAll(function () {
                 try {
-                    const audio = window._shuoyeRicheBgm;
-                    if (audio) {
-                        audio.pause();
-                        try { audio.src = ""; } catch (e) {}
-                        if (audio._shuoyeCtx) {
-                            try { audio._shuoyeCtx.close(); } catch (e) {}
+                    const bgm = ui.backgroundMusic;
+                    const playingRiche = !!(bgm && bgm.src && bgm.src.indexOf("shuoye_richekuanjian_bgm1") >= 0);
+                    // 演出 BGM 还没放完（或视频期间被停在半路）：撤掉回调与增益，恢复原版 BGM
+                    if (bgm && (playingRiche || bgm.paused)) {
+                        bgm.onended = null;
+                        bgm.onerror = null;
+                        bgm.onloadedmetadata = null;
+                        bgm.defaultPlaybackRate = 1;
+                        bgm.playbackRate = 1;
+                        if (bgm._shuoyeGain) {
+                            try { bgm._shuoyeGain.gain.value = 1; } catch (e) {}
                         }
-                        if (audio._shuoyeGain) {
-                            try { audio._shuoyeGain.gain.value = 1; } catch (e) {}
-                        }
-                    }
-                    window._shuoyeRicheBgm = null;
-                    const old = ui.backgroundMusic;
-                    const saved = window._shuoyeRicheOldBgm;
-                    if (old && saved) {
-                        old.muted = saved.muted;
-                        old.volume = saved.volume;
+                        game.playBackgroundMusic();
                     }
                     const bg = ui.background;
                     const bgs = window._shuoyeRicheBg;
@@ -436,7 +393,6 @@ export async function precontent() {
                         bg.style.backgroundPosition = bgs.position;
                     }
                     window._shuoyeRicheBg = null;
-                    window._shuoyeRicheOldBgm = null;
                 } catch (e) {}
             });
         } catch (e) {}

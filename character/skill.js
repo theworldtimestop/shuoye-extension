@@ -15740,7 +15740,8 @@ const skills = {
     //【李信】灰刃
 //#noname-kit-begin skill:shuoye_lx_huiren
     shuoye_lx_huiren: {
-        audio: "ext:朔夜/audio/skill:1",
+        // 台词不由引擎自动播放（useSkill 在硬校验之前就会放 audio）；通过 content 的校验后再手动播
+        audio: false,
         enable: "phaseUse",
         filter(event, player) {
             // 正在结算中不可以再次发动
@@ -15776,6 +15777,10 @@ const skills = {
                     if (lib.lsxFx && typeof lib.lsxFx.turnCounter === "function") {
                         lib.lsxFx.turnCounter(player, "huiren", 1);
                     }
+                } catch (e) {}
+                // 通过硬校验后才放台词：不能发动时点按钮不会再说台词
+                try {
+                    game.trySkillAudio("shuoye_lx_huiren", player, null, null, { audio: "ext:朔夜/audio/skill:1" });
                 } catch (e) {}
                 let res;
                 try {
@@ -17922,6 +17927,57 @@ const skills = {
 //#noname-kit-begin skill:shuoye_qinzheng
     shuoye_qinzheng: {
         chargeSkill: 16,
+        audio: "ext:朔夜/audio/skill:2",
+        mark: true,
+        intro: {
+            content(storage) {
+                const count = storage || 0;
+                return '已计 ' + count + ' 张实体牌。';
+            },
+            markcount(storage) {
+                return String(storage || 0);
+            },
+        },
+        // 计数只算有实体牌来源的牌：直接用/打出的真实牌，或由真实牌转化来的牌（一次只计 1 张）；勤政等凭空造出的虚拟牌不计
+        isPhysical(event) {
+            if (get.itemtype(event.card) === 'card') return true;
+            const cards = event.cards && event.cards.length ? event.cards : (event.card && Array.isArray(event.card.cards) ? event.card.cards : []);
+            return cards.some(card => get.itemtype(card) === 'card');
+        },
+        // 播放勤政语音（随机一句，读主技能的 audio 字段）：只在主机触发，引擎会广播给客机
+        playLine(player) {
+            try {
+                game.trySkillAudio('shuoye_qinzheng', player);
+            } catch (e) {}
+        },
+        // 角标（markcount）+ tip（addTip）；标记数据是计数 N，并写入断线重连恢复表
+        showCount(player) {
+            const count = player.storage.shuoye_qinzheng_count || 0;
+            player.setStorage('shuoye_qinzheng', count);
+            player.markSkill('shuoye_qinzheng');
+            player.addTip('shuoye_qinzheng', '勤政 ' + count);
+            try {
+                _status.postReconnect.shuoye_qinzheng_show ??= [lib.skill.shuoye_qinzheng.restoreShow, []];
+                const list = _status.postReconnect.shuoye_qinzheng_show[1];
+                const item = list.find(i => i[0] === player.playerid);
+                if (item) item[1] = count;
+                else list.push([player.playerid, count]);
+            } catch (e) {}
+        },
+        // 断线重连后由引擎在客机上重放：只还原标记和 tip，不再广播
+        restoreShow: function (list) {
+            try {
+                const all = (game.players || []).concat(game.dead || []);
+                for (const item of list) {
+                    const player = all.find(p => p && p.playerid == item[0]);
+                    if (!player) continue;
+                    const count = item[1] || 0;
+                    player.storage.shuoye_qinzheng = count;
+                    player.markSkill('shuoye_qinzheng', null, null, true);
+                    player.addTip('shuoye_qinzheng', '勤政 ' + count, false, {}, true);
+                }
+            } catch (e) {}
+        },
         enable: "phaseUse",
         filter(event, player) {
             return player.countCharge() >= 2;
@@ -17957,6 +18013,7 @@ const skills = {
             const result = await player.chooseButton(["###勤政###选择视为使用的牌", [list, "vcard"]]).set("ai", button => player.getUseValue({ name: button.link[2] }) || 1).forResult();
             if (!result.bool || !result.links.length) return;
             const name = result.links[0][2];
+            lib.skill.shuoye_qinzheng.playLine(player);
             const cost = (options.find(info => info[0] === name) || [name, 0])[1];
             const use = await player.chooseUseTarget({ name, isCard: true }, false).forResult();
             if (use.bool) player.removeCharge(cost);
@@ -17965,8 +18022,22 @@ const skills = {
             order: 1,
             result: { player: 1 },
         },
-        group: ["shuoye_qinzheng_charge", "shuoye_qinzheng_respond"],
+        group: ["shuoye_qinzheng_charge", "shuoye_qinzheng_respond", "shuoye_qinzheng_show"],
         subSkill: {
+            show: {
+                charlotte: true,
+                silent: true,
+                popup: false,
+                forced: true,
+                trigger: { global: 'gameStart' },
+                filter(event, player) {
+                    return typeof player.storage.shuoye_qinzheng_count !== 'number';
+                },
+                async content(event, trigger, player) {
+                    player.storage.shuoye_qinzheng_count = 0;
+                    lib.skill.shuoye_qinzheng.showCount(player);
+                },
+            },
             respond: {
                 enable: "chooseToRespond",
                 filter(event, player) {
@@ -17989,6 +18060,7 @@ const skills = {
                                 const card = event && event.result && (event.result.card || (event.result.cards && event.result.cards[0]));
                                 const name = card && card.name;
                                 if (!name) return;
+                                lib.skill.shuoye_qinzheng.playLine(player);
                                 const cost = ["shan", "sha"].includes(name) ? 2 : ["tao", "jiu"].includes(name) ? 3 : 4;
                                 player.removeCharge(cost);
                             },
@@ -18009,14 +18081,18 @@ const skills = {
                 forced: true,
                 trigger: { player: ["useCard", "respond"] },
                 filter(event, player) {
-                    return !!event && event.player === player && !event._shuoye_qinzheng_counted;
+                    return !!event && event.player === player && !event._shuoye_qinzheng_counted && lib.skill.shuoye_qinzheng.isPhysical(event);
                 },
                 async content(event, trigger, player) {
                     trigger._shuoye_qinzheng_counted = true;
                     const count = (player.storage.shuoye_qinzheng_count || 0) + 1;
                     player.storage.shuoye_qinzheng_count = count;
                     const gain = [3, 5, 8].filter(n => count % n === 0).length;
-                    if (gain) player.addCharge(gain);
+                    if (gain) {
+                        player.addCharge(gain);
+                        lib.skill.shuoye_qinzheng.playLine(player);
+                    }
+                    lib.skill.shuoye_qinzheng.showCount(player);
                 },
             },
         },
@@ -18026,6 +18102,14 @@ const skills = {
     shuoye_renkang: {
         trigger: { player: ["useCardAfter", "respondAfter"] },
         forced: true,
+        mark: true,
+        marktext: "仁",
+        intro: {
+            content(storage) {
+                if (!storage) return "尚未记录牌类型。";
+                return "上一张：【" + get.translation(storage) + "】";
+            },
+        },
         filter(event, player) {
             if (player.storage.shuoye_renkang_busy) return false;
             return !!player.storage.shuoye_renkang_prev;
@@ -18064,6 +18148,9 @@ const skills = {
                 async content(event, trigger, player) {
                     player.storage.shuoye_renkang_prev = player.storage.shuoye_renkang_last;
                     player.storage.shuoye_renkang_last = get.type(trigger.card);
+                    // 标记：显示最近一张（下一张要比较的「上一张」）的类型；setStorage 写入显示用的数据，markSkill 会广播给客机
+                    player.setStorage("shuoye_renkang", player.storage.shuoye_renkang_last);
+                    player.markSkill("shuoye_renkang");
                 },
             },
             ignore: {
@@ -18208,9 +18295,8 @@ const skills = {
             const list = player.storage.shuoye_caiyan;
             const index = list.indexOf(skill);
             if (index >= 0) {
-                list.splice(index, 1);
                 player.storage.shuoye_caiyan_pending = (player.storage.shuoye_caiyan_pending || 0) + 1;
-                game.log(player, "【裁研】已记录", "#y" + get.translation(skill), "，移除记录");
+                game.log(player, "【裁研】已记录", "#y" + get.translation(skill), "，摸一张牌");
             } else {
                 list.push(skill);
                 game.log(player, "【裁研】记录了装备效果", "#y" + get.translation(skill));
