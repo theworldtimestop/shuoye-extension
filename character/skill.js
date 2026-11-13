@@ -18685,15 +18685,26 @@ const skills = {
                 return;
             }
             const start = first.targets[0];
-            // 第二步只能选与其相邻的一名角色
+            // 第二步只能选与其相邻的一名角色。
+            // 联机要点：filterTarget 会被序列化发到客机执行，里面不能引用闭包变量；
+            // 起点 id 通过 broadcastAll 写进全局 _status，filter 里只读全局
+            game.broadcastAll(function (id) {
+                _status.shuoye_weilong_start = id;
+            }, start.playerid);
             const second = await player
-                .chooseTarget(`选择${get.translation(start)}的相邻角色进入「围笼」`, 1, (card, playerx, target) => target === start.getNext() || target === start.getPrevious())
+                .chooseTarget(`选择${get.translation(start)}的相邻角色进入「围笼」`, 1, (card, playerx, target) => {
+                    const id = _status.shuoye_weilong_start;
+                    if (!id) return false;
+                    const st = game.filterPlayer(p => p.playerid === id)[0];
+                    return !!st && (target === st.getNext() || target === st.getPrevious());
+                })
                 .set("ai", target => {
                     const me = get.player();
                     if (target === me) return 1;
                     return -get.attitude(me, target) * 0.5;
                 })
                 .forResult();
+            _status.shuoye_weilong_start = null;
             if (!second.bool || !second.targets || !second.targets.length) {
                 event.result = { bool: false };
                 return;
