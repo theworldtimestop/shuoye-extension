@@ -18747,21 +18747,40 @@ const skills = {
         filter(event, player) {
             const card = event.card;
             if (!card || !(get.tag(card, "damage") > 0)) return false;
-            if (typeof card.hasGaintag == "function" && card.hasGaintag("shuoye_yuanhun_tag")) return false;
+            // 虚拟牌（武圣/丈八等）要看它的实体牌，不能只看卡对象本身
+            const cards = Array.isArray(card.cards) && card.cards.length ? card.cards : [card];
+            if (cards.some(c => typeof c.hasGaintag == "function" && c.hasGaintag("shuoye_yuanhun_tag"))) return false;
             return true;
         },
         async cost(event, trigger, player) {
             event.result = await player
-                .chooseBool(get.prompt2("shuoye_yuanhun"), "摸一张牌，然后选择：获得此牌（不计入手牌上限），或获得1点蓄力点")
+                .chooseBool(get.prompt2("shuoye_yuanhun"), "摸一张牌，然后选择：获得结算的这张牌（不计入手牌上限，且这张牌之后无法触发〖怨魂〗），或获得1点蓄力点")
                 .set("ai", () => true)
                 .forResult();
         },
         async content(event, trigger, player) {
+            // 先摸一张，摸到的牌也算「通过此法获得的牌」（不计手牌上限、不触发本技能）
             const before = player.getCards("h");
             await player.draw();
             const drawn = player.getCards("h").filter(card => !before.includes(card));
+            if (drawn.length) player.addGaintag(drawn, "shuoye_yuanhun_tag");
+            // 「此牌」= 刚结算的那张伤害牌（虚拟牌则取它对应的实体牌）
+            const used = trigger.card;
+            let cards = [];
+            if (used) {
+                const list = Array.isArray(used.cards) && used.cards.length ? used.cards.slice(0) : [used];
+                // 只收仍在弃牌堆 / 处理区的实体牌：
+                // 被别人拿走（应援、奸雄等 → h/e/j）、已移出游戏（o）、纯虚拟牌（无实体）都不算
+                // 注意不能传第二个参数：get.position(card, ordering) 里传 true 会把
+                // 处理区（ordering）的牌判成 "o"（已移出游戏）；不传才是 "d"。
+                // 结算结束（useCardAfter）时牌多数还在处理区，等引擎把它送弃牌堆就晚了。
+                cards = list.filter(c => {
+                    const pos = get.position(c);
+                    return pos === "d" || pos === "s";
+                });
+            }
             let choose;
-            if (!drawn.length) {
+            if (!cards.length) {
                 choose = 1;
             } else if (player.countCharge(true) <= 0) {
                 choose = 0;
@@ -18769,13 +18788,14 @@ const skills = {
                 choose = (
                     await player
                         .chooseControl("获得此牌", "增加一点蓄力点")
-                        .set("prompt", "〖怨魂〗：请选择")
+                        .set("prompt", `〖怨魂〗：是否获得结算的${get.translation(used)}？`)
                         .set("ai", () => (get.player().countCharge() <= 3 ? 1 : 0))
                         .forResult()
                 ).index;
             }
             if (choose == 0) {
-                player.addGaintag(drawn, "shuoye_yuanhun_tag");
+                await player.gain(cards, "gain2");
+                player.addGaintag(cards, "shuoye_yuanhun_tag");
             } else {
                 player.addCharge(1);
             }
