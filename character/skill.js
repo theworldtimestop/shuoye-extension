@@ -18633,6 +18633,303 @@ const skills = {
         },
     },
 //#noname-kit-end skill:shuoye_zongyu_mark
+//#noname-kit-begin skill:shuoye_zhigu
+    shuoye_zhigu: {
+        forced: true,
+        locked: true,
+        trigger: {
+            source: "damageBegin1",
+            player: "phaseBegin",
+        },
+        filter(event, player) {
+            if (event.name == "damage") {
+                return !player.hasSkill("shuoye_weilong_effect");
+            }
+            return player.countCharge() <= 2;
+        },
+        async content(event, trigger, player) {
+            if (trigger.name == "damage") {
+                trigger.num = Math.max(0, trigger.num - 1);
+                game.log(player, "〖桎梏〗：此伤害-1");
+            } else {
+                player.addCharge(1);
+            }
+        },
+    },
+//#noname-kit-end skill:shuoye_zhigu
+//#noname-kit-begin skill:shuoye_weilong
+    shuoye_weilong: {
+        chargeSkill: 10,
+        group: "shuoye_weilong_init",
+        trigger: {
+            player: "phaseUseBegin",
+            global: "roundStart",
+        },
+        filter(event, player) {
+            if (game.countPlayer() < 2) return false;
+            return player.countCharge() >= (player.hasSkill("shuoye_weilong_used") ? 2 : 4);
+        },
+        async cost(event, trigger, player) {
+            const need = player.hasSkill("shuoye_weilong_used") ? 2 : 4;
+            // 先选一名角色作为起点
+            const first = await player
+                .chooseTarget(get.prompt2("shuoye_weilong") + `<br><span class="bluetext">消耗${need}点蓄力点，先选定一名角色作为「围笼」的起点</span>`, 1)
+                .set("ai", target => {
+                    const me = get.player();
+                    if (target === me) return 1;
+                    return -get.attitude(me, target) * 0.5;
+                })
+                .forResult();
+            if (!first.bool || !first.targets || !first.targets.length) {
+                event.result = { bool: false };
+                return;
+            }
+            const start = first.targets[0];
+            // 第二步只能选与其相邻的一名角色
+            const second = await player
+                .chooseTarget(`选择${get.translation(start)}的相邻角色进入「围笼」`, 1, (card, playerx, target) => target === start.getNext() || target === start.getPrevious())
+                .set("ai", target => {
+                    const me = get.player();
+                    if (target === me) return 1;
+                    return -get.attitude(me, target) * 0.5;
+                })
+                .forResult();
+            if (!second.bool || !second.targets || !second.targets.length) {
+                event.result = { bool: false };
+                return;
+            }
+            event.result = { bool: true, targets: [start, second.targets[0]] };
+        },
+        async content(event, trigger, player) {
+            const targets = event.targets;
+            if (!targets || !targets.length) return;
+            const need = player.hasSkill("shuoye_weilong_used") ? 2 : 4;
+            player.removeCharge(need);
+            player.addTempSkill("shuoye_weilong_used", "roundStart");
+            const list = targets.slice(0).sortBySeat();
+            for (const target of list) {
+                // 必须显式指定 phaseAfter：addTempSkill 的默认到期是
+                // { global: ["phaseAfter", "phaseBeforeStart"] }，而 roundStart
+                // 触发完紧跟就是同一个回合的 phaseBeforeStart（content.js 4145/4149），
+                // 用默认值会让“轮开始时发动”的围笼当场失效。
+                target.addTempSkill("shuoye_weilong_effect", "phaseAfter");
+                target.setStorage("shuoye_weilong_mark", true);
+                target.markSkill("shuoye_weilong_mark");
+            }
+            game.log(player, "令", list, "进入「围笼」状态");
+        },
+        ai: {
+            order: 1,
+            result: {
+                player: 1,
+                target: -0.5,
+            },
+        },
+    },
+//#noname-kit-end skill:shuoye_weilong
+//#noname-kit-begin skill:shuoye_yuanhun
+    shuoye_yuanhun: {
+        trigger: {
+            global: "useCardAfter",
+        },
+        usable: 1,
+        filter(event, player) {
+            const card = event.card;
+            if (!card || !(get.tag(card, "damage") > 0)) return false;
+            if (typeof card.hasGaintag == "function" && card.hasGaintag("shuoye_yuanhun_tag")) return false;
+            return true;
+        },
+        async cost(event, trigger, player) {
+            event.result = await player
+                .chooseBool(get.prompt2("shuoye_yuanhun"), "摸一张牌，然后选择：获得此牌（不计入手牌上限），或获得1点蓄力点")
+                .set("ai", () => true)
+                .forResult();
+        },
+        async content(event, trigger, player) {
+            const before = player.getCards("h");
+            await player.draw();
+            const drawn = player.getCards("h").filter(card => !before.includes(card));
+            let choose;
+            if (!drawn.length) {
+                choose = 1;
+            } else if (player.countCharge(true) <= 0) {
+                choose = 0;
+            } else {
+                choose = (
+                    await player
+                        .chooseControl("获得此牌", "增加一点蓄力点")
+                        .set("prompt", "〖怨魂〗：请选择")
+                        .set("ai", () => (get.player().countCharge() <= 3 ? 1 : 0))
+                        .forResult()
+                ).index;
+            }
+            if (choose == 0) {
+                player.addGaintag(drawn, "shuoye_yuanhun_tag");
+            } else {
+                player.addCharge(1);
+            }
+        },
+        group: "shuoye_yuanhun_limit",
+    },
+//#noname-kit-end skill:shuoye_yuanhun
+//#noname-kit-begin skill:shuoye_yuelong
+    shuoye_yuelong: {
+        enable: "phaseUse",
+        usable: 1,
+        filter(event, player) {
+            return player.countCharge() >= 2;
+        },
+        async content(event, trigger, player) {
+            player.removeCharge(2);
+            player.addTempSkill("shuoye_yuelong_buff");
+            if (player.hasSkill("shuoye_weilong_effect")) {
+                player.addTempSkill("shuoye_yuelong_extra");
+            }
+            game.log(player, "令下一张【杀】无视距离且伤害+1");
+        },
+        ai: {
+            order: 6,
+            result: {
+                player: 1,
+            },
+        },
+    },
+//#noname-kit-end skill:shuoye_yuelong
+//#noname-kit-begin skill:shuoye_weilong_init
+    shuoye_weilong_init: {
+        charlotte: true,
+        trigger: {
+            global: "gameStart",
+        },
+        forced: true,
+        async content(event, trigger, player) {
+            const need = 4 - player.countCharge();
+            if (need > 0) player.addCharge(need);
+        },
+    },
+//#noname-kit-end skill:shuoye_weilong_init
+//#noname-kit-begin skill:shuoye_weilong_used
+    shuoye_weilong_used: {
+        charlotte: true,
+    },
+//#noname-kit-end skill:shuoye_weilong_used
+//#noname-kit-begin skill:shuoye_weilong_mark
+    shuoye_weilong_mark: {
+        marktext: "笼",
+        intro: {
+            content: "「围笼」：处于围笼状态下的角色只能互相成为目标。当场上有围笼角色受到伤害或死亡时，解除场上所有围笼状态。",
+        },
+    },
+//#noname-kit-end skill:shuoye_weilong_mark
+//#noname-kit-begin skill:shuoye_weilong_effect
+    shuoye_weilong_effect: {
+        charlotte: true,
+        mod: {
+            // 用 tempSkills 直查：这两个 mod 会在每一次选目标时被调用，
+            // hasSkill 会走 getSkills + expandSkills 分配数组，卡牌多时开销明显
+            playerEnabled(card, player, target) {
+                if (!target.tempSkills || target.tempSkills["shuoye_weilong_effect"] === void 0) return false;
+            },
+            targetEnabled(card, player, target) {
+                if (!player.tempSkills || player.tempSkills["shuoye_weilong_effect"] === void 0) return false;
+            },
+        },
+        trigger: {
+            global: ["damageEnd", "dieAfter"],
+        },
+        forced: true,
+        filter(event, player) {
+            const target = event.player;
+            if (!target) return false;
+            return target.hasSkill("shuoye_weilong_effect") || target.tempSkills?.["shuoye_weilong_effect"] !== void 0;
+        },
+        async content(event, trigger, player) {
+            const sealed = game.filterPlayer(i => i.hasSkill("shuoye_weilong_effect"));
+            for (const i of sealed) {
+                i.removeSkill("shuoye_weilong_effect");
+                i.setStorage("shuoye_weilong_mark", false);
+                i.unmarkSkill("shuoye_weilong_mark");
+            }
+            if (sealed.length) game.log("「围笼」状态解除");
+        },
+        // 到期（phaseAfter）自动移除时标记名不同，removeSkill 清不到，得自己清；
+        // storage 要广播清，否则客机上还是 true，下一次 updateMarks 会把标记复活
+        onremove(player) {
+            game.broadcastAll(function (p) {
+                p.storage.shuoye_weilong_mark = false;
+            }, player);
+            player.unmarkSkill("shuoye_weilong_mark");
+        },
+    },
+//#noname-kit-end skill:shuoye_weilong_effect
+//#noname-kit-begin skill:shuoye_yuanhun_limit
+    shuoye_yuanhun_limit: {
+        charlotte: true,
+        mod: {
+            maxHandcardFinal(player, num) {
+                return num + player.countCards("h", card => card.hasGaintag("shuoye_yuanhun_tag"));
+            },
+        },
+    },
+//#noname-kit-end skill:shuoye_yuanhun_limit
+//#noname-kit-begin skill:shuoye_yuelong_buff
+    shuoye_yuelong_buff: {
+        charlotte: true,
+        mod: {
+            targetInRange(card, player, target) {
+                if (card && card.name == "sha" && !player.getStorage("shuoye_yuelong_card", null)) return true;
+            },
+        },
+        trigger: {
+            player: "useCard",
+            source: "damageBegin1",
+        },
+        forced: true,
+        filter(event, player) {
+            const id = player.getStorage("shuoye_yuelong_card", null);
+            if (event.name == "damage") {
+                return !!id && !!event.card && event.card.cardid === id;
+            }
+            return !!event.card && event.card.name == "sha" && !id;
+        },
+        async content(event, trigger, player) {
+            if (trigger.name == "damage") {
+                trigger.num++;
+                game.log(player, "〖跃笼〗：此【杀】伤害+1");
+            } else {
+                // 存牌 id 而不是卡对象：客机和主机上的卡是不同的实例，只能靠 cardid 对齐
+                game.broadcastAll(function (p, id) {
+                    p.storage.shuoye_yuelong_card = id;
+                }, player, trigger.card ? trigger.card.cardid : null);
+            }
+        },
+        onremove(player) {
+            game.broadcastAll(function (p) {
+                p.storage.shuoye_yuelong_card = null;
+            }, player);
+        },
+    },
+//#noname-kit-end skill:shuoye_yuelong_buff
+//#noname-kit-begin skill:shuoye_yuelong_extra
+    shuoye_yuelong_extra: {
+        charlotte: true,
+        trigger: {
+            player: "useCardAfter",
+        },
+        forced: true,
+        filter(event, player) {
+            const id = player.getStorage("shuoye_yuelong_card", null);
+            return !!id && !!event.card && event.card.cardid === id;
+        },
+        async content(event, trigger, player) {
+            player.removeSkill("shuoye_yuelong_extra");
+            const result = await player.chooseBool("〖跃笼〗：是否执行一个额外回合？").set("ai", () => true).forResult();
+            if (result.bool) {
+                player.insertPhase("shuoye_yuelong");
+            }
+        },
+    },
+//#noname-kit-end skill:shuoye_yuelong_extra
 };
 
 export default skills;

@@ -494,6 +494,9 @@ const characters = {
         trashBin: [],
     },
 //#noname-kit-end character:shuoye_richekuanjian
+//#noname-kit-begin character:shuoye_bojiaoyang
+    shuoye_bojiaoyang: ["male", "tu", 4, ["shuoye_zhigu", "shuoye_weilong", "shuoye_yuanhun", "shuoye_yuelong"], ["img:extension/朔夜/image/shuoye_bojiaoyang.jpg"]],
+//#noname-kit-end character:shuoye_bojiaoyang
 
 };
 for (let i in characters) {

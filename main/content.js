@@ -15,6 +15,15 @@ export async function content(config, pack) {
         }
         lib.translate["group_shou"] = "兽势力";
     } catch (e) {}
+    // 【跛脚羊】自定义势力「屠」（暂无势力图，仅注册名称）
+    try {
+        if (!lib.group.includes("tu")) {
+            // 必须传 config 对象：addGroup 的钩子会直接读 config.color / config.image，
+            // 传 undefined 会抛异常，导致 group_tu 翻译和后续注册全部被跳过。
+            game.addGroup("tu", "屠", "屠", {});
+        }
+        lib.translate["group_tu"] = "屠势力";
+    } catch (e) {}
     // 【尼禄】黄金之杯的【影】依赖 jsrg 包里的 ying 卡定义；
     // 若本局没有启用 jsrg 包，补一份最小的类型/名称定义用于显示。
     // 销毁只由黄金之杯自己创建的影补 destroyed（见 skill.js 的 getTopCards/initial），
@@ -336,7 +345,7 @@ export async function content(config, pack) {
     // 评级：SSS -> legend，SS -> epic，S -> rare，A -> junk
     const shuoyeRarity = {
         legend: ["shuoye_u_aoerjiamali", "shuoye_taikongyishitaer", "shuoye_shuoye", "shuoye_zhenshiqiaotelude", "shuoye_yiguyoutai", "shuoye_lixin", "shuoye_shengyuxieyan", "shuoye_nilu"],
-        epic: ["shuoye_chengjinji", "shuoye_miaoshitiannv", "shuoye_tianqixinghun", "shuoye_xituo", "shuoye_qiaolienide", "shuoye_chongtiansiling", "shuoye_luxi", "shuoye_wuweijuezhe", "shuoye_kongyuanxingzhe", "shuoye_wuxinchan", "shuoye_dilutianfeng", "shuoye_lx_guang", "shuoye_lx_an", "shuoye_richekuanjian", "shuoye_mankanshizhenzi"],
+        epic: ["shuoye_chengjinji", "shuoye_miaoshitiannv", "shuoye_tianqixinghun", "shuoye_xituo", "shuoye_qiaolienide", "shuoye_chongtiansiling", "shuoye_luxi", "shuoye_wuweijuezhe", "shuoye_kongyuanxingzhe", "shuoye_wuxinchan", "shuoye_dilutianfeng", "shuoye_lx_guang", "shuoye_lx_an", "shuoye_richekuanjian", "shuoye_mankanshizhenzi", "shuoye_bojiaoyang"],
         rare: [
             "shuoye_zuguoren", "shuoye_ailisi", "shuoye_feiniaomashi", "shuoye_fengchuanxiangzi",
             "shuoye_nutaocanglan", "shuoye_wujishengwu", "shuoye_wutiaowu", "shuoye_xier",

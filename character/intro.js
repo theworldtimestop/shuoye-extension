@@ -56,5 +56,6 @@ const characterIntro = {
     shuoye_yizhisilang: "本能字学园裁缝部部长，负责极制服研发改良与神衣制作。",
     shuoye_luotong: "三国时期东吴名臣，官至偏将军、濡须督，以仁惠治理著称。",
     shuoye_richekuanjian: "原为天才律师，后觉醒为术师，以司法审判为术式核心。",
+    shuoye_bojiaoyang: "由真的逊设计。",
 };
 export default characterIntro;
