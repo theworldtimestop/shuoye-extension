@@ -1690,6 +1690,8 @@ export function installLixinFx() {
 	window.lsxFx.formShowBgm = formShowBgm;
 	window.lsxFx.formShowBg = formShowBg;
 	window.lsxFx.syncButtons = syncButtons;
+	// 【iF五条悟】觉醒 BGM 翻倍要复用这条增益通道，并靠 game.playBackgroundMusic 的补丁在换歌时收回 1
+	window.lsxFx.setBgmGain = setBgmGain;
 	window.lsxTaijiIntro = taijiIntro;
 
 	lib.lsxFx = lib.lsxFx || {};

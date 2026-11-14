@@ -56,5 +56,21 @@ const voices = {
 	"#ext:朔夜/audio/die/shuoye_lixin1:die": "岂能以无名之身战死……",
 	"#ext:朔夜/audio/die/shuoye_lx_guang1:die": "纵然身陨，不负梅隐之名……",
 	"#ext:朔夜/audio/die/shuoye_lx_an1:die": "龙困浅滩……",
+	// 【iF五条悟】技能台词（本体/千幻介绍页均读此表；键名 = 音频文件名）
+	"#ext:朔夜/audio/skill/shuoye_if_liuyan1": "会赢的。",
+	"#ext:朔夜/audio/skill/shuoye_if_liuyan2": "能被宿傩大人看上真荣幸。",
+	"#ext:朔夜/audio/skill/shuoye_if_liuyan3": "事先说好，你才是挑战者。",
+	"#ext:朔夜/audio/skill/shuoye_if_canghe1": "没关系，我是最强的。",
+	"#ext:朔夜/audio/skill/shuoye_if_canghe2": "术式反转·赫。",
+	"#ext:朔夜/audio/skill/shuoye_if_canghe3": "术式顺转·苍。",
+	"#ext:朔夜/audio/skill/shuoye_if_canghe4": "没关系，因为你很弱嘛。",
+	"#ext:朔夜/audio/skill/shuoye_if_wuliang1": "领域展开，无量空处。",
+	"#ext:朔夜/audio/skill/shuoye_if_wuliang2": "与其说是停下来，不如说是越靠近速度就越慢。",
+	"#ext:朔夜/audio/skill/shuoye_if_fanzhuan1": "当真，元气满满的哟！",
+	"#ext:朔夜/audio/skill/shuoye_if_xiangbei1": "啊是吗，或许是吧，或许真的是吧！",
+	"#ext:朔夜/audio/skill/shuoye_if_xiangbei2": "哟，好久不见。",
+	"#ext:朔夜/audio/skill/shuoye_if_wuxian1": "我已经掌握了咒力的核心！",
+	"#ext:朔夜/audio/skill/shuoye_if_wuxian2": "哟，好久不见。",
+	"#ext:朔夜/audio/skill/shuoye_if_xushi1": "虚式茈。",
 };
 export default voices;

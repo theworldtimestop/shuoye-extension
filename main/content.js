@@ -75,6 +75,10 @@ export async function content(config, pack) {
                 ".xskill > div[data-color]:has(span.shs-gold){font-size:0 !important;}" +
                 ".xskill > div[data-color] span.shs-gold{font-size:16px !important;letter-spacing:0;}" +
                 ".xskill > div[data-color]:has(span.shs-gold)::after{content:'：';font-size:16px;color:#5a4a72;}" +
+                // 带 span 样式的技能名（尼禄 / iF 五条悟）：70px 固定宽度的技能名标签改成按内容自适应，
+                // 配合 translate.js 里的 <span class="shs-gold">全名</span> 就能完整显示长技能名
+                ".skill:has(span.shs-gold){width:auto !important;min-width:70px;max-width:none;white-space:nowrap;}" +
+                ".xskill > div[data-color] span.shs-gold{white-space:nowrap;overflow:visible;}" +
                 "@keyframes snfGlowPulse{0%,100%{opacity:.5;transform:scale(.97);}50%{opacity:.9;transform:scale(1.04);}}" +
                 "@keyframes snfSpikePulse{0%,100%{opacity:.18;}50%{opacity:.95;}}" +
                 "@keyframes snfRain{from{background-position:0 -120px;}to{background-position:0 0;}}" +
@@ -345,7 +349,7 @@ export async function content(config, pack) {
     // 评级：SSS -> legend，SS -> epic，S -> rare，A -> junk
     const shuoyeRarity = {
         legend: ["shuoye_u_aoerjiamali", "shuoye_taikongyishitaer", "shuoye_shuoye", "shuoye_zhenshiqiaotelude", "shuoye_yiguyoutai", "shuoye_lixin", "shuoye_shengyuxieyan", "shuoye_nilu"],
-        epic: ["shuoye_chengjinji", "shuoye_miaoshitiannv", "shuoye_tianqixinghun", "shuoye_xituo", "shuoye_qiaolienide", "shuoye_chongtiansiling", "shuoye_luxi", "shuoye_wuweijuezhe", "shuoye_kongyuanxingzhe", "shuoye_wuxinchan", "shuoye_dilutianfeng", "shuoye_lx_guang", "shuoye_lx_an", "shuoye_richekuanjian", "shuoye_mankanshizhenzi", "shuoye_bojiaoyang"],
+        epic: ["shuoye_ifwutiaowu", "shuoye_chengjinji", "shuoye_miaoshitiannv", "shuoye_tianqixinghun", "shuoye_xituo", "shuoye_qiaolienide", "shuoye_chongtiansiling", "shuoye_luxi", "shuoye_wuweijuezhe", "shuoye_kongyuanxingzhe", "shuoye_wuxinchan", "shuoye_dilutianfeng", "shuoye_lx_guang", "shuoye_lx_an", "shuoye_richekuanjian", "shuoye_mankanshizhenzi", "shuoye_bojiaoyang"],
         rare: [
             "shuoye_zuguoren", "shuoye_ailisi", "shuoye_feiniaomashi", "shuoye_fengchuanxiangzi",
             "shuoye_nutaocanglan", "shuoye_wujishengwu", "shuoye_wutiaowu", "shuoye_xier",

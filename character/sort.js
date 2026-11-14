@@ -6,7 +6,7 @@ const characterSort = {
 	shuoye_sort_guanxing: ["shuoye_zuguoren", "shuoye_fengchuanxiangzi", "shuoye_shuoye", "shuoye_ying", "shuoye_lixin", "shuoye_lx_guang", "shuoye_lx_an"],
 	shuoye_sort_zhanfu: ["shuoye_majunke", "shuoye_yuantoushanwo", "shuoye_shebengnainyin", "shuoye_quanmoutianbaohuo", "shuoye_mankanshizhenzi", "shuoye_yizhisilang"],
 	shuoye_sort_tongsu: ["shuoye_wenyang", "shuoye_luotong"],
-	shuoye_sort_zhoushuhuizhan: ["shuoye_yiguyoutai", "shuoye_wutiaowu", "shuoye_chengjinji", "shuoye_richekuanjian"],
+	shuoye_sort_zhoushuhuizhan: ["shuoye_yiguyoutai", "shuoye_wutiaowu", "shuoye_ifwutiaowu", "shuoye_chengjinji", "shuoye_richekuanjian"],
 	shuoye_sort_ba: ["shuoye_ailisi", "shuoye_feiniaomashi", "shuoye_kongqirinai"],
 	shuoye_sort_bengbeng: ["shuoye_xier", "shuoye_fuhua", "shuoye_kongzhilvzhe", "shuoye_huangquan"],
 	shuoye_sort_jojo: ["shuoye_diyabolo", "shuoye_puqishenfu"],

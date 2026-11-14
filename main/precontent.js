@@ -86,6 +86,30 @@ function shuoyeInstallEmotion() {
 // 【李信】形态特效 / 瞬发技按钮 / 太极进度条（模块实现见 lixinfx.js）
 import { installLixinFx } from "./lixinfx.js";
 
+// 【iF五条悟 / 领域展开】描述里的超链接。
+// 与引擎原版、其它扩展一致：translate 里用 get.poptip(id) 生成原生 <noname-poptip>，
+// 点击由引擎的 HTMLPoptipElement 处理，弹出引擎自己的 poptip 弹窗，不再自绘浮窗。
+// 这里只补两条纯样式规则，不改原生行为：
+// 1）本包技能名在 translate 里是 <span class="shs-gold"> 彩色全名，塞进 poptip 会带深色描边，
+//    让 poptip 内的名字跟随描述文字颜色，和原版链接外观一致；
+// 2）内层 span 设为 pointer-events:none，点击目标是 noname-poptip 本身，
+//    角色详情（ui.click.intro 的 clickintro）才会识别成 poptip，不顺手把详情面板关掉。
+function shuoyeInstallIfPoptipStyle() {
+    try {
+        if (typeof document === "undefined" || !document.head) return;
+        if (document.getElementById("shuoye-if-link-style")) return;
+        const style = document.createElement("style");
+        style.id = "shuoye-if-link-style";
+        style.innerHTML =
+            'noname-poptip[poptip^="shuoye_"]{cursor:pointer;}' +
+            'noname-poptip[poptip^="shuoye_"] span.shs-gold{color:inherit!important;-webkit-text-fill-color:currentColor!important;' +
+            "-webkit-text-stroke:0!important;text-shadow:none!important;background:none!important;pointer-events:none!important;}";
+        document.head.appendChild(style);
+    } catch (e) {
+        console.error("[朔夜] iF词条链接样式初始化失败", e);
+    }
+}
+
 export async function precontent() {
     // 【李信】光明神/弑杀神前缀：金色/暗红流光（对局内武将牌上显示名字时的前缀样式，
     // 参考 REACGN「绝境」的 namePrefix 做法；CSS 动画做流光和呼吸光晕）
@@ -121,6 +145,19 @@ export async function precontent() {
         installLixinFx();
     } catch (e) {
         console.error("[朔夜] 李信特效模块加载失败", e);
+    }
+    // 原生 <noname-poptip> 默认在 arenaReady 才注册；菜单里的武将详情可能早于第一局，
+    // 提前注册一次，避免其它武将的原生词条在菜单里显示为空。
+    try {
+        if (lib.poptip && typeof lib.poptip.init === "function") lib.poptip.init();
+    } catch (e) {
+        console.error("[朔夜] poptip 提前注册失败", e);
+    }
+    // 【iF五条悟 / 领域展开】描述词条链接（引擎原生 poptip，只影响本扩展的这几个词条）
+    try {
+        shuoyeInstallIfPoptipStyle();
+    } catch (e) {
+        console.error("[朔夜] iF词条链接初始化失败", e);
     }
     // 【朔夜表情】包名、安装与缓存登记（面板按 get.translation(包名) 显示）
     lib.translate.shuoye_emotion = "朔夜表情";

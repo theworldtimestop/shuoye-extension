@@ -118,6 +118,40 @@ const translates = {
     shuoyewuliang: "无量",
     shuoyewuliang_info: "出牌阶段限一次，你可令一名角色摸牌至体力上限，本轮内其无法使用牌且跳过弃牌阶段，直到受到伤害；该角色回合开始时，其可失去1点体力移除此效果。",
 
+    shuoye_ifwutiaowu: "iF五条悟",
+    shuoye_if_liuyan: "六眼",
+    shuoye_if_liuyan_info: "每回合每种花色限一次，你的牌进入弃牌堆时若你无同花色手牌，可收回之。",
+    // iF 技能名：照【尼禄·怀抱溶解的黄金剧场】的做法用 span 包名字，配合 main/content.js 里注入的
+    // `.skill:has(span.shs-gold){width:auto !important}`，名字不再被 70px 标签截断
+    shuoye_if_canghe: `<span class="shs-gold" style="color:#1B4B9C;-webkit-text-stroke:0.3px #CFE9FF;text-shadow:0 0 3px rgba(120,200,255,.85),0 0 9px rgba(40,110,220,.55);font-weight:700;">苍/赫</span>`,
+    shuoye_if_canghe_info: `出牌阶段限一次，你可将手牌中一种花色所有牌令一名角色当做任意牌对一个指定目标使用，其明置所有手牌，若造成伤害其失去一点体力。然后若双方手牌相加后♠♣♥♦牌数相等，可发动${get.poptip("shuoye_if_xushi")}。`,
+    shuoye_if_wuliang: `<span class="shs-gold" style="color:#3A2A6E;-webkit-text-stroke:0.3px #D9CCFF;text-shadow:0 0 3px rgba(160,130,255,.85),0 0 9px rgba(90,50,180,.55);font-weight:700;">无量空处</span>`,
+    shuoye_if_wuliang_info: `${get.poptip("shuoye_if_domain_rule")}，其他角色使用或打出牌后失去一点体力，使用或打出牌数达到体力上限后弃置所有牌且技能失效。`,
+    shuoye_if_fanzhuan: `<span class="shs-gold" style="color:#8A1226;-webkit-text-stroke:0.25px #FFC9B0;text-shadow:0 0 3px rgba(255,120,90,.8),0 0 9px rgba(180,20,20,.55);font-weight:700;">术式反转</span>`,
+    shuoye_if_fanzhuan_info: "你使用【桃】后可摸一张牌，或弃置一张不同花色牌并重置一个技能。",
+    shuoye_if_xiangbei: "向北",
+    shuoye_if_xiangbei_info: `觉醒技，你体力值减少前，可弃置不同花色牌各一张防止之。若防止前此次变化会令你濒死，你获得${get.poptip("shuoye_if_wuxian")}${get.poptip("shuoye_if_xushi")}`,
+    shuoye_if_wuxian: `<span class="shs-gold" style="color:#20365E;-webkit-text-stroke:0.3px #BFE3FF;text-shadow:0 0 3px rgba(110,170,255,.8),0 0 8px rgba(30,70,150,.55);font-weight:700;">无下限</span>`,
+    shuoye_if_wuxian_info: "其他角色一张牌对你生效时/你体力值减少时，你可防止之并将X+1（X为本回合技能使用次数）张不同花色牌置于武将牌上称为【界】。武将牌上花色数>3时，你分配所有【界】并失去一点体力。",
+    shuoye_if_xushi: `<span class="shs-gold" style="color:#4B1E63;-webkit-text-stroke:0.25px #F0C9FF;text-shadow:0 0 3px rgba(220,130,255,.85),0 0 9px rgba(120,30,160,.55);font-weight:700;">虚式茈</span>`,
+    shuoye_if_xushi_info: "出牌阶段，你可选择一名有明置牌的角色，若其与你手牌花色数相等，你可令你或其将你与其不同花色手牌各一张，当做【杀】对一名角色/所有角色使用，无视防具不可响应，伤害基数为底牌花色数之和。",
+    // 【领域展开】词条：照一中杀的同款做法，用原生 poptip 链接；静态翻译即可，不依赖 lib.poptip.add
+    shuoye_if_domain_rule: "领域展开",
+    shuoye_if_domain_rule_info: "拥有此词条的技能为领域技。领域技可于出牌阶段弃置任意张手牌发动，展开持续X个回合的领域（X为弃置的牌数）。若展开前处于其他角色的领域内，弃置的牌数优先抵消其剩余回合数，抵消完后剩余部分才展开自己的领域。处于自己的领域内时不能再次展开。领域持续结束、领域中角色用牌数达到其体力上限或领域主人死亡时，领域解除。",
+    // 【iF五条悟】技能短名（_ab）：引擎 get.translation(skill, "skill") / get.rawName 以及很多技能面板都会优先读它
+    //（没有 _ab 时引擎会退化成「全名前 2 个字」，见 get/index.js:3933-3940）
+    // 短名通道用「全名的纯文字版」：上面主翻译里包了 span，凡是读 _ab 的界面（引擎 get.translation(skill,"skill")、
+    // 3D精选/REACGN/一中杀/不死者之王 的技能面板）都能拿到干净的全名，不会因为切片切到 HTML 标记
+    shuoye_if_liuyan_ab: "六眼",
+    shuoye_if_canghe_ab: "苍/赫",
+    shuoye_if_wuliang_ab: "无量空处",
+    shuoye_if_fanzhuan_ab: "术式反转",
+    shuoye_if_xiangbei_ab: "向北",
+    shuoye_if_wuxian_ab: "无下限",
+    shuoye_if_xushi_ab: "虚式茈",
+    // 明置手牌的 gaintag：引擎会把 lib.translate[tag] 直接写到牌上，缺这条翻译就会显示成英文 id
+    visible_shuoye_if_canghe: "明置",
+
     shuoye_u_aoerjiamali: "U-奥尔加玛丽",
     shuoye_xuanyan: "宣言",
     shuoye_xuanyan_info: "锁定技，每轮开始时你声明两种花色的牌，本轮其他角色使用此花色牌对你无效，你对其他角色使用牌时弃置其手中此花色的牌。",

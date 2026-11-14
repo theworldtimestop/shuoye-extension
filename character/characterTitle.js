@@ -1,6 +1,7 @@
 import { lib, game, ui, get, ai, _status } from "noname"
 
 const characterTitles = {
+	shuoye_ifwutiaowu: "向北",
 	shuoye_lixin: '<span class="shj-title-gold">一</span><span class="shj-title-dark">念</span><span class="shj-title-gold">神</span><span class="shj-title-dark">魔</span>',
 	shuoye_lx_guang: '<span class="shj-title-gold">光</span>',
 	shuoye_lx_an: '<span class="shj-title-dark">暗</span>',
