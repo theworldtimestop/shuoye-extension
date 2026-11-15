@@ -1,6 +1,7 @@
 import { lib, game, ui, get, ai, _status } from '../../../../noname.js'
 import update from "../update.js";
 import { EXTENSION_VERSION } from "../version.js";
+
 export async function content(config, pack) {
     // 【尼禄】自定义势力「兽」
     try {

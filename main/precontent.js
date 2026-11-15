@@ -103,7 +103,10 @@ function shuoyeInstallIfPoptipStyle() {
         style.innerHTML =
             'noname-poptip[poptip^="shuoye_"]{cursor:pointer;}' +
             'noname-poptip[poptip^="shuoye_"] span.shs-gold{color:inherit!important;-webkit-text-fill-color:currentColor!important;' +
-            "-webkit-text-stroke:0!important;text-shadow:none!important;background:none!important;pointer-events:none!important;}";
+            "-webkit-text-stroke:0!important;text-shadow:none!important;background:none!important;pointer-events:none!important;}" +
+            // 原版界面里【查看资料】框和名词解释窗都写死 z-index:21（ui/click/index.js 与 get/index.js），
+            // 同层时可能被资料框压住；这里把解释窗抬到最上层，不影响其它弹窗。
+            "#poptip{z-index:2147483000!important;}";
         document.head.appendChild(style);
     } catch (e) {
         console.error("[朔夜] iF词条链接样式初始化失败", e);

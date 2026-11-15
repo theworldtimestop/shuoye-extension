@@ -4,7 +4,7 @@ import { characters as epicCharacters } from './epicThree.js'
 
 const banCharacters = [
 	"shuoye_u_aoerjiamali",
-	"shuoye_xier",
+	"shuoye_tianqixinghun",
 	"shuoye_taikongyishitaer",
 	"shuoye_shuoye",
 	"shuoye_zhende",

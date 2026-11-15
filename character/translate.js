@@ -124,9 +124,9 @@ const translates = {
     // iF 技能名：照【尼禄·怀抱溶解的黄金剧场】的做法用 span 包名字，配合 main/content.js 里注入的
     // `.skill:has(span.shs-gold){width:auto !important}`，名字不再被 70px 标签截断
     shuoye_if_canghe: `<span class="shs-gold" style="color:#1B4B9C;-webkit-text-stroke:0.3px #CFE9FF;text-shadow:0 0 3px rgba(120,200,255,.85),0 0 9px rgba(40,110,220,.55);font-weight:700;">苍/赫</span>`,
-    shuoye_if_canghe_info: `出牌阶段限一次，你可将手牌中一种花色所有牌令一名角色当做任意牌对一个指定目标使用，其明置所有手牌，若造成伤害其失去一点体力。然后若双方手牌相加后♠♣♥♦牌数相等，可发动${get.poptip("shuoye_if_xushi")}。`,
+    shuoye_if_canghe_info: `出牌阶段限一次，你可将手牌中一种花色所有牌令一名角色当做任意牌对一个指定目标使用，其明置所有手牌，若造成伤害其失去一点体力。然后若使用者不为你且双方手牌相加后♠♣♥♦牌数相等，可发动${get.poptip("shuoye_if_xushi")}。`,
     shuoye_if_wuliang: `<span class="shs-gold" style="color:#3A2A6E;-webkit-text-stroke:0.3px #D9CCFF;text-shadow:0 0 3px rgba(160,130,255,.85),0 0 9px rgba(90,50,180,.55);font-weight:700;">无量空处</span>`,
-    shuoye_if_wuliang_info: `${get.poptip("shuoye_if_domain_rule")}，其他角色使用或打出牌后失去一点体力，使用或打出牌数达到体力上限后弃置所有牌且技能失效。`,
+    shuoye_if_wuliang_info: `${get.poptip("shuoye_if_domain_rule")}，其他角色使用或打出牌后失去一点体力，使用或打出牌数达到其体力上限后其弃置所有牌，然后解除领域。`,
     shuoye_if_fanzhuan: `<span class="shs-gold" style="color:#8A1226;-webkit-text-stroke:0.25px #FFC9B0;text-shadow:0 0 3px rgba(255,120,90,.8),0 0 9px rgba(180,20,20,.55);font-weight:700;">术式反转</span>`,
     shuoye_if_fanzhuan_info: "你使用【桃】后可摸一张牌，或弃置一张不同花色牌并重置一个技能。",
     shuoye_if_xiangbei: "向北",

@@ -424,7 +424,6 @@ if (!lib.shuoyeIf) {
         // 武将牌转一圈（觉醒演出用）。旋转单独抽出来，避免客机视频加载/播放失败时连旋转一起被 try/catch 吞掉。
         cardSpin(player) {
             try {
-                console.log("[朔夜] cardSpin", game.online ? "client" : "host", player && player.playerid);
                 if (!player || !player.classList) return;
                 // 用 CSS 动画而不是 inline transform：动画期间以动画为准，
                 // 就算别的 UI 逻辑把 inline transform 清掉/覆盖，旋转也不会被打断。
@@ -447,7 +446,6 @@ if (!lib.shuoyeIf) {
             } catch (e) {}
         },
         awaken(player) {
-            console.log("[朔夜] awaken", game.online ? "client" : "host", player && player.playerid);
             if (!player || player.storage.shuoye_if_xiangbei_awake) return;
             game.broadcastAll(function (target) {
                 target.storage.shuoye_if_xiangbei_awake = true;
@@ -486,13 +484,11 @@ if (!lib.shuoyeIf) {
             // （第二次旋转在 applyAwakenSkin 里一直正常，就是因为它是一条只调 cardSpin 的小广播。）
             game.broadcastAll(function (target) {
                 try {
-                    console.log("[朔夜] awakenSpin", game.online ? "client" : "host");
                     lib.shuoyeIf.cardSpin(target);
                 } catch (e) {}
             }, player);
             game.broadcastAll(function (target) {
                 try {
-                    console.log("[朔夜] awakenVideo", game.online ? "client" : "host");
                     if (!target || !target.node || !target.node.avatar) return;
                     const avatar = target.node.avatar;
                     if (ui.shuoyeIfAwakenVideo) {
@@ -19830,7 +19826,7 @@ shuoye_if_canghe: {
                 lib.shuoyeNilu.voice("shuoye_if_canghe4.mp3", 0, 2, player);
                 await user.loseHp(1);
             }
-            // 8. 双方手牌相加后四种花色张数相等，可发动虚式茈。
+            // 8. 使用者不为你，且双方手牌相加后四种花色张数相等，可发动虚式茈。
             //    满足后只走虚式茈的后半段：其=本次被令使用牌的角色，不再检查明置牌/手牌花色数。
             const total = {};
             for (const s of ["spade", "heart", "club", "diamond"]) total[s] = 0;
@@ -19838,8 +19834,8 @@ shuoye_if_canghe: {
                 const s = get.suit(card);
                 if (total[s] != null) total[s]++;
             }
-            if (total.spade > 0 && total.spade == total.heart && total.heart == total.club && total.club == total.diamond) {
-                const bool = await player.chooseBool("苍/赫：双方手牌四种花色张数相等，是否发动【虚式茈】？").set("ai", () => true).forResult();
+            if (user != player && total.spade > 0 && total.spade == total.heart && total.heart == total.club && total.club == total.diamond) {
+                const bool = await player.chooseBool("苍/赫：使用者不为你且双方手牌四种花色张数相等，是否发动【虚式茈】？").set("ai", () => true).forResult();
                 if (bool.bool) await lib.skill.shuoye_if_xushi.activate(player, user, true);
             }
         },
