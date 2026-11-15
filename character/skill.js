@@ -99,9 +99,12 @@ if (!lib.shuoyeIf) {
                         if (!str || !ui.window || !ui.arena) return;
                         let target = null;
                         try {
-                            if (_status.connectMode && lib.playerOL) target = lib.playerOL[playerid];
+                            if (lib.playerOL) target = lib.playerOL[playerid];
                         } catch (e) {}
-                        if (!target) target = game.playerMap[playerid];
+                        if (!target) {
+                            // game.playerMap 是按座次存的键，查不到 playerid；单机要靠遍历找
+                            target = (game.players || []).concat(game.dead || []).find((p) => p && p.playerid == playerid) || null;
+                        }
                         if (!target || !target.node || !target.node.avatar) return;
                         // 同时只留一个气泡：新台词顶掉上一个，避免连续台词堆叠
                         try {
@@ -19745,7 +19748,7 @@ shuoye_if_liuyan: {
 //#noname-kit-end skill:shuoye_if_liuyan
 //#noname-kit-begin skill:shuoye_if_canghe
 shuoye_if_canghe: {
-        // 1 发动 / 2 选定伤害牌 / 3 选定非伤害牌 / 4 造成伤害令其失去体力
+        // 1 发动 / 2 选定伤害牌 / 3 选定非伤害牌 / 4 有人因此受到伤害
         audio: "ext:朔夜/audio/skill:4",
         logAudio: () => false,
         enable: "phaseUse",
@@ -19819,13 +19822,11 @@ shuoye_if_canghe: {
                 useEvent = user.useCard(cardx, cards, cardTarget.targets);
                 await useEvent;
             }
+            // 7. 此牌造成伤害：播第 4 句语音（仅语音，无额外效果）
             const usedCard = useEvent.card;
-            // 7. 此牌造成伤害则其失去 1 点体力
             const damaged = user.hasHistory("sourceDamage", (evt) => evt.getParent("useCard") === useEvent || (usedCard && evt.card === usedCard));
-            if (damaged && user.isAlive()) {
-                lib.shuoyeNilu.voice("shuoye_if_canghe4.mp3", 0, 2, player);
-                await user.loseHp(1);
-            }
+            // 第 4 句单独用一个防重复 key：否则会被同一个技能 1/2/3 句的 2 秒间隔吞掉，语音和文字框都不出
+            if (damaged) lib.shuoyeNilu.voice("shuoye_if_canghe4.mp3", 0, 2, player, "shuoye_if_canghe4");
             // 8. 使用者不为你，且双方手牌相加后四种花色张数相等，可发动虚式茈。
             //    满足后只走虚式茈的后半段：其=本次被令使用牌的角色，不再检查明置牌/手牌花色数。
             const total = {};
