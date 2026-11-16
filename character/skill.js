@@ -20659,7 +20659,7 @@ shuoye_kuanggu: {
         audio: "ext:朔夜/audio/skill:2",
         audioname: ["shuoye_weiyan_fail"],
         audioname2: { shuoye_weiyan_achieve: "shuoye_kuanggu_achieve" },
-        trigger: { source: "damageSource", player: "damageSource" },
+        trigger: { source: "damageSource" },
         frequent: true,
         filter(event, player) {
             if (!event.checkKuanggu || !event.num || event.num <= 0) return false;

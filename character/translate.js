@@ -1201,7 +1201,7 @@ shuoye_zhongao: "忠傲",
 //#noname-kit-end translate:shuoye_zhongao
 //#noname-kit-begin translate:shuoye_kuanggu
 shuoye_kuanggu: "狂骨",
-    shuoye_kuanggu_info: "当你造成或受到距离1以内角色伤害时，你可摸一张牌或回复一点体力。",
+    shuoye_kuanggu_info: "当你对距离1以内角色造成伤害时，你可摸一张牌或回复一点体力。",
 //#noname-kit-end translate:shuoye_kuanggu
 };
 export default translates;
