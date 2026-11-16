@@ -37,5 +37,13 @@ const dynamicTranslates = {
         }
         return info;
     },
+    shuoye_kuanggu(player) {
+        try {
+            if (player && typeof player.hasStorage === "function" && player.hasStorage("shuoye_kuanggu_achieve_flag")) {
+                return "当你造成或受到一点距离1以内角色伤害时，你可摸一张牌或回复一点体力。";
+            }
+        } catch (e) {}
+        return lib.translate["shuoye_kuanggu_info"];
+    },
 };
 export default dynamicTranslates;

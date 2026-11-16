@@ -114,6 +114,16 @@ function shuoyeInstallIfPoptipStyle() {
 }
 
 export async function precontent() {
+    // 【兼容一中杀】一中杀重写的 loseHp 内容会 broadcast 一个调用 game.yzs_playAudio 的函数。
+    // 若一中杀未加载/未定义该函数，客机执行 loseHp 广播时会报 game.yzs_playAudio is not a function。
+    // 只在缺失时补一个转发 game.playAudio 的兜底；一中杀自己的实现稍后加载会正常覆盖。
+    try {
+        if (typeof game.yzs_playAudio !== "function") {
+            game.yzs_playAudio = function (...args) {
+                return game.playAudio(...args);
+            };
+        }
+    } catch (e) {}
     // 【李信】光明神/弑杀神前缀：金色/暗红流光（对局内武将牌上显示名字时的前缀样式，
     // 参考 REACGN「绝境」的 namePrefix 做法；CSS 动画做流光和呼吸光晕）
     try {

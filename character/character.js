@@ -499,7 +499,7 @@ const characters = {
 //#noname-kit-end character:shuoye_bojiaoyang
 //#noname-kit-begin character:shuoye_ifwutiaowu
 shuoye_ifwutiaowu: {
-        sex: "male",
+        sex: "female",
         hp: 3,
         group: "wei",
         skills: ["shuoye_if_liuyan", "shuoye_if_canghe", "shuoye_if_wuliang", "shuoye_if_fanzhuan", "shuoye_if_xiangbei"],
@@ -507,6 +507,16 @@ shuoye_ifwutiaowu: {
         trashBin: [],
     },
 //#noname-kit-end character:shuoye_ifwutiaowu
+//#noname-kit-begin character:shuoye_weiyan
+shuoye_weiyan: {
+        sex: "female",
+        hp: 3,
+        group: "shu",
+        skills: ["shuoye_zhuangshi", "shuoye_yinzhan", "shuoye_zhongao"],
+        img: "extension/朔夜/image/shuoye_weiyan.webp",
+        trashBin: [],
+    },
+//#noname-kit-end character:shuoye_weiyan
 
 };
 for (let i in characters) {

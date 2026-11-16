@@ -35,6 +35,7 @@ const quModeAllow = [
 	"shuoye_quanmoutianbaohuo",
 	"shuoye_mankanshizhenzi",
 	"shuoye_luotong",
+	"shuoye_weiyan",
 	"shuoye_yizhisilang",
 	"shuoye_richekuanjian",
 ];

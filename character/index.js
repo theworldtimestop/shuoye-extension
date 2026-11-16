@@ -25,6 +25,10 @@ game.import("character", function () {
 		characterTitle: {...characterTitles, ...epicTitles},
 		characterSubstitute: {
 			shuoye_ifwutiaowu: [["shuoye_ifwutiaowu_awaken", ["ext:朔夜/image/shuoye_ifwutiaowu_awaken.jpg"]]],
+			shuoye_weiyan: [
+				["shuoye_weiyan_achieve", ["ext:朔夜/image/shuoye_weiyan_achieve.jpg"]],
+				["shuoye_weiyan_fail", ["ext:朔夜/image/shuoye_weiyan_fail.jpg"]],
+			],
 			shuoye_miaoshitiannv: [["shuoye_miaoshitiannv_shadow", ["ext:朔夜/image/character/shuoye_miaoshitiannv_shadow.jpg"]]],
 			shuoye_huangquan: [["shuoye_huangquan_shadow", ["ext:朔夜/image/character/shuoye_huangquan_shadow.jpg"]]],
 			shuoye_fengchuanxiangzi: [["shuoye_fengchuanxiangzi_shadow", ["ext:朔夜/image/character/shuoye_fengchuanxiangzi_shadow.jpg"]]],
