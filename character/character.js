@@ -517,6 +517,17 @@ shuoye_weiyan: {
         trashBin: [],
     },
 //#noname-kit-end character:shuoye_weiyan
+//#noname-kit-begin character:shuoye_leidianyayi
+    shuoye_leidianyayi: {
+        sex: "female",
+        hp: 3,
+        group: "jin",
+        skills: ["shuoye_yulei", "shuoye_huangshan", "shuoye_shenxian", "shuoye_huoying"],
+        img: "extension/朔夜/image/shuoye_leidianyayi.jpg",
+        dieAudios: ["ext:朔夜/audio/die/shuoye_leidianyayi1.mp3"],
+        trashBin: [],
+    },
+//#noname-kit-end character:shuoye_leidianyayi
 
 };
 for (let i in characters) {

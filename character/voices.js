@@ -102,5 +102,21 @@ const voices = {
 	"#shuoye_weiyan:die": "止为大汉献身，纵死又有何恨？",
 	"#shuoye_weiyan_achieve:die": "战死沙场固为快事，且待来生看大汉兴复！",
 	"#shuoye_weiyan_fail:die": "不怨小人构陷，只恨主公雄志未成……",
+	// 【雷之律者】雷电芽衣（千幻聆音与原版台词均读此表）
+	"#ext:朔夜/audio/skill/shuoye_yulei1": "将我的剑化作雷光",
+	"#ext:朔夜/audio/skill/shuoye_huangshan1": "疾如雷电",
+	"#ext:朔夜/audio/skill/shuoye_huangshan2": "雷鸣将至",
+	"#ext:朔夜/audio/skill/shuoye_shenxian1": "留给更需要的人吧",
+	"#ext:朔夜/audio/skill/shuoye_shenxian2": "千鸟，拔刀！",
+	"#ext:朔夜/audio/skill/shuoye_shenxian3": "一刀——了断！",
+	"#ext:朔夜/audio/skill/shuoye_shenxian4": "狂风，臣服于我！",
+	"#ext:朔夜/audio/skill/shuoye_huoying1": "我将坠入黑暗，换你回到光明",
+	"#ext:朔夜/audio/skill/shuoye_huoying2": "我已做出了我的选择",
+	"#ext:朔夜/audio/skill/shuoye_tianjizhijing_skill1": "该结束了",
+	"#ext:朔夜/audio/skill/shuoye_tianjizhijing_skill2": "我不需要其他武器，收起来吧",
+	"#ext:朔夜/audio/skill/shuoye_julijialuo1": "你们逃不掉了",
+	"#ext:朔夜/audio/skill/shuoye_julijialuo2": "怒吼吧，俱利伽罗！",
+	"#ext:朔夜/audio/die/shuoye_leidianyayi1:die": "对不起，琪亚娜",
+	"#shuoye_leidianyayi:die": "对不起，琪亚娜",
 };
 export default voices;

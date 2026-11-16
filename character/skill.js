@@ -1,5 +1,774 @@
 import { lib, game, ui, get, ai, _status } from "noname";
 
+// ===== 【雷之律者】雷电芽衣 公共入口：台词 / 浮雷判定 / 否极技 / 俱利伽罗血条 / BGM =====
+// 这些函数会被 game.broadcastAll 或联机序列化下发给客机执行，
+// 回调里只依赖全局 lib/game/ui/get/_status，不引用模块闭包变量。
+if (!lib.shuoyeLei) {
+    lib.shuoyeLei = {
+        // 台词：只主机播放（lib.shuoyeNilu.voice 内部已处理联机与 2 秒去重）
+        voice(files, gap) {
+            try {
+                if (lib.shuoyeNilu && typeof lib.shuoyeNilu.voice == "function") {
+                    lib.shuoyeNilu.voice(files, gap, 1.5);
+                }
+            } catch (e) {}
+        },
+        // 可以当作【闪】使用的手牌：黑色牌，或本身是【闪】的牌
+        shanCards(player) {
+            // 引擎在 autoChoose / arrangeTrigger 等时机调 filterCard 时 get.player() 可能为空，
+            // 这里先防御一下，避免抛错中断结算。
+            if (!player || typeof player.getCards != "function") return [];
+            return player.getCards("h").filter((card) => {
+                if (!card) return false;
+                if (get.color(card) == "black") return true;
+                return get.name(card) == "shan";
+            });
+        },
+        // 本事件造成“进入弃牌堆”的黑色牌（含 discard / lose 等不同路径，排除因使用进的牌）
+        discardBlackCards(event) {
+            const out = [];
+            const push = (card) => {
+                if (!card) return;
+                if (get.color(card) != "black") return;
+                if (get.position(card) != "d") return;
+                if (out.includes(card)) return;
+                out.push(card);
+            };
+            // 快的提前退出：普通 lose 事件如果不是去弃牌堆，直接跳过（避开历史扫描）
+            if (event.name == "lose" && event.position && event.position !== ui.discardPile) {
+                return [];
+            }
+            try {
+                if (event.name == "cardsDiscard") {
+                    for (const card of event.cards || []) push(card);
+                } else {
+                    // lose / loseAsync：取该玩家本次落到弃牌堆的牌（按玩家历史，比全局历史便宜）
+                    const owner = event.player || null;
+                    const losers = owner ? [owner] : (game.players || []).concat(game.dead || []);
+                    for (const p of losers) {
+                        if (!p || typeof p.checkAllHistory != "function") continue;
+                        let map = null;
+                        try {
+                            map = event.getl ? event.getl(p) : null;
+                        } catch (e) {
+                            map = null;
+                        }
+                        if (map && map.cards2 && map.cards2.length) {
+                            for (const card of map.cards2) push(card);
+                        }
+                    }
+                    for (const card of event.cards || []) push(card);
+                }
+            } catch (e) {}
+            const used = [];
+            try {
+                const ctx = event.getParent && event.getParent("useCard");
+                if (ctx && ctx.cards) used.push.apply(used, ctx.cards);
+            } catch (e) {}
+            return out.filter((card) => !used.includes(card));
+        },
+        discardBlackCardsOld(event) {
+            const out = [];
+            const push = (card) => {
+                if (!card) return;
+                if (get.color(card) != "black") return;
+                if (get.position(card) != "d") return;
+                if (out.includes(card)) return;
+                out.push(card);
+            };
+            try {
+                if (typeof event.getd == "function") {
+                    const list = event.getd(null, "cards2");
+                    if (list && list.length) for (const card of list) push(card);
+                }
+            } catch (e) {}
+            try {
+                for (const card of event.cards || []) push(card);
+            } catch (e) {}
+            const used = [];
+            try {
+                const ctx = event.getParent && event.getParent("useCard");
+                if (ctx && ctx.cards) used.push.apply(used, ctx.cards);
+            } catch (e) {}
+            return out.filter((card) => !used.includes(card));
+        },
+        // 本次进入弃牌堆的黑色牌（排除“因使用”而进的牌）
+        blackDiscarded(event) {
+            const list = [];
+            const used = [];
+            let ctx = null;
+            try {
+                ctx = event.getParent ? event.getParent("useCard") : null;
+            } catch (e) {
+                ctx = null;
+            }
+            if (ctx && ctx.cards) used.push.apply(used, ctx.cards);
+            for (const card of event.cards || []) {
+                if (!card) continue;
+                if (get.color(card) != "black") continue;
+                if (get.position(card) != "d") continue;
+                if (used.includes(card)) continue;
+                list.push(card);
+            }
+            return list;
+        },
+        // ---------------- 【影】 ----------------
+        // 雷电芽衣自己的【影】（不计入手牌上限、可视为任意非伤害牌）
+        yingCards(player) {
+            return !player || typeof player.getCards != "function" ? [] : player.getCards("h").filter((card) => !!(card && card.storage && card.storage.shuoye_huoying));
+        },
+        // 别的角色从祸影那里拿到的红色【影】
+        guestYing(player) {
+            return !player || typeof player.getCards != "function" ? [] : player.getCards("he").filter((card) => !!(card && card.storage && card.storage.shuoye_huoying_guest == player.playerid));
+        },
+        createYings(num) {
+            const list = [];
+            const suits = ["spade", "heart", "club", "diamond"];
+            for (let i = 0; i < num; i++) {
+                let card = null;
+                try {
+                    card = game.createCard("ying", suits[Math.floor(Math.random() * 4)], 1 + Math.floor(Math.random() * 13));
+                } catch (e) {
+                    card = null;
+                }
+                if (!card) continue;
+                card.destroyed = "discardPile";
+                if (!card.storage) card.storage = {};
+                card.storage.shuoye_huoying = true;
+                list.push(card);
+            }
+            return list;
+        },
+        // 可作为“任意非伤害牌”的牌名池：没有伤害标签、且不是装备牌
+        nonDamageNames() {
+            const list = [];
+            for (const name of lib.inpile) {
+                if (!name || list.includes(name)) continue;
+                let type = null;
+                try {
+                    type = get.type(name);
+                } catch (e) {
+                    type = null;
+                }
+                if (type != "basic" && type != "trick" && type != "delay") continue;
+                let tag = 0;
+                try {
+                    tag = get.tag({ name: name }, "damage") || 0;
+                } catch (e) {
+                    tag = 0;
+                }
+                if (tag > 0) continue;
+                list.push(name);
+            }
+            return list;
+        },
+        // ---------------- 否极技 ----------------
+        branchList(player) {
+            const list = player.getStorage("shuoye_shenxian_record", []);
+            return Array.isArray(list) ? list.slice(0) : [];
+        },
+        branchAvailable(player, num) {
+            if (!player.hasSkill("shuoye_shenxian")) return false;
+            return !lib.shuoyeLei.branchList(player).includes(num);
+        },
+        async recordBranch(player, num) {
+            const list = lib.shuoyeLei.branchList(player);
+            if (list.includes(num)) return;
+            list.push(num);
+            game.broadcastAll(function (p, l) {
+                if (!p.storage) p.storage = {};
+                p.storage.shuoye_shenxian_record = l.slice(0);
+                try {
+                    if (p.updateMarks) p.updateMarks("shuoye_shenxian");
+                } catch (e) {}
+            }, player, list);
+            try {
+                player.markSkill("shuoye_shenxian");
+            } catch (e) {}
+            game.log(player, "发动了", "#g神现", "的第", "#y" + get.cnNumber(num), "个分支");
+            if (list.length >= 3) await lib.shuoyeLei.taiLai(player);
+        },
+        async taiLai(player) {
+            lib.shuoyeLei.voice("shuoye_shenxian4.mp3");
+            try {
+                player.popup("泰来");
+            } catch (e) {}
+            game.log(player, "触发了", "#g泰来");
+            game.broadcastAll(function (p) {
+                if (!p.storage) p.storage = {};
+                p.storage.shuoye_shenxian_record = [];
+                try {
+                    if (p.updateMarks) p.updateMarks("shuoye_shenxian");
+                } catch (e) {}
+            }, player);
+            if (player.hasSkill("shuoye_julijialuo") && lib.shuoyeLei.dragonMax(player) > 0) {
+                // 已获得则叠加体力值
+                const max = lib.shuoyeLei.dragonMax(player) + 1;
+                lib.shuoyeLei.setDragon(player, lib.shuoyeLei.dragonHp(player) + 1, max);
+                game.log(player, "的副将", "#y俱利伽罗", "体力上限+1并回复1点体力");
+            } else {
+                await player.addSkill("shuoye_julijialuo");
+                lib.shuoyeLei.setDragon(player, 1, 1);
+                lib.shuoyeLei.summonDragon(player);
+                game.log(player, "获得了副将", "#y俱利伽罗");
+            }
+            // 首次获得俱利伽罗：替换 BGM 循环播放「雷之律者」
+            if (!player.storage.shuoye_leizhilvzhe_bgm) {
+                game.broadcastAll(function (p) {
+                    if (!p.storage) p.storage = {};
+                    p.storage.shuoye_leizhilvzhe_bgm = true;
+                }, player);
+                lib.shuoyeLei.startBgm();
+            }
+        },
+        // ---------------- 俱利伽罗 ----------------
+        dragonHp(player) {
+            return Math.max(0, Number(player.storage.shuoye_julijialuo_hp) || 0);
+        },
+        dragonMax(player) {
+            return Math.max(0, Number(player.storage.shuoye_julijialuo_max) || 0);
+        },
+        hasDragon(player) {
+            return player.hasSkill("shuoye_julijialuo") && lib.shuoyeLei.dragonHp(player) > 0;
+        },
+        setDragon(player, hp, max) {
+            max = Math.max(0, Number(max) || 0);
+            hp = Math.max(0, Math.min(Number(hp) || 0, max));
+            if (!player.storage) player.storage = {};
+            player.storage.shuoye_julijialuo_hp = hp;
+            player.storage.shuoye_julijialuo_max = max;
+            try {
+                if (typeof player.syncStorage == "function") {
+                    player.syncStorage("shuoye_julijialuo_hp");
+                    player.syncStorage("shuoye_julijialuo_max");
+                }
+            } catch (e) {}
+            game.broadcastAll(function (pid, hp2, max2) {
+                let p = null;
+                try {
+                    p = (lib.playerOL && lib.playerOL[pid]) || null;
+                } catch (e) {}
+                if (!p) p = (game.players || []).concat(game.dead || []).find((x) => x && x.playerid == pid) || null;
+                if (p) {
+                    // 客机的 player.storage 不会自动同步，必须在这里一并写入，
+                    // 否则血条显示、以及依赖它的技能条件在客机上都不一致。
+                    if (!p.storage) p.storage = {};
+                    p.storage.shuoye_julijialuo_hp = hp2;
+                    p.storage.shuoye_julijialuo_max = max2;
+                    lib.shuoyeLei.drawDragonBar(p, hp2, max2);
+                }
+            }, player.playerid, hp, max);
+            lib.shuoyeLei.drawDragonBar(player, hp, max);
+            try {
+                if (player.updateMarks) player.updateMarks("shuoye_julijialuo");
+            } catch (e) {}
+        },
+        // 紫色额外血条：画在原体力条上方（独立 DOM，不参与 .hp 的 innerHTML 重绘）
+        drawDragonBar(player, hp, max) {
+            try {
+                if (!player || !player.node || !player.node.hp) return;
+                if (!max) {
+                    delete player.node.shuoyeDragonDots;
+                    const olds = player.node.hp.querySelectorAll(".shuoye-dragon-dot");
+                    for (let i = 0; i < olds.length; i++) olds[i].remove();
+                    return;
+                }
+                player.node.shuoyeDragonDots = { hp: Math.max(0, Number(hp) || 0), max: Math.max(0, Number(max) || 0) };
+                // 体力条每次 $update 都会重写 innerHTML，所以把重绘挂到 player.updates 里
+                if (!player.updates) player.updates = [];
+                let found = false;
+                for (const fn of player.updates) {
+                    if (fn && fn._shuoyeDragon) {
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) {
+                    const updater = function (p) {
+                        lib.shuoyeLei.refreshDragonDots(p);
+                    };
+                    updater._shuoyeDragon = true;
+                    player.updates.push(updater);
+                }
+                // 包一层 $update：体力条每次重绘（清空 innerHTML）后同步补回紫点，
+                // 不用 player.updates 是因为它不保证每次都回调，会出现“紫点一闪又变绿”。
+                const install = function (p) {
+                    if (!p || !p.node) return;
+                    if (!p._shuoyeDragonWrap && typeof p.$update == "function") {
+                        const old = p.$update;
+                        p._shuoyeDragonWrap = true;
+                        p.$update = function () {
+                            let result;
+                            try {
+                                result = old.apply(this, arguments);
+                            } catch (e) {}
+                            try {
+                                lib.shuoyeLei.refreshDragonDots(this);
+                            } catch (e) {}
+                            return result;
+                        };
+                    }
+                    lib.shuoyeLei.refreshDragonDots(p);
+                };
+                game.broadcastAll(install, player);
+                install(player);
+            } catch (e) {}
+        },
+        // 把紫色圆点直接插到体力条内部（排在绿点前面），尺寸/间距自然和体力点一致
+        refreshDragonDots(player) {
+            try {
+                const hpEl = player && player.node && player.node.hp;
+                if (!hpEl) return;
+                const data = player.node.shuoyeDragonDots;
+                const olds = hpEl.querySelectorAll(".shuoye-dragon-dot");
+                if (!data || !data.max) {
+                    for (let i = 0; i < olds.length; i++) olds[i].remove();
+                    return;
+                }
+                // 只换颜色，不写死尺寸/间距（让它们和体力点同一套 CSS，大小完全一致）
+                const paint = function (dot, lost) {
+                    if (!dot) return;
+                    dot.style.position = "static";
+                    dot.style.margin = "";
+                    dot.style.width = "";
+                    dot.style.height = "";
+                    dot.style.filter = "brightness(1.5) hue-rotate(200deg) saturate(1.15)" + (lost ? " grayscale(1)" : "");
+                    dot.style.webkitFilter = dot.style.filter;
+                    if (lost) dot.classList.add("lost");
+                    else dot.classList.remove("lost");
+                };
+                if (olds.length == data.max) {
+                    for (let i = 0; i < olds.length; i++) paint(olds[i], i >= data.hp);
+                    return;
+                }
+                for (let i = 0; i < olds.length; i++) olds[i].remove();
+                let anchor = hpEl.firstChild;
+                for (let i = 0; i < data.max; i++) {
+                    const dot = ui.create.div(".shuoye-dragon-dot");
+                    hpEl.insertBefore(dot, anchor);
+                    anchor = dot.nextSibling;
+                    paint(dot, i >= data.hp);
+                }
+            } catch (e) {}
+        },
+        refreshDragonDotsOld(player) {
+            try {
+                const hpEl = player && player.node && player.node.hp;
+                if (!hpEl) return;
+                const olds = hpEl.querySelectorAll(".shuoye-dragon-dot");
+                for (let i = 0; i < olds.length; i++) olds[i].remove();
+                const data = player.node.shuoyeDragonDots;
+                if (!data || !data.max) return;
+                const refNode = hpEl.querySelector("div:not(.shuoye-dragon-dot)");
+                const refDot = refNode ? getComputedStyle(refNode) : null;
+                const isColumn = /column/.test(getComputedStyle(hpEl).flexDirection || "");
+                let anchor = hpEl.firstChild;
+                for (let i = 0; i < data.max; i++) {
+                    const dot = ui.create.div(".shuoye-dragon-dot");
+                    hpEl.insertBefore(dot, anchor);
+                    anchor = dot.nextSibling;
+                    const lost = i >= data.hp;
+                    if (refDot && refDot.width) {
+                        dot.style.width = refDot.width;
+                        dot.style.height = refDot.height;
+                        dot.style.borderRadius = refDot.borderRadius;
+                        dot.style.border = refDot.border;
+                        dot.style.boxShadow = refDot.boxShadow;
+                        dot.style.position = "static";
+                        dot.style.transform = "none";
+                        dot.style.margin = isColumn ? refDot.marginTop + " 0 0 0" : "0 0 0 " + (refDot.marginLeft || "3px");
+                        dot.style.backgroundColor = refDot.backgroundColor;
+                        if (refDot.backgroundImage && refDot.backgroundImage !== "none") dot.style.backgroundImage = refDot.backgroundImage;
+                        const baseFilter = refDot.filter && refDot.filter !== "none" ? refDot.filter : "brightness(1.5)";
+                        dot.style.filter = baseFilter + " hue-rotate(200deg) saturate(1.2)" + (lost ? " grayscale(0.6)" : "");
+                        dot.style.webkitFilter = dot.style.filter;
+                    } else {
+                        dot.style.background = lost ? "rgba(74,48,96,1)" : "rgba(138,74,216,1)";
+                    }
+                }
+            } catch (e) {}
+        },
+        drawDragonBarLegacy(player, hp, max) {
+            try {
+                if (!player || !player.node || !player.node.hp) return;
+                const hpEl = player.node.hp;
+                let bar = player.node.shuoyeDragonHp;
+                if (!max) {
+                    if (bar) {
+                        bar.remove();
+                        delete player.node.shuoyeDragonHp;
+                    }
+                    return;
+                }
+                if (!bar || !bar.parentNode) {
+                    const host = hpEl.parentNode || hpEl.offsetParent || player;
+                    bar = ui.create.div(".shuoye-dragon-hp", host);
+                    player.node.shuoyeDragonHp = bar;
+                }
+                // 排版照抄原版体力条：贴在体能条正上方，圆点尺寸/间距/阴影都取体力条自身的计算结果
+                const cs = getComputedStyle(hpEl);
+                const isColumn = /column/.test(cs.flexDirection || "");
+                bar.style.position = "absolute";
+                bar.style.left = hpEl.offsetLeft + "px";
+                bar.style.top = hpEl.offsetTop + "px";
+                bar.style.width = (hpEl.offsetWidth || 14) + "px";
+                bar.style.height = "auto";
+                bar.style.display = "flex";
+                bar.style.flexDirection = isColumn ? "column" : "row";
+                bar.style.alignItems = "center";
+                bar.style.justifyContent = isColumn ? "flex-start" : "flex-start";
+                bar.style.transform = "translateY(calc(-100% - 2px))";
+                bar.style.margin = "0";
+                bar.style.zIndex = "130";
+                bar.innerHTML = "";
+                const refDot = hpEl.children && hpEl.children[0] ? getComputedStyle(hpEl.children[0]) : null;
+                for (let i = 0; i < max; i++) {
+                    const dot = ui.create.div(bar);
+                    if (refDot && refDot.width) {
+                        dot.style.width = refDot.width;
+                        dot.style.height = refDot.height;
+                        dot.style.borderRadius = refDot.borderRadius;
+                        dot.style.border = refDot.border;
+                        dot.style.boxShadow = refDot.boxShadow;
+                        dot.style.filter = refDot.filter;
+                        dot.style.webkitFilter = refDot.webkitFilter;
+                        dot.style.position = "static";
+                        dot.style.transform = "none";
+                        dot.style.margin = isColumn ? refDot.marginTop + " 0 0 0" : "0 0 0 " + (refDot.marginLeft || "3px");
+                    }
+                    const lost = i >= hp;
+                    // 颜色跟体力一样靠 filter:brightness 提亮，仅换成紫色
+                    // 配色/亮度沿用原版体力点，用色相旋转整体偏紫（绿/黄/红的体力色都会变成紫色系）
+                    if (refDot && refDot.backgroundColor) {
+                        dot.style.backgroundColor = refDot.backgroundColor;
+                        if (refDot.backgroundImage && refDot.backgroundImage !== "none") dot.style.backgroundImage = refDot.backgroundImage;
+                        const baseFilter = refDot.filter && refDot.filter !== "none" ? refDot.filter : "brightness(1.5)";
+                        dot.style.filter = baseFilter + " hue-rotate(200deg) saturate(1.2)" + (lost ? " grayscale(0.6)" : "");
+                        dot.style.webkitFilter = dot.style.filter;
+                    } else {
+                        dot.style.background = lost ? "rgba(74,48,96,1)" : "rgba(138,74,216,1)";
+                    }
+                    if (lost) dot.style.opacity = "0.9";
+                }
+            } catch (e) {}
+        },
+        // 旧版绘制（已不调用，保留以防外部引用）
+        drawDragonBarOld(player, hp, max) {
+            try {
+                if (!player || !player.node || !player.node.hp) return;
+                const ref = player.node.hp;
+                if (!max) {
+                    if (player.node.shuoyeDragonHp) {
+                        player.node.shuoyeDragonHp.remove();
+                        delete player.node.shuoyeDragonHp;
+                    }
+                    return;
+                }
+                let bar = player.node.shuoyeDragonHp;
+                if (!bar || !bar.parentNode) {
+                    const host = ref.offsetParent || ref.parentNode || player;
+                    bar = ui.create.div(".shuoye-dragon-hp", host);
+                    player.node.shuoyeDragonHp = bar;
+                }
+                bar.style.left = (ref.offsetLeft || 18) + "px";
+                bar.style.top = Math.max(0, (ref.offsetTop || 14) - 13) + "px";
+                bar.innerHTML = "";
+                for (let i = 0; i < max; i++) {
+                    const dot = ui.create.div(bar);
+                    if (i >= hp) dot.classList.add("lost");
+                }
+            } catch (e) {}
+        },
+        // 副将卡画到武将牌上（纯演出，状态在 storage 里）
+        summonDragon(player) {
+            try {
+                game.broadcastAll(function (player2) {
+                    try {
+                        // 客机不执行 content，副将卡的角色条目必须在这里补一份，否则头像/名字取不到
+                        if (!lib.character["shuoye_julijialuo"]) {
+                            lib.character["shuoye_julijialuo"] = get.convertedCharacter(["", "", 0, [], ["ext:朔夜/image/shuoye_julijialuo.jpg", "unseen"]]);
+                            if (!lib.character["shuoye_julijialuo"].img) lib.character["shuoye_julijialuo"].img = "ext:朔夜/image/shuoye_julijialuo.jpg";
+                        }
+                        if (!player2 || !player2.$draw) return;
+                        const name = "shuoye_julijialuo";
+                        // 角色的 img 必须是不带 ext: 的资源路径（带 ext: 时引擎不会做替换，会导致图空了）
+                        if (!lib.character[name].img || String(lib.character[name].img).indexOf("ext:") == 0) lib.character[name].img = "extension/朔夜/image/" + name + ".jpg";
+                        const cardname = "huashen_card_" + name;
+                        if (!lib.card[cardname]) {
+                            // 卡面直接用 ext: 图片（卡牌图会将 ext: 翻译为 extension/），不依赖角色图解析
+                            lib.card[cardname] = { fullimage: true, image: "ext:朔夜/image/shuoye_julijialuo.jpg" };
+                            lib.translate[cardname] = get.rawName2(name);
+                        }
+                        player2.$draw([game.createCard(cardname, " ", " ")], "nobroadcast");
+                    } catch (e) {}
+                }, player);
+            } catch (e) {}
+            try {
+                player.markSkill("shuoye_julijialuo");
+            } catch (e) {}
+        },
+        async destroyDragon(player) {
+            const cards = player.getExpansions("shuoye_julijialuo");
+            if (cards.length) {
+                try {
+                    await player.loseToDiscardpile(cards);
+                } catch (e) {}
+            }
+            if (!player.storage) player.storage = {};
+            player.storage.shuoye_julijialuo_hp = 0;
+            player.storage.shuoye_julijialuo_max = 0;
+            try {
+                if (typeof player.syncStorage == "function") {
+                    player.syncStorage("shuoye_julijialuo_hp");
+                    player.syncStorage("shuoye_julijialuo_max");
+                }
+            } catch (e) {}
+            game.broadcastAll(function (pid) {
+                let p = null;
+                try {
+                    p = (lib.playerOL && lib.playerOL[pid]) || null;
+                } catch (e) {}
+                if (!p) p = (game.players || []).concat(game.dead || []).find((x) => x && x.playerid == pid) || null;
+                if (p) {
+                    if (!p.storage) p.storage = {};
+                    p.storage.shuoye_julijialuo_hp = 0;
+                    p.storage.shuoye_julijialuo_max = 0;
+                    lib.shuoyeLei.drawDragonBar(p, 0, 0);
+                }
+            }, player.playerid);
+            try {
+                player.removeSkill("shuoye_julijialuo");
+            } catch (e) {}
+            try {
+                player.unmarkSkill("shuoye_julijialuo");
+            } catch (e) {}
+            game.log(player, "的副将", "#y俱利伽罗", "损毁了");
+        },
+        // 把一张【鸣】当做【闪】对来源/目标使用（旧的全部用掉的写法保留为 mingToShanAll）
+        async mingToShan(player, target) {
+            // 每次只拿一张【鸣】当【闪】对来源/目标使用
+            if (!player.hasSkill("shuoye_julijialuo")) return;
+            const cards = player.getExpansions("shuoye_julijialuo");
+            if (!cards.length) return;
+            const card = cards[0];
+            if (!card) return;
+            lib.shuoyeLei.voice("shuoye_julijialuo2.mp3");
+            await player.gain([card], "gain2");
+            if (get.position(card) == "d") return;
+            game.log(player, "将一张【鸣】", "当做【闪】使用");
+            const next = player.useCard({ card: { name: "shan" }, cards: [card], targets: [] });
+            next.shuoye_judge_target = target && target.isIn && target.isIn() ? target : null;
+            await next;
+        },
+        async mingToShanAll(player, target) {
+            // 即使这次伤害会把俱利伽罗打穿，也要先把【鸣】全部用完再损毁
+            if (!player.hasSkill("shuoye_julijialuo")) return;
+            const cards = player.getExpansions("shuoye_julijialuo");
+            if (!cards.length) return;
+            lib.shuoyeLei.voice("shuoye_julijialuo2.mp3");
+            game.log(player, "将", "#y" + get.cnNumber(cards.length) + "张【鸣】", "当做【闪】使用");
+            await player.gain(cards, "gain2");
+            for (const card of cards) {
+                if (!card) continue;
+                if (get.position(card) == "d") continue;
+                const next = player.useCard({ card: { name: "shan" }, cards: [card], targets: [] });
+                next.shuoye_judge_target = target && target.isIn && target.isIn() ? target : null;
+                await next;
+            }
+        },
+        // ---------------- 【浮雷】判定 ----------------
+        async fuleiJudge(target, source) {
+            if (!target || !target.isIn || !target.isIn()) return null;
+            try {
+                target.popup("浮雷", "thunder");
+            } catch (e) {}
+            game.log(target, "进行了一次", "#y【浮雷】判定");
+            const result = await target.judge(function (card) {
+                return get.suit(card) == "spade" ? -1 : 1;
+            }).forResult();
+            const card = result && result.card;
+            if (result && result.bool === false) {
+                await target.damage(1, "thunder", source);
+            } else {
+                game.log(target, "的【浮雷】判定", "#g失效");
+                if (source && card) await lib.shuoyeLei.shenxianBranch1(source, card);
+            }
+            return result;
+        },
+        // 神现分支1：浮雷判定失效时获得判定牌
+        async shenxianBranch1(player, card) {
+            try {
+                if (!player || !player.isIn || !player.isIn()) return;
+                if (!lib.shuoyeLei.branchAvailable(player, 1)) return;
+                lib.shuoyeLei.voice("shuoye_shenxian1.mp3");
+                await lib.shuoyeLei.recordBranch(player, 1);
+                if (card && get.position(card) == "d") {
+                    await player.gain(card, "gain2");
+                    game.log(player, "获得了判定牌", card);
+                }
+            } catch (e) {}
+        },
+        // 【闪】生效：令一名角色进行【浮雷】判定
+        async shanTakeEffect(player, preferred) {
+            if (!player.hasSkill("shuoye_huangshan")) return;
+            lib.shuoyeLei.voice("shuoye_huangshan2.mp3");
+            let target = preferred && preferred.isIn && preferred.isIn() ? preferred : null;
+            if (!target) {
+                const result = await player.chooseTarget("荒闪：令一名角色进行【浮雷】判定", true).set("ai", function (t) {
+                    return -get.attitude(get.player(), t);
+                }).forResult();
+                target = (result && result.targets && result.targets[0]) || null;
+            }
+            if (!target) target = player;
+            await lib.shuoyeLei.fuleiJudge(target, player);
+        },
+        // 荒闪·主动：对一名角色使用【闪】（主技能按钮与神现②的选项共用）
+        async huangshanActive(player, target) {
+            if (!player.hasSkill("shuoye_huangshan")) return false;
+            const cards = lib.shuoyeLei.shanCards(player);
+            if (!cards.length) return false;
+            if (!target) {
+                const res = await player.chooseTarget("荒闪：对一名角色使用【闪】", true).set("ai", function (t) {
+                    return -get.attitude(get.player(), t);
+                }).forResult();
+                target = (res && res.targets && res.targets[0]) || null;
+            }
+            if (!target) return false;
+            let chosen = cards[0];
+            if (cards.length > 1) {
+                const result = await player.chooseCard("h", true, "荒闪：选择一张牌当作【闪】使用").set("filterCard", function (card, p) {
+                    // 联机时这个函数会被序列化到客机重新 eval，不能闭包外层 player；
+                    // 优先用引擎传入的第二个参数，其次 get.player()。
+                    let who = p || null;
+                    if (!who) {
+                        try {
+                            who = get.player();
+                        } catch (e) {}
+                    }
+                    return lib.shuoyeLei.shanCards(who).includes(card);
+                }).set("ai", function (card) {
+                    return 1 + Math.random();
+                }).forResult();
+                if (!result || !result.bool || !result.cards || !result.cards.length) return false;
+                chosen = result.cards[0];
+            }
+            lib.shuoyeLei.voice("shuoye_huangshan1.mp3");
+            let ineffective = false;
+            if (target.countCards("h", "sha") > 0) {
+                const resp = await target.chooseToRespond("荒闪：是否打出一张【杀】令此【闪】无效？", { name: "sha" }).set("ai", function (card) {
+                    const me = get.player();
+                    if (!me || typeof me.countCards != "function") return -1;
+                    if (me.countCards("h", "sha") > 1) return 1;
+                    return -1;
+                }).forResult();
+                ineffective = !!(resp && resp.bool);
+            }
+            const next = player.useCard({ card: { name: "shan" }, cards: [chosen], targets: [] });
+            next.shuoye_shan_ineffective = ineffective;
+            next.shuoye_judge_target = target;
+            await next;
+            if (ineffective) game.log(player, "对", target, "使用的【闪】被【杀】无效");
+            return true;
+        },
+        // ---------------- 祸影 ----------------
+        huoyingAvailable(player) {
+            if (!player.hasSkill("shuoye_huoying")) return false;
+            if (!player.countCards("he")) return false;
+            let turnId = null;
+            try {
+                turnId = lib.shuoyeIf.turnId();
+            } catch (e) {
+                turnId = String(game.phaseNumber || 0);
+            }
+            return player.storage.shuoye_huoying_turn != turnId;
+        },
+        async huoying(player) {
+            const max = player.countCards("he");
+            if (!max) return false;
+            const result = await player.chooseToDiscard("he", [1, max], false, "祸影：弃置任意张牌，获得等量不计入手牌上限的【影】").set("ai", function (card) {
+                return 5 - get.value(card);
+            }).forResult();
+            if (!result || !result.bool || !result.cards || !result.cards.length) return false;
+            let turnId = null;
+            try {
+                turnId = lib.shuoyeIf.turnId();
+            } catch (e) {
+                turnId = String(game.phaseNumber || 0);
+            }
+            game.broadcastAll(function (p, tid) {
+                if (!p.storage) p.storage = {};
+                p.storage.shuoye_huoying_turn = tid;
+            }, player, turnId);
+            lib.shuoyeLei.voice(Math.random() < 0.5 ? "shuoye_huoying1.mp3" : "shuoye_huoying2.mp3");
+            const cards = lib.shuoyeLei.createYings(result.cards.length);
+            if (!cards.length) return false;
+            await player.gain(cards, "gain2");
+            // 【影】是 createCard 临时造的牌，card.storage 不会自动同步到客机，
+            // 不补这一句的话客机上“视为任意非伤害牌”的选牌条件会是空。
+            game.broadcastAll(function (list) {
+                for (const card of list || []) {
+                    if (!card) continue;
+                    if (!card.storage) card.storage = {};
+                    card.storage.shuoye_huoying = true;
+                }
+            }, cards);
+            game.log(player, "获得了", "#y" + get.cnNumber(cards.length) + "张【影】");
+            const reds = cards.filter((card) => get.color(card) == "red");
+            if (reds.length) {
+                const res = await player.chooseTarget(`令一名角色获得其中的红色牌（${reds.length}张）`, true).set("ai", function (target) {
+                    return get.attitude(get.player(), target);
+                }).forResult();
+                const target = res && res.targets && res.targets[0];
+                if (target) {
+                    await target.gain(reds, "gain2");
+                    // 给回自己（或另一个本身就有【祸影】的角色）时，不必再发临时入口，
+                    // 否则会同时出现两个【祸影】按钮（自己的【影】转换 + 临时祸影）。
+                    if (!target.hasSkill("shuoye_huoying")) {
+                        game.broadcastAll(function (list, pid) {
+                            for (const card of list) {
+                                if (!card.storage) card.storage = {};
+                                card.storage.shuoye_huoying_guest = pid;
+                            }
+                        }, reds, target.playerid);
+                        if (!target.hasSkill("shuoye_huoying_guest")) target.addSkill("shuoye_huoying_guest");
+                    }
+                    game.log(target, "获得了", "#y" + get.cnNumber(reds.length) + "张红色【影】");
+                }
+            }
+            return true;
+        },
+        // ---------------- BGM ----------------
+        startBgm() {
+            try {
+                game.broadcastAll(function () {
+                    try {
+                        _status.tempMusic = "ext:朔夜/audio/skill/shuoye_leizhilvzhe_bgm1.mp3";
+                        game.playBackgroundMusic();
+                        if (ui.backgroundMusic) ui.backgroundMusic.loop = true;
+                        // 同时把战斗背景换成雷之律者的图（走引擎 updateBackground，联机广播后全端一致）
+                        _status.tempBackground = "ext:朔夜/image/shuoye_leizhilvzhe_bg.jpg";
+                        game.updateBackground();
+                    } catch (e) {}
+                });
+            } catch (e) {}
+        },
+        stopBgm() {
+            try {
+                if (_status.tempMusic && String(_status.tempMusic).includes("shuoye_leizhilvzhe_bgm")) {
+                    delete _status.tempMusic;
+                    try {
+                        delete _status.tempBackground;
+                        game.updateBackground();
+                    } catch (e) {}
+                    try {
+                        game.playBackgroundMusic();
+                    } catch (e) {}
+                }
+            } catch (e) {}
+        },
+    };
+}
+
 // 【法咒】结算口径：true = 目标体力上限；false = 目标当前体力值。
 // 按原文“体力值”应取 false，但【苍书】的“已损体力值视为目标额外体力上限”只有在 true 时才有实际作用，默认 true。
 // 改成 false 后，记得把 translate.js 里 shuoye_fazhou_info 的「体力上限」改回「体力值」。
@@ -4546,30 +5315,26 @@ const skills = {
 //#noname-kit-end skill:shuoye_dinghan
 //#noname-kit-begin skill:shuoye_shenxian
     shuoye_shenxian: {
-        trigger: {
-            global: ["loseAfter", "loseAsyncAfter"],
-        },
-        forced: true,
-        locked: false,
-        filter(event, player) {
-            if (event.type != "discard" || event.getlx === false) return false;
-            if (event.name == "lose" && event.player == player) return false;
-            var cards = event.cards.slice(0);
-            var evt = event.getl(player);
-            if (evt && evt.cards) cards.removeArray(evt.cards);
-            for (var i = 0; i < cards.length; i++) {
-                if (get.type(cards[i], null, event.hs && event.hs.includes(cards[i]) ? event.player : false) == "basic" && cards[i].original != "j") {
-                    return true;
-                }
-            }
-            return false;
-        },
-        async content(event, trigger, player) {
-            if (trigger.delay == false) await game.delay();
-            await player.draw();
-        },
-        ai: {
-            threaten: 1.5,
+        audio: "ext:朔夜/audio/skill:4",
+        logAudio: () => false,
+        mark: true,
+        marktext: "极",
+        group: ["shuoye_shenxian_2", "shuoye_shenxian_3"],
+        intro: {
+            name: "否极技",
+            markcount(storage, player) {
+                return lib.shuoyeLei.branchList(player).length;
+            },
+            content(storage, player) {
+                const list = lib.shuoyeLei.branchList(player);
+                const names = {
+                    1: "①【浮雷】判定失效时获得判定牌",
+                    2: "②一名角色使用【闪】后使用一张牌",
+                    3: "③一名角色受到雷电伤害时令其-1/+1",
+                };
+                if (!list.length) return "尚未发动任何分支";
+                return "已发动：<br>" + list.map((num) => names[num] || num).join("<br>");
+            },
         },
     },
 //#noname-kit-end skill:shuoye_shenxian
@@ -6572,7 +7337,7 @@ const skills = {
                     const name = info[2], type = get.type(name), infox = get.info({ name: name });
                     return (get.type({ name: name }) == 'trick' && get.tag({ name: name }, 'damage')) || ['sha', 'jiu'].includes(name);
                 }).filter(card => event.filterCard({ name: card[2], nature: card[3] }, player, event));
-                const dialog = ui.create.dialog('椎锋', [list, 'vcard']);
+                const dialog = ui.create.dialog('椎坚', [list, 'vcard']);
                 dialog.direct = true;
                 return dialog;
             },
@@ -6694,7 +7459,7 @@ const skills = {
                         return get.type(card) == 'equip' && lib.filter.cardDiscardable(card, player, event.name);
                     })) list2.push('弃置装备牌');
                     list2.push('失去体力');
-                    const { control } = await player.chooseControl(list2, 'cancel2').set('prompt', `你可以弃置装备牌或失去体力增加“椎锋”的使用次数`).forResult();
+                    const { control } = await player.chooseControl(list2, 'cancel2').set('prompt', `你可以弃置装备牌或失去体力增加“椎坚”的使用次数`).forResult();
                     if (control == 'cancel2') {
                         event.finish();
                         return;
@@ -20746,6 +21511,600 @@ shuoye_weiyan_enter: {
         },
     },
 //#noname-kit-end skill:shuoye_weiyan_enter
+//#noname-kit-begin skill:shuoye_yulei
+    shuoye_yulei: {
+        audio: "ext:朔夜/audio/skill:1",
+        logAudio: () => false,
+        trigger: {
+            player: "enterGame",
+            global: "phaseBefore",
+        },
+        forced: true,
+        filter(event, player) {
+            if (event.name == "phase" && game.phaseNumber != 0) return false;
+            return !player.hasCard(function (card) {
+                return card.name == "shuoye_tianjizhijing";
+            }, "e");
+        },
+        async content(event, trigger, player) {
+            lib.shuoyeLei.voice("shuoye_yulei1.mp3");
+            const card = game.createCard("shuoye_tianjizhijing", "spade", 7);
+            await player.equip(card);
+            game.log(player, "装备了", card);
+        },
+    },
+//#noname-kit-end skill:shuoye_yulei
+//#noname-kit-begin skill:shuoye_huangshan
+    shuoye_huangshan: {
+        audio: "ext:朔夜/audio/skill:2",
+        logAudio: () => false,
+        enable: ["phaseUse", "chooseToUse"],
+        usable: 1,
+        group: ["shuoye_huangshan_zhi", "shuoye_huangshan_used"],
+        // 通用入口：自己的出牌阶段，以及任何“可以任意使用一张牌”的窗口（如神现、其他技能给的用牌机会）。
+        // 用一张普通锦囊试探窗口能不能接受任意牌，从而排除【杀】响应、濒死求桃、无懈等受限窗口。
+        filter(event, player) {
+            if (lib.shuoyeLei.shanCards(player).length === 0) return false;
+            if (!event) return true;
+            if (event.name && event.name !== "chooseToUse") return false;
+            if (event.type === "phase") return true;
+            if (typeof event.type === "string") return false;
+            try {
+                if (!event.filterCard) return false;
+                // 用几张常见牌试探窗口是否“接受任意一张牌”：
+                // 无中（通用/只需自己）、“杀”（只能对某人使用牌的窗口）、拆牌类（含目标的锦囊）
+                const probes = ["wuzhong", "sha", "guohe", "shunshou", "juedou", "tiesuo"];
+                for (const name of probes) {
+                    try {
+                        if (event.filterCard({ name: name, isCard: true }, player, event)) return true;
+                    } catch (e) {}
+                }
+                return false;
+            } catch (e) {
+                return false;
+            }
+        },
+        selectTarget: 1,
+        filterTarget(card, player, target) {
+            return true;
+        },
+        prompt: "对一名角色使用【闪】",
+        prompt2: "目标可打出一张【杀】令此【闪】无效；若此【闪】生效，你令一名角色进行【浮雷】判定",
+        async content(event, trigger, player) {
+            await lib.shuoyeLei.huangshanActive(player, event.target);
+        },
+        ai: {
+            order: 5,
+            result: {
+                target(player, target) {
+                    return -get.attitude(player, target);
+                },
+            },
+        },
+    },
+//#noname-kit-end skill:shuoye_huangshan
+//#noname-kit-begin skill:shuoye_huangshan_zhi
+    shuoye_huangshan_zhi: {
+        charlotte: true,
+        sub: true,
+        enable: ["chooseToUse", "chooseToRespond"],
+        // 只在真正的用牌/响应窗口提供入口：
+        // 出牌阶段交给主动技（否则会出现两个【荒闪】），
+        // 顺手牵羊/获取手牌这种选牌框、以及其它非用牌事件一律不出现。
+        filter(event, player) {
+            if (!event) return false;
+            if (event.name !== "chooseToUse" && event.name !== "chooseToRespond") return false;
+            if (event.type === "phase") return false;
+            return lib.shuoyeLei.shanCards(player).length > 0;
+        },
+        filterCard(card) {
+            return get.color(card) == "black";
+        },
+        viewAs: { name: "shan" },
+        viewAsFilter(player) {
+            return lib.shuoyeLei.shanCards(player).length > 0;
+        },
+        prompt: "将一张黑色牌当【闪】使用或打出",
+        check(card) {
+            return 1 + Math.random();
+        },
+        position: "h",
+        ai: {
+            respondShan: true,
+            skillTagFilter(player) {
+                return lib.shuoyeLei.shanCards(player).length > 0;
+            },
+        },
+    },
+//#noname-kit-end skill:shuoye_huangshan_zhi
+//#noname-kit-begin skill:shuoye_huangshan_used
+    shuoye_huangshan_used: {
+        charlotte: true,
+        sub: true,
+        // 同一时机多技能触发时，荒闪必须先于神现结算（get.priority：数值越大越先）
+        priority: 2,
+        trigger: { player: "useCardAfter" },
+        forced: true,
+        filter(event, player) {
+            if (!event.card) return false;
+            if (get.name(event.card) != "shan") return false;
+            if (event.cancelled) return false;
+            return !event.shuoye_shan_ineffective;
+        },
+        async content(event, trigger, player) {
+            await lib.shuoyeLei.shanTakeEffect(player, trigger.shuoye_judge_target || null);
+        },
+    },
+//#noname-kit-end skill:shuoye_huangshan_used
+//#noname-kit-begin skill:shuoye_shenxian_2
+    shuoye_shenxian_2: {
+        charlotte: true,
+        sub: true,
+        // 只有「其他角色」使用【闪】才触发（不包括自己）
+        trigger: { global: "useCardAfter" },
+        filter(event, player) {
+            if (!event.card) return false;
+            if (get.name(event.card) != "shan") return false;
+            if (event.player === player) return false;
+            if (!lib.shuoyeLei.branchAvailable(player, 2)) return false;
+            return player.countCards("h") > 0;
+        },
+        async cost(event, trigger, player) {
+            const result = await player.chooseBool(`神现：${get.translation(trigger.player)}使用了【闪】，是否使用一张牌？`).set("ai", function () {
+                return true;
+            }).forResult();
+            if (result && result.bool) event.result = { bool: true };
+        },
+        async content(event, trigger, player) {
+            lib.shuoyeLei.voice("shuoye_shenxian2.mp3");
+            await lib.shuoyeLei.recordBranch(player, 2);
+            await player.chooseToUse("神现：使用一张牌").forResult();
+        },
+    },
+//#noname-kit-end skill:shuoye_shenxian_2
+//#noname-kit-begin skill:shuoye_shenxian_3
+    shuoye_shenxian_3: {
+        charlotte: true,
+        sub: true,
+        trigger: {
+            player: "damageBegin3",
+            global: "damageBegin3",
+        },
+        filter(event, player) {
+            if (!event.hasNature || !event.hasNature("thunder")) return false;
+            if (!(event.num > 0)) return false;
+            return lib.shuoyeLei.branchAvailable(player, 3);
+        },
+        async cost(event, trigger, player) {
+            const result = await player.chooseControl("-1", "+1", "cancel2").set("prompt", `神现：是否令${get.translation(trigger.player)}受到的雷电伤害-1或+1？`).set("ai", function () {
+                const me = get.player();
+                const trigger2 = _status.event.getTrigger();
+                if (!trigger2 || !trigger2.player) return "cancel2";
+                if (!me) return "cancel2";
+                return get.attitude(me, trigger2.player) > 0 ? "-1" : "+1";
+            }).forResult();
+            const control = result && result.control;
+            if (control == "-1" || control == "+1") event.result = { bool: true, cost_data: control };
+        },
+        async content(event, trigger, player) {
+            lib.shuoyeLei.voice("shuoye_shenxian3.mp3");
+            await lib.shuoyeLei.recordBranch(player, 3);
+            const control = event.cost_data;
+            if (control == "-1") {
+                trigger.num = Math.max(0, trigger.num - 1);
+                game.log(player, "令此雷电伤害", "#y-1");
+            } else {
+                trigger.num += 1;
+                game.log(player, "令此雷电伤害", "#y+1");
+            }
+        },
+    },
+//#noname-kit-end skill:shuoye_shenxian_3
+//#noname-kit-begin skill:shuoye_huoying
+    shuoye_huoying: {
+        audio: "ext:朔夜/audio/skill:2",
+        logAudio: () => false,
+        trigger: {
+            player: "damageEnd",
+            source: "damageEnd",
+        },
+        frequent: true,
+        group: ["shuoye_huoying_ying"],
+        filter(event, player) {
+            return lib.shuoyeLei.huoyingAvailable(player);
+        },
+        async cost(event, trigger, player) {
+            const result = await player.chooseBool("祸影：是否弃置任意张牌，获得等量的【影】？").set("ai", function () {
+                return true;
+            }).forResult();
+            if (result && result.bool) event.result = { bool: true };
+        },
+        async content(event, trigger, player) {
+            await lib.shuoyeLei.huoying(player);
+        },
+        mod: {
+            maxHandcardFinal(player, num) {
+                return num + lib.shuoyeLei.yingCards(player).length;
+            },
+        },
+        ai: {
+            order: 6,
+            result: {
+                player: 1,
+            },
+        },
+    },
+//#noname-kit-end skill:shuoye_huoying
+//#noname-kit-begin skill:shuoye_huoying_ying
+    shuoye_huoying_ying: {
+        charlotte: true,
+        sub: true,
+        enable: ["chooseToUse", "chooseToRespond"],
+        filter(event, player) {
+            if (!lib.shuoyeLei.yingCards(player).length) return false;
+            // 每回合限一次（按真实回合计，含他人回合）
+            return player.storage.shuoye_huoying_ying_turn != lib.shuoyeIf.turnId();
+        },
+        chooseButton: {
+            dialog(event, player) {
+                const list = lib.shuoyeLei.nonDamageNames().filter(function (name) {
+                    try {
+                        return event.filterCard({ name: name }, player, event);
+                    } catch (e) {
+                        return false;
+                    }
+                });
+                return ui.create.dialog("祸影", [list, "vcard"]);
+            },
+            filter(button, player) {
+                const evt = _status.event.getParent();
+                try {
+                    return evt.filterCard({ name: button.link[2] }, player, evt);
+                } catch (e) {
+                    return false;
+                }
+            },
+            check(button) {
+                return 1 + Math.random();
+            },
+            backup(links) {
+                const name = links[0][2];
+                return {
+                    filterCard(card) {
+                        return !!(card && card.storage && card.storage.shuoye_huoying);
+                    },
+                    selectCard: 1,
+                    position: "h",
+                    viewAs: { name: name },
+                    prompt: "将一张【影】当作" + get.translation(name) + "使用或打出",
+                    log: false,
+                    async precontent(event, trigger, player) {
+                        game.broadcastAll(function (p, tid) {
+                            if (!p.storage) p.storage = {};
+                            p.storage.shuoye_huoying_ying_turn = tid;
+                        }, player, lib.shuoyeIf.turnId());
+                    },
+                    ai: {
+                        basic: { useful: 1, value: 1 },
+                        result: { player: 1 },
+                    },
+                };
+            },
+            prompt(links) {
+                return "将一张【影】当作" + get.translation(links[0][2]) + "使用或打出";
+            },
+        },
+        ai: {
+            order: 1,
+            result: {
+                player: 1,
+            },
+        },
+    },
+//#noname-kit-end skill:shuoye_huoying_ying
+//#noname-kit-begin skill:shuoye_huoying_guest
+    shuoye_huoying_guest: {
+        enable: "phaseUse",
+        group: ["shuoye_huoying_guest_keep"],
+        filter(event, player) {
+            if (!lib.shuoyeLei.guestYing(player).length) return false;
+            if (lib.shuoyeLei.nonDamageNames().length === 0) return false;
+            // 每回合限一次（同一个回合计数）
+            return player.storage.shuoye_huoying_guest_turn != lib.shuoyeIf.turnId();
+        },
+        chooseButton: {
+            dialog(event, player) {
+                const list = lib.shuoyeLei.nonDamageNames().filter(function (name) {
+                    try {
+                        return event.filterCard({ name: name }, player, event);
+                    } catch (e) {
+                        return false;
+                    }
+                });
+                return ui.create.dialog("祸影", [list, "vcard"]);
+            },
+            filter(button, player) {
+                const evt = _status.event.getParent();
+                try {
+                    return evt.filterCard({ name: button.link[2] }, player, evt);
+                } catch (e) {
+                    return false;
+                }
+            },
+            check(button) {
+                return 1 + Math.random();
+            },
+            backup(links) {
+                const name = links[0][2];
+                return {
+                    filterCard(card) {
+                        if (!card || !card.storage || card.storage.shuoye_huoying_guest == null) return false;
+                        // 引擎会把当前玩家作为 filterCard 的第二个参数传进来，优先用它；
+                        // 其次 get.player()，最后 _status.event.player（autoChoose / arrangeTrigger 时前两者可能为空）。
+                        let __p = arguments.length > 1 ? arguments[1] : null;
+                        try {
+                            __p = __p || get.player();
+                        } catch (e) {}
+                        if (!__p) {
+                            try {
+                                __p = _status.event && _status.event.player;
+                            } catch (e) {}
+                        }
+                        // autoChoose 等拿不到当前玩家时，只要是从祸影拿到的红影就放行
+                        return __p ? card.storage.shuoye_huoying_guest == __p.playerid : true;
+                    },
+                    selectCard: 1,
+                    position: "h",
+                    viewAs: { name: name },
+                    prompt: "将一张红色【影】当作" + get.translation(name) + "使用",
+                    log: false,
+                    async precontent(event, trigger, player) {
+                        game.broadcastAll(function (p, tid) {
+                            if (!p.storage) p.storage = {};
+                            p.storage.shuoye_huoying_guest_turn = tid;
+                        }, player, lib.shuoyeIf.turnId());
+                    },
+                    ai: {
+                        basic: { useful: 1, value: 1 },
+                        result: { player: 1 },
+                    },
+                };
+            },
+            prompt(links) {
+                return "将一张红色【影】当作" + get.translation(links[0][2]) + "使用";
+            },
+        },
+        ai: {
+            order: 1,
+            result: {
+                player: 1,
+            },
+        },
+    },
+//#noname-kit-end skill:shuoye_huoying_guest
+//#noname-kit-begin skill:shuoye_huoying_guest_keep
+    shuoye_huoying_guest_keep: {
+        charlotte: true,
+        sub: true,
+        trigger: {
+            player: ["loseAfter", "loseAsyncAfter", "gainAfter", "equipAfter"],
+        },
+        forced: true,
+        silent: true,
+        filter(event, player) {
+            return !lib.shuoyeLei.guestYing(player).length;
+        },
+        async content(event, trigger, player) {
+            game.log(player, "失去了所有来自祸影的红色【影】", "#g祸影", "失效");
+            player.removeSkill("shuoye_huoying_guest");
+            player.removeSkill("shuoye_huoying_guest_keep");
+        },
+    },
+//#noname-kit-end skill:shuoye_huoying_guest_keep
+//#noname-kit-begin skill:shuoye_julijialuo
+    shuoye_julijialuo: {
+        audio: "ext:朔夜/audio/skill:2",
+        logAudio: () => false,
+        mark: true,
+        marktext: "伽",
+        group: ["shuoye_julijialuo_take", "shuoye_julijialuo_hurt", "shuoye_julijialuo_ming", "shuoye_julijialuo_dealt"],
+        intro: {
+            name: "俱利伽罗",
+            markcount(storage, player) {
+                return player.getExpansions("shuoye_julijialuo").length;
+            },
+            mark(dialog, storage, player) {
+                // 点开标记时先显示俱利伽罗的图（角色卡样式），再列体力与【鸣】
+                try {
+                    if (!lib.character["shuoye_julijialuo"]) {
+                        lib.character["shuoye_julijialuo"] = get.convertedCharacter(["", "", 0, [], ["ext:朔夜/image/shuoye_julijialuo.jpg", "unseen"]]);
+                    }
+                    if (!lib.character["shuoye_julijialuo"].img) lib.character["shuoye_julijialuo"].img = "ext:朔夜/image/shuoye_julijialuo.jpg";
+                    // 同理：img 用不带 ext: 的路径，标记弹窗里才能正常显示图
+                    if (!lib.character["shuoye_julijialuo"].img || String(lib.character["shuoye_julijialuo"].img).indexOf("ext:") == 0) {
+                        lib.character["shuoye_julijialuo"].img = "extension/朔夜/image/shuoye_julijialuo.jpg";
+                    }
+                    // 直接把图画在弹窗里（不依赖角色图解析，任何皮肤都能显示）
+                    const dragonSrc = lib.assetURL + "extension/朔夜/image/shuoye_julijialuo.jpg";
+                    dialog.add('<div style="width:150px;height:106px;margin:0 auto;border-radius:6px;background:url(' + dragonSrc + ') center/cover no-repeat;"></div>');
+                    dialog.addText("俱利伽罗");
+                    dialog.addText(get.characterIntro("shuoye_julijialuo"));
+                } catch (e) {}
+                dialog.addText(`体力：${lib.shuoyeLei.dragonHp(player)}/${lib.shuoyeLei.dragonMax(player)}`);
+                const cards = player.getExpansions("shuoye_julijialuo");
+                if (cards.length) dialog.addAuto(cards);
+            },
+        },
+        onremove(player) {
+            const cards = player.getExpansions("shuoye_julijialuo");
+            if (cards.length) {
+                try {
+                    player.loseToDiscardpile(cards);
+                } catch (e) {}
+            }
+            try {
+                lib.shuoyeLei.drawDragonBar(player, 0, 0);
+            } catch (e) {}
+        },
+    },
+//#noname-kit-end skill:shuoye_julijialuo
+//#noname-kit-begin skill:shuoye_julijialuo_take
+    shuoye_julijialuo_take: {
+        charlotte: true,
+        sub: true,
+        trigger: {
+            player: ["damageBegin3", "loseHpBegin"],
+        },
+        forced: true,
+        filter(event, player) {
+            if (!(event.num > 0)) return false;
+            return lib.shuoyeLei.hasDragon(player);
+        },
+        async content(event, trigger, player) {
+            const hp = lib.shuoyeLei.dragonHp(player);
+            const max = lib.shuoyeLei.dragonMax(player);
+            const absorb = Math.min(trigger.num, hp);
+            if (absorb <= 0) return;
+            trigger.num = 0;
+            if (trigger.name == "damage") trigger.shuoye_absorbed = absorb;
+            lib.shuoyeLei.setDragon(player, hp - absorb, max);
+            game.log(player, "的副将", "#y俱利伽罗", "承受了", "#y" + get.cnNumber(absorb), trigger.name == "damage" ? "点伤害" : "点体力流失");
+            if (trigger.name != "damage" && lib.shuoyeLei.dragonHp(player) <= 0) await lib.shuoyeLei.destroyDragon(player);
+        },
+    },
+//#noname-kit-end skill:shuoye_julijialuo_take
+//#noname-kit-begin skill:shuoye_julijialuo_ming
+    shuoye_julijialuo_ming: {
+        charlotte: true,
+        sub: true,
+        // 黑色牌「非因使用」进入弃牌堆就收为【鸣】：
+        // 弃置（cardsDiscard）、失去并置入弃牌堆（lose）等不同路径都能触发。
+        trigger: {
+            player: ["cardsDiscardAfter", "loseAfter"],
+            global: ["cardsDiscardAfter", "loseAfter"],
+        },
+        forced: true,
+        filter(event, player) {
+            if (!lib.shuoyeLei.hasDragon(player)) return false;
+            return lib.shuoyeLei.discardBlackCards(event).length > 0;
+        },
+        async content(event, trigger, player) {
+            const cards = lib.shuoyeLei.discardBlackCards(trigger);
+            if (!cards.length) return;
+            lib.shuoyeLei.voice("shuoye_julijialuo1.mp3");
+            const next = player.addToExpansion(cards, "gain2");
+            next.gaintag.add("shuoye_julijialuo");
+            await next;
+            game.log(player, "将", "#y" + get.cnNumber(cards.length) + "张黑色牌", "置于武将牌上称为【鸣】");
+            try {
+                player.markSkill("shuoye_julijialuo");
+            } catch (e) {}
+        },
+    },
+//#noname-kit-end skill:shuoye_julijialuo_ming
+//#noname-kit-begin skill:shuoye_julijialuo_dealt
+    shuoye_julijialuo_dealt: {
+        charlotte: true,
+        sub: true,
+        trigger: { source: "damageEnd" },
+        forced: true,
+        filter(event, player) {
+            if (!lib.shuoyeLei.hasDragon(player)) return false;
+            if (!player.getExpansions("shuoye_julijialuo").length) return false;
+            return !!(event.player && event.player.isIn());
+        },
+        async content(event, trigger, player) {
+            await lib.shuoyeLei.mingToShan(player, trigger.player);
+        },
+    },
+//#noname-kit-end skill:shuoye_julijialuo_dealt
+//#noname-kit-begin skill:shuoye_tianjizhijing_skill
+    shuoye_tianjizhijing_skill: {
+        audio: "ext:朔夜/audio/skill:2",
+        logAudio: () => false,
+        equipSkill: true,
+        group: ["shuoye_tianjizhijing_extra", "shuoye_tianjizhijing_recast"],
+    },
+//#noname-kit-end skill:shuoye_tianjizhijing_skill
+//#noname-kit-begin skill:shuoye_tianjizhijing_extra
+    shuoye_tianjizhijing_extra: {
+        equipSkill: true,
+        charlotte: true,
+        sub: true,
+        trigger: { player: "useCardToPlayer" },
+        filter(event, player) {
+            if (!event.card) return false;
+            if (!event.isFirstTarget) return false;
+            if (get.color(event.card) != "black") return false;
+            const info = get.info(event.card, false);
+            if (!info) return false;
+            if (info.notarget) return false;
+            if (info.type == "equip") return false;
+            return true;
+        },
+        async cost(event, trigger, player) {
+            const result = await player.chooseBool(`天殛之境：是否令${get.translation(trigger.card)}额外结算一次？`).set("ai", function () {
+                const evt = _status.event.getTrigger();
+                if (!evt || !evt.card || !evt.target) return false;
+                const me0 = get.player();
+                if (!me0) return false;
+                return get.effect(evt.target, evt.card, me0, me0) > 0;
+            }).forResult();
+            if (result && result.bool) event.result = { bool: true };
+        },
+        async content(event, trigger, player) {
+            const parent = trigger.getParent();
+            if (!parent) return;
+            parent.effectCount = (parent.effectCount || 1) + 1;
+            lib.shuoyeLei.voice("shuoye_tianjizhijing_skill1.mp3");
+            game.log(player, "令", trigger.card, "额外结算一次");
+        },
+    },
+//#noname-kit-end skill:shuoye_tianjizhijing_extra
+//#noname-kit-begin skill:shuoye_tianjizhijing_recast
+    shuoye_tianjizhijing_recast: {
+        equipSkill: true,
+        charlotte: true,
+        sub: true,
+        trigger: { player: "equipBefore" },
+        forced: true,
+        filter(event, player) {
+            if (event.name != "equip") return false;
+            if (!player.hasCard(function (card) {
+                return card.name == "shuoye_tianjizhijing";
+            }, "e")) return false;
+            return (event.cards || []).some(function (card) {
+                return card.name != "shuoye_tianjizhijing" && get.subtype(card) == "equip1";
+            });
+        },
+        async content(event, trigger, player) {
+            lib.shuoyeLei.voice("shuoye_tianjizhijing_skill2.mp3");
+            trigger.cancel();
+            const cards = (trigger.cards || []).slice(0);
+            game.log(player, "发动天殛之境，改为重铸", cards);
+            if (cards.length) await player.recast(cards);
+        },
+    },
+//#noname-kit-end skill:shuoye_tianjizhijing_recast
+//#noname-kit-begin skill:shuoye_julijialuo_hurt
+    shuoye_julijialuo_hurt: {
+        charlotte: true,
+        sub: true,
+        trigger: {
+            player: "damageZero",
+        },
+        forced: true,
+        filter(event, player) {
+            if (!(event.shuoye_absorbed > 0)) return false;
+            return lib.shuoyeLei.hasDragon(player) || lib.shuoyeLei.dragonMax(player) > 0;
+        },
+        async content(event, trigger, player) {
+            await lib.shuoyeLei.mingToShan(player, trigger.source || null);
+            if (lib.shuoyeLei.huoyingAvailable(player)) await lib.shuoyeLei.huoying(player);
+            if (lib.shuoyeLei.dragonMax(player) > 0 && lib.shuoyeLei.dragonHp(player) <= 0) await lib.shuoyeLei.destroyDragon(player);
+        },
+    },
+//#noname-kit-end skill:shuoye_julijialuo_hurt
 };
 
 export default skills;

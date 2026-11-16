@@ -29,5 +29,6 @@ const characterTitles = {
     shuoye_richekuanjian: "律师审判长",
     shuoye_bojiaoyang: "困兽之笼",
     shuoye_weiyan: "是",
+    shuoye_leidianyayi: "雷之律者",
 };
 export default characterTitles;

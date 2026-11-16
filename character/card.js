@@ -4,7 +4,8 @@ const cards = {
 //#noname-kit-begin card:shuoye_xiaotiqin
     shuoye_xiaotiqin: {
         fullskin: true,
-        image: "ext:朔夜/image/card/shuoye_xiaotiqin.jpg",
+        image: "ext:朔夜/image/card/shuoye_xiaotiqin.png",
+        derivation: "shuoye_yuanlv",
         type: "equip",
         subtype: "equip1",
         distance: {
@@ -63,6 +64,7 @@ const cards = {
     shuoye_xugouren: {
         fullskin: true,
         image: 'ext:朔夜/image/card/shuoye_xugouren.jpg',
+        derivation: "shuoye_xugouji",
         type: "trick",
         enable: true,
         filterTarget(card, player, target) {
@@ -110,6 +112,7 @@ const cards = {
 //#noname-kit-end card:shuoye_xugouren
 //#noname-kit-begin card:shuoye_lx_shuiyan
     shuoye_lx_shuiyan: {
+        derivation: "shuoye_lixin",
         type: "trick",
         enable: true,
         selectTarget: [1, 2],
@@ -158,6 +161,7 @@ const cards = {
     shuoye_shouzhizhiguan: {
         fullskin: true,
         image: "ext:朔夜/image/shuoye_shouzhizhiguan.jpg",
+        derivation: "shuoye_nilu",
         type: "delay",
         enable: true,
         // 允许把离开游戏/修整中的角色选为目标（结算时先令其回归）
@@ -260,5 +264,29 @@ const cards = {
         },
     },
 //#noname-kit-end card:shuoye_shouzhizhiguan
+//#noname-kit-begin card:shuoye_tianjizhijing
+    shuoye_tianjizhijing: {
+        fullskin: true,
+        image: "ext:朔夜/image/shuoye_tianjizhijing.png",
+        derivation: "shuoye_leidianyayi",
+        type: "equip",
+        subtype: "equip1",
+        distance: {
+            attackFrom: -1,
+        },
+        skills: ["shuoye_tianjizhijing_skill"],
+        ai: {
+            basic: {
+                equipValue: 8,
+                order: 8,
+                useful: 2,
+                value: 8,
+            },
+            result: {
+                target: (player, target, card) => get.equipResult(player, target, card.name),
+            },
+        },
+    },
+//#noname-kit-end card:shuoye_tianjizhijing
 };
 export default cards;

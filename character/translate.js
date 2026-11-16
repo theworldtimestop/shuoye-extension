@@ -627,7 +627,7 @@ const translates = {
     "shuoye_quedi_info": "每回合限一次，当你用伤害类牌指定单一目标时，你可以①获得其区域内一张牌，②弃一张牌令此牌伤害加一。背水:失去一点体力上限，选择一种花色，令其本回合不可使用或打出之",
 //#noname-kit-end translate:shuoye_quedi
 //#noname-kit-begin translate:shuoye_zhuifeng
-    "shuoye_zhuifeng": "椎坚",
+    "shuoye_zhuifeng": "椎坚【使用】",
     "shuoye_zhuifeng_info": "初始使用次数为二，且你的每个结束阶段次数加二。出牌阶段限一次，你可以弃置任意张装备牌，或失去任意点体力，增加等量使用次数。当你需要时，你可以视为使用或打出一张只能指定单个目标的任意伤害类锦囊牌或【酒】，【杀】。以此法使用或影响的牌造成伤害后，你可观看并选择获得其区域内的等同于伤害数的牌。",
 //#noname-kit-end translate:shuoye_zhuifeng
 //#noname-kit-begin translate:shuoye_chouju
@@ -803,8 +803,8 @@ const translates = {
     shuoye_dinghan_info:'添加效果，回合开始改变牌名记录时可视为使用。',
 //#noname-kit-end translate:shuoye_dinghan
 //#noname-kit-begin translate:shuoye_shenxian
-    shuoye_shenxian:'甚贤',
-    shuoye_shenxian_info:'其他角色的一张基本牌因弃置进入弃牌堆时，你摸一张牌',
+    shuoye_shenxian: "神现",
+    shuoye_shenxian_info: `${get.poptip("shuoye_pijiji_faq")}，1，${get.poptip("fulei")}判定失效时你获得判定牌。2，一名其他角色使用[闪]后你可使用一张牌。3，一名角色受到雷电伤害时你可令其-1/+1。泰来：你获得副将[${get.poptip("shuoye_julijialuo_faq")}]。已获得则叠加体力值。`,
 //#noname-kit-end translate:shuoye_shenxian
 //#noname-kit-begin translate:shuoye_powei
     shuoye_powei:'破围',
@@ -1203,5 +1203,96 @@ shuoye_zhongao: "忠傲",
 shuoye_kuanggu: "狂骨",
     shuoye_kuanggu_info: "当你对距离1以内角色造成伤害时，你可摸一张牌或回复一点体力。",
 //#noname-kit-end translate:shuoye_kuanggu
+//#noname-kit-begin translate:shuoye_leidianyayi
+    shuoye_leidianyayi: "雷电芽衣",
+//#noname-kit-end translate:shuoye_leidianyayi
+//#noname-kit-begin translate:shuoye_yulei
+    shuoye_yulei: "御雷",
+    shuoye_yulei_info: `游戏开始时你装备${get.poptip("shuoye_tianjizhijing")}。`,
+//#noname-kit-end translate:shuoye_yulei
+//#noname-kit-begin translate:shuoye_huangshan
+    shuoye_huangshan: "荒闪",
+    shuoye_huangshan_info: `你的黑色牌均可视为[闪]。每回合限一次，你可直接对一名角色使用[闪]，目标可用[杀]令其无效。你使用或打出[闪]生效时令一名角色进行${get.poptip("fulei")}判定。`,
+//#noname-kit-end translate:shuoye_huangshan
+//#noname-kit-begin translate:shuoye_huangshan_zhi
+    shuoye_huangshan_zhi: "荒闪",
+    shuoye_huangshan_zhi_info: "你的黑色牌均可视为[闪]。",
+//#noname-kit-end translate:shuoye_huangshan_zhi
+//#noname-kit-begin translate:shuoye_huangshan_used
+    shuoye_huangshan_used: "荒闪",
+    shuoye_huangshan_used_info: `你使用或打出[闪]生效时令一名角色进行${get.poptip("fulei")}判定。`,
+//#noname-kit-end translate:shuoye_huangshan_used
+//#noname-kit-begin translate:shuoye_shenxian_2
+    shuoye_shenxian_2: "神现",
+    shuoye_shenxian_2_info: "一名其他角色使用[闪]后你可使用一张牌。",
+//#noname-kit-end translate:shuoye_shenxian_2
+//#noname-kit-begin translate:shuoye_shenxian_3
+    shuoye_shenxian_3: "神现",
+    shuoye_shenxian_3_info: "一名角色受到雷电伤害时你可令其-1/+1。",
+//#noname-kit-end translate:shuoye_shenxian_3
+//#noname-kit-begin translate:shuoye_huoying
+    shuoye_huoying: "祸影",
+    shuoye_huoying_info: "你每回合首次受到或造成伤害后可弃置任意张牌获得等量不计入手牌上限的[影]，然后令一名角色获得其中的红色牌。每回合限一次，这些牌可视为任意非伤害牌使用或打出。",
+//#noname-kit-end translate:shuoye_huoying
+//#noname-kit-begin translate:shuoye_huoying_ying
+    shuoye_huoying_ying: "祸影",
+    shuoye_huoying_ying_info: "每回合限一次，你可将一张【影】视为任意非伤害牌使用或打出。",
+//#noname-kit-end translate:shuoye_huoying_ying
+//#noname-kit-begin translate:shuoye_huoying_guest
+    shuoye_huoying_guest: "祸影",
+    shuoye_huoying_guest_info: "每回合限一次，你可将获得的红色【影】视为任意非伤害牌使用。",
+//#noname-kit-end translate:shuoye_huoying_guest
+//#noname-kit-begin translate:shuoye_huoying_guest_keep
+    shuoye_huoying_guest_keep: "祸影",
+    shuoye_huoying_guest_keep_info: "失去全部红色【影】后移除此效果。",
+//#noname-kit-end translate:shuoye_huoying_guest_keep
+//#noname-kit-begin translate:shuoye_julijialuo
+    shuoye_julijialuo: "俱利伽罗",
+    shuoye_julijialuo_info: "体力1，优先承担体流与伤害且不会溢出，一张黑色牌非因使用进入弃牌堆时获得之置于武将牌上称为[鸣]。芽衣受到/造成伤害后将一张[鸣]当做[闪]对来源/目标使用。",
+//#noname-kit-end translate:shuoye_julijialuo
+//#noname-kit-begin translate:shuoye_julijialuo_take
+    shuoye_julijialuo_take: "俱利伽罗",
+    shuoye_julijialuo_take_info: "优先承担雷电芽衣受到的伤害与体力流失，且不会溢出。",
+//#noname-kit-end translate:shuoye_julijialuo_take
+//#noname-kit-begin translate:shuoye_julijialuo_ming
+    shuoye_julijialuo_ming: "俱利伽罗",
+    shuoye_julijialuo_ming_info: "一张黑色牌非因使用进入弃牌堆时获得之置于武将牌上称为[鸣]。",
+//#noname-kit-end translate:shuoye_julijialuo_ming
+//#noname-kit-begin translate:shuoye_julijialuo_dealt
+    shuoye_julijialuo_dealt: "俱利伽罗",
+    shuoye_julijialuo_dealt_info: "雷电芽衣造成伤害后将一张[鸣]当做[闪]对目标使用。",
+//#noname-kit-end translate:shuoye_julijialuo_dealt
+//#noname-kit-begin translate:shuoye_tianjizhijing
+    shuoye_tianjizhijing: "天殛之境",
+    shuoye_tianjizhijing_info: "使用黑色牌可额外结算一次。其他武器进入装备区时改为重铸之。",
+//#noname-kit-end translate:shuoye_tianjizhijing
+//#noname-kit-begin translate:shuoye_tianjizhijing_skill
+    shuoye_tianjizhijing_skill: "天殛之境",
+    shuoye_tianjizhijing_skill_info: "使用黑色牌可额外结算一次。其他武器进入装备区时改为重铸之。",
+//#noname-kit-end translate:shuoye_tianjizhijing_skill
+//#noname-kit-begin translate:shuoye_tianjizhijing_extra
+    shuoye_tianjizhijing_extra: "天殛之境",
+    shuoye_tianjizhijing_extra_info: "你使用黑色牌可令其额外结算一次。",
+//#noname-kit-end translate:shuoye_tianjizhijing_extra
+//#noname-kit-begin translate:shuoye_tianjizhijing_recast
+    shuoye_tianjizhijing_recast: "天殛之境",
+    shuoye_tianjizhijing_recast_info: "其他武器进入你的装备区时改为重铸之。",
+//#noname-kit-end translate:shuoye_tianjizhijing_recast
+//#noname-kit-begin translate:shuoye_julijialuo_hurt
+    shuoye_julijialuo_hurt: "俱利伽罗",
+    shuoye_julijialuo_hurt_info: "雷电芽衣受到的伤害被俱利伽罗承担后，将一张[鸣]当做[闪]对来源使用。",
+//#noname-kit-end translate:shuoye_julijialuo_hurt
+//#noname-kit-begin translate:shuoye_pijiji_faq
+    shuoye_pijiji_faq: "否极技",
+    shuoye_pijiji_faq_info: "否极技是一种技能标签（封装），该技能有至少两个选项分支，每个分支每局游戏限一次，若所有分支都被选择过后，则重置此技能所有选项的选择次数，然后若该技能有『泰来』，则执行之。",
+//#noname-kit-end translate:shuoye_pijiji_faq
+//#noname-kit-begin translate:shuoye_julijialuo_faq
+    shuoye_julijialuo_faq: "俱利伽罗",
+    shuoye_julijialuo_faq_info: "雷电芽衣的副将。体力1，优先承担雷电芽衣受到的伤害与体力流失且不会溢出；一张黑色牌非因使用进入弃牌堆时，获得之置于武将牌上称为【鸣】；雷电芽衣受到或造成伤害后，将一张【鸣】当做【闪】对来源或目标使用。",
+//#noname-kit-end translate:shuoye_julijialuo_faq
+//#noname-kit-begin translate:shuoye_zhuifeng_use
+    "shuoye_zhuifeng_use": "椎坚【次数】",
+    "shuoye_zhuifeng_use_info": "出牌阶段限一次，你可以弃置任意张装备牌，或失去任意点体力，增加等量使用次数。",
+//#noname-kit-end translate:shuoye_zhuifeng_use
 };
 export default translates;

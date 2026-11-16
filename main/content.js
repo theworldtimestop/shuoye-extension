@@ -347,10 +347,87 @@ export async function content(config, pack) {
             info: "你的回合限一次，开始时或出牌阶段，你可选择自己或里香失去一点体力，你与一名角色【决斗】，期间双方基本牌均视为【杀】。你与因此受到伤害的角色各摸一张牌，若受到伤害角色非你则使用次数+1，然后发动一次【模仿】。",
         });
     }
+    // 【雷之律者】雷电芽衣：名词解释（get.poptip 超链接）、浮雷兜底卡、俱利伽罗副将卡、紫色额外血条样式、BGM 还原
+    try {
+        if (lib.poptip) {
+            lib.poptip.add({
+                id: "shuoye_pijiji_faq",
+                name: "否极技",
+                info: "否极技是一种技能标签（封装），该技能有至少两个选项分支，每个分支每局游戏限一次，若所有分支都被选择过后，则重置此技能所有选项的选择次数，然后若该技能有『泰来』，则执行之。",
+            });
+            lib.poptip.add({
+                id: "shuoye_julijialuo_faq",
+                name: "俱利伽罗",
+                info: "雷电芽衣的副将。体力1，优先承担雷电芽衣受到的伤害与体力流失且不会溢出；一张黑色牌非因使用进入弃牌堆时，获得之置于武将牌上称为【鸣】；雷电芽衣受到或造成伤害后，将一张【鸣】当做【闪】对来源或目标使用。",
+            });
+        }
+    } catch (e) {}
+    // 【浮雷】是核心 SP 包的延时锦囊：本局没启用该包时补一份最小定义，保证描述里的超链接能正常显示与解释
+    try {
+        if (!lib.card.fulei) {
+            lib.card.fulei = {
+                audio: true,
+                fullskin: true,
+                type: "delay",
+                cardnature: "thunder",
+                judge(card) {
+                    return get.suit(card) === "spade" ? -6 : 6;
+                },
+                judge2(result) {
+                    return result.bool === false;
+                },
+                async effect(event, trigger, player) {
+                    const { card } = event;
+                    if (event.result && event.result.bool === false && card) {
+                        if (typeof card.storage.fulei !== "number") card.storage.fulei = 1;
+                        else card.storage.fulei++;
+                        await player.damage(card.storage.fulei, "thunder", "nosource");
+                    }
+                    await player.addJudgeNext(card);
+                },
+                ai: {
+                    basic: { order: 1, useful: 0, value: 0 },
+                    tag: { damage: 0.25, natureDamage: 0.25, thunderDamage: 0.25 },
+                },
+            };
+        }
+        if (!lib.translate.fulei) lib.translate.fulei = "浮雷";
+        if (!lib.translate.fulei_info) {
+            lib.translate.fulei_info =
+                "出牌阶段，对你使用。你将【浮雷】置入判定区。若判定结果为♠，则目标角色受到X点雷电伤害（X为此牌判定结果为♠的次数）。判定完成后，将此牌移动到下家的判定区里。";
+        }
+    } catch (e) {}
+    // 【俱利伽罗】副将卡：画在武将牌上的那张卡需要 lib.character 里有对应条目（同包金玄的做法）
+    try {
+        if (!lib.character.shuoye_julijialuo) {
+            lib.character.shuoye_julijialuo = get.convertedCharacter(["", "", 0, [], ["ext:朔夜/image/shuoye_julijialuo.jpg", "unseen"]]);
+        }
+    } catch (e) {}
+    // 【俱利伽罗】紫色额外血条样式（独立 DOM，不参与体力条的重绘）
+    try {
+        if (typeof document !== "undefined" && document.head && !document.getElementById("shuoye-lei-style")) {
+            const style = document.createElement("style");
+            style.id = "shuoye-lei-style";
+            style.innerHTML =
+                ".shuoye-dragon-hp{position:absolute;display:flex;z-index:6;pointer-events:none;margin:0;padding:0;}" +
+                ".shuoye-dragon-hp > div{box-sizing:border-box;transition:all .3s;}" +
+                "" +
+                "";
+            document.head.appendChild(style);
+        }
+    } catch (e) {}
+    // 返回菜单时还原 BGM，避免雷之律者的循环 BGM 带进菜单
+    try {
+        lib.onfree.push(function () {
+            try {
+                if (lib.shuoyeLei && typeof lib.shuoyeLei.stopBgm === "function") lib.shuoyeLei.stopBgm();
+            } catch (e) {}
+        });
+    } catch (e) {}
     // 评级：SSS -> legend，SS -> epic，S -> rare，A -> junk
     const shuoyeRarity = {
         legend: ["shuoye_u_aoerjiamali", "shuoye_taikongyishitaer", "shuoye_shuoye", "shuoye_zhenshiqiaotelude", "shuoye_yiguyoutai", "shuoye_lixin", "shuoye_shengyuxieyan", "shuoye_nilu"],
-        epic: ["shuoye_ifwutiaowu", "shuoye_weiyan", "shuoye_chengjinji", "shuoye_miaoshitiannv", "shuoye_tianqixinghun", "shuoye_xituo", "shuoye_qiaolienide", "shuoye_chongtiansiling", "shuoye_luxi", "shuoye_wuweijuezhe", "shuoye_kongyuanxingzhe", "shuoye_wuxinchan", "shuoye_dilutianfeng", "shuoye_lx_guang", "shuoye_lx_an", "shuoye_richekuanjian", "shuoye_mankanshizhenzi", "shuoye_bojiaoyang"],
+        epic: ["shuoye_ifwutiaowu", "shuoye_weiyan", "shuoye_chengjinji", "shuoye_miaoshitiannv", "shuoye_tianqixinghun", "shuoye_xituo", "shuoye_qiaolienide", "shuoye_chongtiansiling", "shuoye_luxi", "shuoye_wuweijuezhe", "shuoye_kongyuanxingzhe", "shuoye_wuxinchan", "shuoye_dilutianfeng", "shuoye_lx_guang", "shuoye_lx_an", "shuoye_richekuanjian", "shuoye_mankanshizhenzi", "shuoye_bojiaoyang", "shuoye_leidianyayi"],
         rare: [
             "shuoye_zuguoren", "shuoye_ailisi", "shuoye_feiniaomashi", "shuoye_fengchuanxiangzi",
             "shuoye_nutaocanglan", "shuoye_wujishengwu", "shuoye_wutiaowu", "shuoye_xier",
