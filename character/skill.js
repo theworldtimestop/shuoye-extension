@@ -1839,9 +1839,10 @@ if (!lib.shuoyeNilu) {
                             if (left <= 0) break;
                             try {
                                 const ying = game.createCard("ying", suits[left % 4], 6);
-                                // 显式补 destroy：即使本局没有启用 jsrg 包（lib.card.ying 缺失），
-                                // 影进入弃牌堆时也会按卡牌规则被销毁。
-                                ying.destroyed = "discardPile";
+                                // 不要在这里设 destroyed：引擎会在 lose 结算中途就 selfDestroy，
+                                // 弃牌阶段的数量还没算完，影会留在手里/多弃；改由弃牌堆清理销毁。
+                                delete ying.destroyed;
+                                delete ying._destroy;
                                 ying.shuoye_huangjin = true;
                                 cards.push(ying);
                             } catch (e) {
@@ -18718,7 +18719,8 @@ const skills = {
             const cards = [];
             for (let i = 0; i < num; i++) {
                 const ying = game.createCard("ying", suits[i % 4], 6);
-                ying.destroyed = "discardPile";
+                delete ying.destroyed;
+                delete ying._destroy;
                 ying.shuoye_huangjin = true;
                 cards.push(ying);
             }
