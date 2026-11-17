@@ -608,6 +608,33 @@ if (!lib.shuoyeLei) {
                 }
             } catch (e) {}
         },
+        // “使用/打出【闪】”的统一识别：
+        // 引擎里「使用」是 useCard，「打出/响应」是 respond，是两个不同事件；
+        // 另外黑色牌当【闪】时 event.card 可能是原牌，需要看事件上的技能。
+        isShanUse(event) {
+            if (!event) return false;
+            try {
+                if ("shuoye_judge_target" in event) return true;
+            } catch (e) {}
+            try {
+                if (event.card && get.name(event.card) == "shan") return true;
+            } catch (e) {}
+            try {
+                if (event.cards) {
+                    for (const card of event.cards) {
+                        if (card && get.name(card) == "shan") return true;
+                    }
+                }
+            } catch (e) {}
+            try {
+                if (event.cardname == "shan") return true;
+            } catch (e) {}
+            try {
+                const info = event.skill ? lib.skill[event.skill] : null;
+                if (info && info.viewAs && info.viewAs.name == "shan") return true;
+            } catch (e) {}
+            return false;
+        },
         // 【闪】生效：令一名角色进行【浮雷】判定
         async shanTakeEffect(player, preferred) {
             if (!player.hasSkill("shuoye_huangshan")) return;
@@ -21623,13 +21650,12 @@ shuoye_weiyan_enter: {
         sub: true,
         // 同一时机多技能触发时，荒闪必须先于神现结算（get.priority：数值越大越先）
         priority: 2,
-        trigger: { player: "useCardAfter" },
+        // 使用【闪】走 useCard；极端情况下有真正的「打出」走 respond，一并监听
+        trigger: { player: ["useCardAfter", "respondAfter"] },
         forced: true,
         filter(event, player) {
-            if (!event.card) return false;
-            if (get.name(event.card) != "shan") return false;
-            if (event.cancelled) return false;
-            return !event.shuoye_shan_ineffective;
+            if (event.shuoye_shan_ineffective) return false;
+            return lib.shuoyeLei.isShanUse(event);
         },
         async content(event, trigger, player) {
             await lib.shuoyeLei.shanTakeEffect(player, trigger.shuoye_judge_target || null);
@@ -21747,9 +21773,13 @@ shuoye_weiyan_enter: {
         },
         chooseButton: {
             dialog(event, player) {
+                const yings = lib.shuoyeLei.yingCards(player);
                 const list = lib.shuoyeLei.nonDamageNames().filter(function (name) {
                     try {
-                        return event.filterCard({ name: name }, player, event);
+                        // 必须用真正的虚拟牌去试探：无懈等窗口会走 cardEnabled/cardRespondable，
+                        // 裸 { name } 对象会被判成不可用，导致根本选不出【无懈可击】。
+                        const vcard = get.autoViewAs({ name: name }, yings.slice(0, 1));
+                        return event.filterCard(vcard, player, event);
                     } catch (e) {
                         return false;
                     }
@@ -21759,7 +21789,9 @@ shuoye_weiyan_enter: {
             filter(button, player) {
                 const evt = _status.event.getParent();
                 try {
-                    return evt.filterCard({ name: button.link[2] }, player, evt);
+                    const yings = lib.shuoyeLei.yingCards(player);
+                    const vcard = get.autoViewAs({ name: button.link[2] }, yings.slice(0, 1));
+                    return evt.filterCard(vcard, player, evt);
                 } catch (e) {
                     return false;
                 }
@@ -21814,9 +21846,12 @@ shuoye_weiyan_enter: {
         },
         chooseButton: {
             dialog(event, player) {
+                const yings = lib.shuoyeLei.guestYing(player);
                 const list = lib.shuoyeLei.nonDamageNames().filter(function (name) {
                     try {
-                        return event.filterCard({ name: name }, player, event);
+                        // 同【影】：用真正的虚拟牌试探，否则无懈等窗口会整列被过滤掉
+                        const vcard = get.autoViewAs({ name: name }, yings.slice(0, 1));
+                        return event.filterCard(vcard, player, event);
                     } catch (e) {
                         return false;
                     }
@@ -21826,7 +21861,9 @@ shuoye_weiyan_enter: {
             filter(button, player) {
                 const evt = _status.event.getParent();
                 try {
-                    return evt.filterCard({ name: button.link[2] }, player, evt);
+                    const yings = lib.shuoyeLei.guestYing(player);
+                    const vcard = get.autoViewAs({ name: button.link[2] }, yings.slice(0, 1));
+                    return evt.filterCard(vcard, player, evt);
                 } catch (e) {
                     return false;
                 }
