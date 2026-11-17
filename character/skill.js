@@ -682,12 +682,26 @@ if (!lib.shuoyeLei) {
             lib.shuoyeLei.voice("shuoye_huangshan1.mp3");
             let ineffective = false;
             if (target.countCards("h", "sha") > 0) {
-                const resp = await target.chooseToRespond("荒闪：是否打出一张【杀】令此【闪】无效？", { name: "sha" }).set("ai", function (card) {
+                // 对齐官方【决斗】的写法：chooseToRespond 不带参数，条件/台词/ai 全部走 .set，
+                // 这样联机重放时「构造函数参数」和「_set 列表」两条通道都不会依赖参数的序列化。
+                const next = target.chooseToRespond();
+                next.set("prompt", "荒闪：是否打出一张【杀】令此【闪】无效？");
+                next.set("filterCard", function (card, player2) {
+                    let res = false;
+                    try {
+                        res = get.name(card) === "sha" && lib.filter.cardRespondable(card, player2);
+                    } catch (e) {
+                        res = false;
+                    }
+                    return res;
+                });
+                next.set("ai", function (card) {
                     const me = get.player();
                     if (!me || typeof me.countCards != "function") return -1;
                     if (me.countCards("h", "sha") > 1) return 1;
                     return -1;
-                }).forResult();
+                });
+                const resp = await next.forResult();
                 ineffective = !!(resp && resp.bool);
             }
             const next = player.useCard({ card: { name: "shan" }, cards: [chosen], targets: [] });
@@ -712,7 +726,7 @@ if (!lib.shuoyeLei) {
         async huoying(player) {
             const max = player.countCards("he");
             if (!max) return false;
-            const result = await player.chooseToDiscard("he", [1, max], false, "祸影：弃置任意张牌，获得等量不计入手牌上限的【影】").set("ai", function (card) {
+            const result = await player.chooseToDiscard("he", [1, max], false, "祸影：弃置任意张牌，获得等量不计入手牌上限的随机花色点数【影】").set("ai", function (card) {
                 return 5 - get.value(card);
             }).forResult();
             if (!result || !result.bool || !result.cards || !result.cards.length) return false;
@@ -742,7 +756,7 @@ if (!lib.shuoyeLei) {
             game.log(player, "获得了", "#y" + get.cnNumber(cards.length) + "张【影】");
             const reds = cards.filter((card) => get.color(card) == "red");
             if (reds.length) {
-                const res = await player.chooseTarget(`令一名角色获得其中的红色牌（${reds.length}张）`, true).set("ai", function (target) {
+                const res = await player.chooseTarget(`令一名角色获得其中的红色【影】（${reds.length}张）`, true).set("ai", function (target) {
                     return get.attitude(get.player(), target);
                 }).forResult();
                 const target = res && res.targets && res.targets[0];
@@ -21596,7 +21610,7 @@ shuoye_weiyan_enter: {
             return true;
         },
         prompt: "对一名角色使用【闪】",
-        prompt2: "目标可打出一张【杀】令此【闪】无效；若此【闪】生效，你令一名角色进行【浮雷】判定",
+        prompt2: "目标可打出【杀】无效之；若此【闪】生效，你令一名角色进行【浮雷】判定",
         async content(event, trigger, player) {
             await lib.shuoyeLei.huangshanActive(player, event.target);
         },

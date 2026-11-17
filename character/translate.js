@@ -1212,7 +1212,7 @@ shuoye_kuanggu: "狂骨",
 //#noname-kit-end translate:shuoye_yulei
 //#noname-kit-begin translate:shuoye_huangshan
     shuoye_huangshan: "荒闪",
-    shuoye_huangshan_info: `你的黑色牌均可视为[闪]。每回合限一次，你可直接对一名角色使用[闪]，目标可用[杀]令其无效。你使用或打出[闪]生效时令一名角色进行${get.poptip("fulei")}判定。`,
+    shuoye_huangshan_info: `你的黑色牌均可视为[闪]。每回合限一次，你可直接对一名角色使用[闪]，目标可打出[杀]无效之。你使用或打出[闪]生效时令一名角色进行${get.poptip("fulei")}判定。`,
 //#noname-kit-end translate:shuoye_huangshan
 //#noname-kit-begin translate:shuoye_huangshan_zhi
     shuoye_huangshan_zhi: "荒闪",
@@ -1232,7 +1232,7 @@ shuoye_kuanggu: "狂骨",
 //#noname-kit-end translate:shuoye_shenxian_3
 //#noname-kit-begin translate:shuoye_huoying
     shuoye_huoying: "祸影",
-    shuoye_huoying_info: "你每回合首次受到或造成伤害后可弃置任意张牌获得等量不计入手牌上限的[影]，然后令一名角色获得其中的红色牌。每回合限一次，这些牌可视为任意非伤害牌使用或打出。",
+    shuoye_huoying_info: "你每回合首次受到或造成伤害后可弃置任意张牌获得等量不计入手牌上限的随机花色点数[影]，然后令一名角色获得其中的红色[影]。每回合限一次，这些牌可视为任意非伤害牌使用或打出。",
 //#noname-kit-end translate:shuoye_huoying
 //#noname-kit-begin translate:shuoye_huoying_ying
     shuoye_huoying_ying: "祸影",
