@@ -21765,32 +21765,64 @@ shuoye_weiyan_enter: {
     shuoye_huoying_ying: {
         charlotte: true,
         sub: true,
+        // 无懈可击的询问本身就是一次 chooseToUse 事件（type 为 "wuxie"），
+        // 所以这里只要 chooseToUse / chooseToRespond，无懈窗口里就会出现这个按钮。
         enable: ["chooseToUse", "chooseToRespond"],
         filter(event, player) {
+            const yings = lib.shuoyeLei.yingCards(player);
+            let okTurn = true;
+            try {
+                okTurn = player.storage.shuoye_huoying_ying_turn != lib.shuoyeIf.turnId();
+            } catch (e) {
+                okTurn = true;
+            }
+            if (!yings.length) return false;
+            return okTurn;
+        },
+        // 关键：引擎问无懈之前会用 player.hasWuxie() 筛候选人，而 hasWuxie 只认
+        // 「手里有真无懈 / viewAs 是无懈 / hiddenCard 声明」这三种。
+        // 不写 hiddenCard 时，手上没有真【无懈可击】就根本不会弹无懈窗口，
+        // 【影】也就没有机会转化。这里把「影可以当无懈」告诉引擎和 AI。
+        hiddenCard(player, name) {
+            if (name !== "wuxie") return false;
             if (!lib.shuoyeLei.yingCards(player).length) return false;
-            // 每回合限一次（按真实回合计，含他人回合）
-            return player.storage.shuoye_huoying_ying_turn != lib.shuoyeIf.turnId();
+            try {
+                return player.storage.shuoye_huoying_ying_turn != lib.shuoyeIf.turnId();
+            } catch (e) {
+                return true;
+            }
         },
         chooseButton: {
             dialog(event, player) {
                 const yings = lib.shuoyeLei.yingCards(player);
-                const list = lib.shuoyeLei.nonDamageNames().filter(function (name) {
-                    try {
-                        // 必须用真正的虚拟牌去试探：无懈等窗口会走 cardEnabled/cardRespondable，
-                        // 裸 { name } 对象会被判成不可用，导致根本选不出【无懈可击】。
-                        const vcard = get.autoViewAs({ name: name }, yings.slice(0, 1));
-                        return event.filterCard(vcard, player, event);
-                    } catch (e) {
-                        return false;
-                    }
-                });
+                // 无懈窗口里只可能当作【无懈可击】：直接给这一项，
+                // 不依赖 filterCard 探测（各版本引擎对虚拟牌的探测口径不一样）。
+                const isWuxie = !!(event && (event.type === "wuxie" || event.name === "_wuxie"));
+                let list;
+                if (isWuxie) {
+                    list = ["wuxie"];
+                } else {
+                    list = lib.shuoyeLei.nonDamageNames().filter(function (name) {
+                        try {
+                            // 用 "unsure" 生成虚拟牌探测（与官方印牌技能同样写法），
+                            // 避免拿【影】当来源牌时因 cardEnabled 判定失败而整列为空。
+                            const vcard = get.autoViewAs({ name: name }, "unsure");
+                            return event.filterCard(vcard, player, event);
+                        } catch (e) {
+                            return false;
+                        }
+                    });
+                }
+                try {
+                    game.log(player, `【祸影】弹窗：影${yings.length}张，可选牌名${list.length}个`);
+                } catch (e) {}
                 return ui.create.dialog("祸影", [list, "vcard"]);
             },
             filter(button, player) {
                 const evt = _status.event.getParent();
+                if (evt && (evt.type === "wuxie" || evt.name === "_wuxie")) return button.link[2] == "wuxie";
                 try {
-                    const yings = lib.shuoyeLei.yingCards(player);
-                    const vcard = get.autoViewAs({ name: button.link[2] }, yings.slice(0, 1));
+                    const vcard = get.autoViewAs({ name: button.link[2] }, "unsure");
                     return evt.filterCard(vcard, player, evt);
                 } catch (e) {
                     return false;
@@ -21836,33 +21868,56 @@ shuoye_weiyan_enter: {
 //#noname-kit-end skill:shuoye_huoying_ying
 //#noname-kit-begin skill:shuoye_huoying_guest
     shuoye_huoying_guest: {
-        enable: "phaseUse",
+        // 同主【祸影】：无懈询问本身就是 chooseToUse（type "wuxie"），enable 里不用再写 "_wuxie"。
+        enable: ["phaseUse", "chooseToUse"],
         group: ["shuoye_huoying_guest_keep"],
         filter(event, player) {
             if (!lib.shuoyeLei.guestYing(player).length) return false;
             if (lib.shuoyeLei.nonDamageNames().length === 0) return false;
             // 每回合限一次（同一个回合计数）
-            return player.storage.shuoye_huoying_guest_turn != lib.shuoyeIf.turnId();
+            let okTurn = true;
+            try {
+                okTurn = player.storage.shuoye_huoying_guest_turn != lib.shuoyeIf.turnId();
+            } catch (e) {
+                okTurn = true;
+            }
+            return okTurn;
+        },
+        // 拿到红色【影】的其他角色同理：不声明 hiddenCard，引擎不会来问他的无懈。
+        hiddenCard(player, name) {
+            if (name !== "wuxie") return false;
+            if (!lib.shuoyeLei.guestYing(player).length) return false;
+            try {
+                return player.storage.shuoye_huoying_guest_turn != lib.shuoyeIf.turnId();
+            } catch (e) {
+                return true;
+            }
         },
         chooseButton: {
             dialog(event, player) {
                 const yings = lib.shuoyeLei.guestYing(player);
-                const list = lib.shuoyeLei.nonDamageNames().filter(function (name) {
-                    try {
-                        // 同【影】：用真正的虚拟牌试探，否则无懈等窗口会整列被过滤掉
-                        const vcard = get.autoViewAs({ name: name }, yings.slice(0, 1));
-                        return event.filterCard(vcard, player, event);
-                    } catch (e) {
-                        return false;
-                    }
-                });
+                // 无懈窗口里只可能当作【无懈可击】，直接给这一项
+                const isWuxie = !!(event && (event.type === "wuxie" || event.name === "_wuxie"));
+                let list;
+                if (isWuxie) {
+                    list = ["wuxie"];
+                } else {
+                    list = lib.shuoyeLei.nonDamageNames().filter(function (name) {
+                        try {
+                            const vcard = get.autoViewAs({ name: name }, "unsure");
+                            return event.filterCard(vcard, player, event);
+                        } catch (e) {
+                            return false;
+                        }
+                    });
+                }
                 return ui.create.dialog("祸影", [list, "vcard"]);
             },
             filter(button, player) {
                 const evt = _status.event.getParent();
+                if (evt && (evt.type === "wuxie" || evt.name === "_wuxie")) return button.link[2] == "wuxie";
                 try {
-                    const yings = lib.shuoyeLei.guestYing(player);
-                    const vcard = get.autoViewAs({ name: button.link[2] }, yings.slice(0, 1));
+                    const vcard = get.autoViewAs({ name: button.link[2] }, "unsure");
                     return evt.filterCard(vcard, player, evt);
                 } catch (e) {
                     return false;
@@ -21877,7 +21932,7 @@ shuoye_weiyan_enter: {
                     filterCard(card) {
                         if (!card || !card.storage || card.storage.shuoye_huoying_guest == null) return false;
                         // 引擎会把当前玩家作为 filterCard 的第二个参数传进来，优先用它；
-                        // 其次 get.player()，最后 _status.event.player（autoChoose / arrangeTrigger 时前两者可能为空）。
+                        // 其次 get.player()，最后 _status.event.player。
                         let __p = arguments.length > 1 ? arguments[1] : null;
                         try {
                             __p = __p || get.player();
@@ -21887,7 +21942,6 @@ shuoye_weiyan_enter: {
                                 __p = _status.event && _status.event.player;
                             } catch (e) {}
                         }
-                        // autoChoose 等拿不到当前玩家时，只要是从祸影拿到的红影就放行
                         return __p ? card.storage.shuoye_huoying_guest == __p.playerid : true;
                     },
                     selectCard: 1,
