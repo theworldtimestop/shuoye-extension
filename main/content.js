@@ -3,6 +3,20 @@ import update from "../update.js";
 import { EXTENSION_VERSION } from "../version.js";
 
 export async function content(config, pack) {
+
+    // 【阳间模式】主机权威：arenaReady 时先把本机值落一次（单机立即生效、联机主机先有自己的值），
+    // 再把同步技挂成全局技——房主在 gameStart / roundStart 广播给客机；
+    // 客机上 game.broadcastAll 是空操作，只会等主机广播过来再落值。
+    try {
+        lib.arenaReady?.push(function () {
+            try {
+                if (!lib.skill.global.includes("shuoye_qumoshi_sync") && lib.skill.shuoye_qumoshi_sync) {
+                    game.addGlobalSkill("shuoye_qumoshi_sync");
+                }
+                lib.shuoyeIf.setQumoshi(!!(lib.config && lib.config["extension_朔夜_qumoshi"]));
+            } catch (e) {}
+        });
+    } catch (e) {}
     // 【尼禄】自定义势力「兽」
     try {
         const shouGroupImage = "ext:朔夜/image/group_shou.png";
@@ -693,8 +707,10 @@ export async function content(config, pack) {
 
     // 【影】兜底销毁（只处理黄金之杯生成的影）：
     // 这些影创建时带 shuoye_huangjin 标记；个别模式/UI 覆写可能让
-    // destroy: "discardPile" 没生效而直接留在弃牌堆，这里在弃牌/失去牌
-    // 结算后再扫一遍事件涉及的牌。其他来源的 ying 不受影响。
+    // destroy: "discardPile" 没生效而直接留在弃牌堆，这里只在牌确实进入
+    // 弃牌堆后兜底销毁。不要用 get.position(card, true)：它会优先看 destiny，
+    // 牌还在手牌/处理区时就会被判成 "d"，提前 selfDestroy 会删掉手牌节点，
+    // 导致剩余手牌数误判。
     try {
         const installYingCleanup = () => {
             if (!lib.skill.shuoye_ying_cleanup) {
@@ -704,12 +720,12 @@ export async function content(config, pack) {
                     popup: false,
                     silent: true,
                     forced: true,
-                    trigger: { global: ["cardsDiscardAfter", "loseAfter", "loseAsyncAfter"] },
+                    trigger: { global: "cardsDiscardAfter" },
                     filter(event, player) {
-                        return (event.cards || []).some(card => card && card.shuoye_huangjin === true && get.name(card, false) === "ying" && get.position(card, true) === "d" && !card._selfDestroyed);
+                        return (event.cards || []).some(card => card && card.shuoye_huangjin === true && get.name(card, false) === "ying" && card.parentNode && card.parentNode.id === "discardPile" && !card._selfDestroyed);
                     },
                     async content(event, trigger, player) {
-                        const list = (trigger.cards || []).filter(card => card && card.shuoye_huangjin === true && get.name(card, false) === "ying" && get.position(card, true) === "d" && !card._selfDestroyed);
+                        const list = (trigger.cards || []).filter(card => card && card.shuoye_huangjin === true && get.name(card, false) === "ying" && card.parentNode && card.parentNode.id === "discardPile" && !card._selfDestroyed);
                         for (const card of list) {
                             card.selfDestroy(trigger);
                         }

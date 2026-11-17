@@ -872,6 +872,37 @@ if (!lib.shuoyeIf) {
                 target.storage[k] = v;
             }, player, key, value);
         },
+        // ---------------- 阳间模式（主机权威） ----------------
+        // 联机时 lib.config 是各机器自己的配置（房间只同步 lib.configOL），不能直接拿
+        // 本机的 extension_朔夜_qumoshi 当房间规则。房主在 gameStart / roundStart 用
+        // game.broadcastAll 把值写进三端的 _status.shuoyeQumoshi，filter 与技能描述都读它；
+        // 客机重连等没拿到广播时，才回退本机配置。
+        qumoshi() {
+            const value = _status.shuoyeQumoshi;
+            if (typeof value !== "undefined") return !!value;
+            return !!(lib.config && lib.config["extension_朔夜_qumoshi"]);
+        },
+        // 广播并落全局值：主机/单机执行；客机直接返回，只在收到主机广播时落值
+        // （函数体只引用 lib / game / _status 等全局，联机会被序列化到客机执行）。
+        setQumoshi(value) {
+            if (game.online) return;
+            game.broadcastAll(function (v) {
+                try {
+                    _status.shuoyeQumoshi = !!v;
+                    if (lib.shuoyeIf && typeof lib.shuoyeIf.refreshWuliangInfo === "function") {
+                        lib.shuoyeIf.refreshWuliangInfo();
+                    }
+                } catch (e) {}
+            }, value);
+        },
+        // 按阳间模式刷新【无量空处】的技能描述（原描述存在 lib.shuoyeIfWuliangInfoBase）
+        refreshWuliangInfo() {
+            const base = lib.shuoyeIfWuliangInfoBase;
+            if (typeof base !== "string") return;
+            try {
+                lib.translate["shuoye_if_wuliang_info"] = lib.shuoyeIf.qumoshi() ? "该模式不可用。" : base;
+            } catch (e) {}
+        },
         // ---------------- 无量空处：领域状态 ----------------
         domainOwner() {
             const player = _status.shuoyeIfDomainPlayer;
@@ -18905,9 +18936,18 @@ const skills = {
             player.storage.shuoye_tianxin = 1;
             player.markSkill("shuoye_tianxin");
         },
-        trigger: { target: "useCardToTarget" },
+        trigger: { target: "useCardToTarget", global: "useCard" },
         filter(event, player) {
-            if (event.player === player || !event.card || event.target !== player) return false;
+            if (event.name === "useCardToTarget") {
+                if (event.player === player || !event.card || event.target !== player) return false;
+            } else if (event.name === "useCard") {
+                if (event.player === player || !event.card || event.all_excluded) return false;
+                if (!_status.currentPhase || _status.currentPhase !== player) return false;
+                if (event.targets && event.targets.includes(player)) return false;
+                if (event.player.getHistory("useCard").indexOf(event) !== 0) return false;
+            } else {
+                return false;
+            }
             const level = player.storage.shuoye_tianxin_level === 2 ? 2 : 1;
             const form = player.storage.shuoye_tianxin_form === "yang" ? "yang" : "yin";
             if (level === 1) {
@@ -18917,19 +18957,32 @@ const skills = {
             return player.countCards("he") > 0 && event.player.countCards("he") > 0;
         },
         async cost(event, trigger, player) {
-            const form = player.storage.shuoye_tianxin_form === "yang" ? "阳" : "阴";
             event.result = await player.chooseBool(`###天心###是否摸一张牌？`).set("ai", () => {
+                const me = get.player();
                 const t = get.event().getTrigger();
-                return get.effect(get.player(), t.card, t.player, get.player()) < 0 || get.attitude(get.player(), t.player) < 0;
+                if (!t || !t.card) return false;
+                if (get.effect(me, t.card, t.player, me) < 0) return true;
+                if (get.attitude(me, t.player) >= 0) return false;
+                const level = me.storage.shuoye_tianxin_level === 2 ? 2 : 1;
+                const form = me.storage.shuoye_tianxin_form === "yang" ? "yang" : "yin";
+                if (level === 2 || form === "yang") return true;
+                return me.countCards("h") > 1;
             }).forResult();
         },
         async content(event, trigger, player) {
-            await player.draw();
             const user = trigger.player;
+            const card = trigger.card;
+            const whole = trigger.name === "useCard";
             const form = player.storage.shuoye_tianxin_form === "yang" ? "yang" : "yin";
             const level = player.storage.shuoye_tianxin_level === 2 ? 2 : 1;
-            const card = trigger.card;
+            await player.draw();
             const invalidate = () => {
+                if (whole) {
+                    if (trigger.targets) trigger.targets.length = 0;
+                    trigger.all_excluded = true;
+                    game.log(card, "被", player, "无效");
+                    return;
+                }
                 const use = trigger.getParent();
                 if (use && use.targets) use.targets.remove(player);
                 if (use && use.triggeredTargets2) use.triggeredTargets2.remove(player);
@@ -20653,6 +20706,21 @@ shuoye_if_canghe: {
         },
     },
 //#noname-kit-end skill:shuoye_if_canghe
+//#noname-kit-begin skill:shuoye_qumoshi_sync
+    // 【阳间模式】主机权威同步：房主在 gameStart / roundStart 把本机开关广播成
+    // _status.shuoyeQumoshi（见 lib.shuoyeIf.setQumoshi）。
+    // 由 main/content.js 在 arenaReady 时用 game.addGlobalSkill 挂成全局技。
+    shuoye_qumoshi_sync: {
+        charlotte: true,
+        popup: false,
+        silent: true,
+        forced: true,
+        trigger: { global: ["gameStart", "roundStart"] },
+        async content(event, trigger, player) {
+            lib.shuoyeIf.setQumoshi(!!(lib.config && lib.config["extension_朔夜_qumoshi"]));
+        },
+    },
+//#noname-kit-end skill:shuoye_qumoshi_sync
 //#noname-kit-begin skill:shuoye_if_wuliang
 shuoye_if_wuliang: {
         // 1 展开领域 / 2 领域内他人用牌失去体力
@@ -20664,6 +20732,9 @@ shuoye_if_wuliang: {
         position: "h",
         allowChooseAll: true,
         filter(event, player) {
+            // 【阳间模式】iF五条悟的【无量空处】整技禁用：filter 恒 false，
+            // 出牌阶段不会出现发动按钮（技能描述同步显示「该模式不可用」）
+            if (lib.shuoyeIf.qumoshi()) return false;
             // getStorage 默认返回 []（真值），这里必须直接读 storage
             if (player.storage.shuoye_if_wuliang_used) return false;
             if (lib.shuoyeIf.isDomain() && lib.shuoyeIf.domainOwner() == player) return false;

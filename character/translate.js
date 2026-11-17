@@ -1064,7 +1064,7 @@ const translates = {
 //#noname-kit-end translate:shuoye_woxin
 //#noname-kit-begin translate:shuoye_tianxin
     shuoye_tianxin: "天心",
-    shuoye_tianxin_info: "其他角色对你使用牌时你可摸一张牌。<br>· 一级：转换技，阴：弃1张牌，若与被使用的牌同名则其无效。阳：弃对方一张牌，若此牌与被使用的牌不同类型则对其造成一点伤害。<br>· 二级：获得对方一张牌并弃一张牌，若与被使用的牌类型不同则令此牌无效并对其造成一点伤害。",
+    shuoye_tianxin_info: "其他角色对你使用牌时，或其他角色在你的回合内首次使用牌时，你可摸一张牌。<br>· 一级：转换技，阴：弃1张牌，若与被使用的牌同名则令此牌无效。阳：弃对方一张牌，若此牌与被使用的牌不同类型则对其造成一点伤害。<br>· 二级：获得对方一张牌并弃一张牌，若与被使用的牌类型不同则令此牌无效并对其造成一点伤害。",
 //#noname-kit-end translate:shuoye_tianxin
 //#noname-kit-begin translate:shuoye_kaiyan
     shuoye_kaiyan: "开眼",

@@ -48,6 +48,16 @@ game.import("character", function () {
 		translate: { ...translates, ...epicTranslates, ...voices, ...characterSortTranslate },
 		pinyins: { ...pinyins },
 	};
+    // 【阳间模式】iF五条悟的【无量空处】在该模式下整技禁用（filter 见 skill.js）。
+    // 联机是主机权威：这里只记下原描述、按本机配置给个初始值；
+    // 真正生效的值由房主在 gameStart / roundStart 广播的 _status.shuoyeQumoshi 决定
+    // （单机等同本机配置；客机没收到广播前也先按本机配置走）。
+    if (typeof lib.shuoyeIfWuliangInfoBase !== "string") {
+        lib.shuoyeIfWuliangInfoBase = shuoye.translate["shuoye_if_wuliang_info"];
+    }
+    if (lib.shuoyeIf && lib.shuoyeIf.qumoshi()) {
+        shuoye.translate["shuoye_if_wuliang_info"] = "该模式不可用。";
+    }
     lib.translate["shuoye_character_config"] = "朔夜";
     if (!lib.config[`extension_朔夜_characterPack_shuoye_enable`]) {
 		game.saveExtensionConfig("朔夜", "characterPack_shuoye_enable", true);
