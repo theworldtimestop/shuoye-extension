@@ -1232,15 +1232,15 @@ shuoye_kuanggu: "狂骨",
 //#noname-kit-end translate:shuoye_shenxian_3
 //#noname-kit-begin translate:shuoye_huoying
     shuoye_huoying: "祸影",
-    shuoye_huoying_info: "你每回合首次受到或造成伤害后可弃置任意张牌获得等量不计入手牌上限的随机花色点数[影]，然后令一名角色获得其中的红色[影]。每回合限一次，这些牌可视为任意非伤害牌使用或打出。",
+    shuoye_huoying_info: "你每回合首次受到或造成伤害后可弃置任意张牌获得等量不计入手牌上限的随机花色点数[影]，然后令一名角色获得其中的红色[影]。每回合限一次，这些牌可视为任意非伤害基本牌或普通锦囊牌使用或打出。",
 //#noname-kit-end translate:shuoye_huoying
 //#noname-kit-begin translate:shuoye_huoying_ying
     shuoye_huoying_ying: "祸影",
-    shuoye_huoying_ying_info: "每回合限一次，你可将一张【影】视为任意非伤害牌使用或打出。",
+    shuoye_huoying_ying_info: "每回合限一次，你可将一张【影】视为任意非伤害基本牌或普通锦囊牌使用或打出。",
 //#noname-kit-end translate:shuoye_huoying_ying
 //#noname-kit-begin translate:shuoye_huoying_guest
     shuoye_huoying_guest: "祸影",
-    shuoye_huoying_guest_info: "每回合限一次，你可将获得的红色【影】视为任意非伤害牌使用。",
+    shuoye_huoying_guest_info: "每回合限一次，你可将获得的红色【影】视为任意非伤害基本牌或普通锦囊牌使用。",
 //#noname-kit-end translate:shuoye_huoying_guest
 //#noname-kit-begin translate:shuoye_huoying_guest_keep
     shuoye_huoying_guest_keep: "祸影",

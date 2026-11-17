@@ -113,7 +113,7 @@ if (!lib.shuoyeLei) {
             return list;
         },
         // ---------------- 【影】 ----------------
-        // 雷电芽衣自己的【影】（不计入手牌上限、可视为任意非伤害牌）
+        // 雷电芽衣自己的【影】（不计入手牌上限、可视为任意非伤害基本牌或普通锦囊牌）
         yingCards(player) {
             return !player || typeof player.getCards != "function" ? [] : player.getCards("h").filter((card) => !!(card && card.storage && card.storage.shuoye_huoying));
         },
@@ -139,7 +139,8 @@ if (!lib.shuoyeLei) {
             }
             return list;
         },
-        // 可作为“任意非伤害牌”的牌名池：没有伤害标签、且不是装备牌
+        // 可作为【影】转化目标的牌名池：非伤害的基本牌或普通锦囊牌。
+        // 延时锦囊（get.type 为 "delay"）一律排除；装备牌本来就不在池内。
         nonDamageNames() {
             const list = [];
             for (const name of lib.inpile) {
@@ -150,7 +151,7 @@ if (!lib.shuoyeLei) {
                 } catch (e) {
                     type = null;
                 }
-                if (type != "basic" && type != "trick" && type != "delay") continue;
+                if (type != "basic" && type != "trick") continue;
                 let tag = 0;
                 try {
                     tag = get.tag({ name: name }, "damage") || 0;
@@ -745,7 +746,7 @@ if (!lib.shuoyeLei) {
             if (!cards.length) return false;
             await player.gain(cards, "gain2");
             // 【影】是 createCard 临时造的牌，card.storage 不会自动同步到客机，
-            // 不补这一句的话客机上“视为任意非伤害牌”的选牌条件会是空。
+            // 不补这一句的话客机上“视为任意非伤害基本/普通锦囊牌”的选牌条件会是空。
             game.broadcastAll(function (list) {
                 for (const card of list || []) {
                     if (!card) continue;
