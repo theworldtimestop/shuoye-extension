@@ -212,6 +212,8 @@ function animationOff() {
 // ---------------------------------------------------------------- 音频
 // 台词音量倍率（1 = 原音量；从 4 降到 3，即比原来小声四分之一）
 const VOICE_GAIN = 3;
+// 【三轮霞】阴流 / 束缚 的台词倍率（1 = 引擎原音量；2 = 比原先再响一倍）
+const SANLUN_VOICE_GAIN = 2;
 
 function audioBaseVolume() {
 	const setting = lib.config && lib.config.volumn_audio != null ? lib.config.volumn_audio : 8;
@@ -302,7 +304,7 @@ function setBgmGain(value) {
 }
 
 // 用 WebAudio 增益把台词音量翻倍；增益不可用时退回普通播放（略提高元素音量）
-function playBoosted(url, onDone) {
+function playBoosted(url, onDone, boost) {
 	let audio;
 	try {
 		audio = document.createElement("audio");
@@ -328,7 +330,7 @@ function playBoosted(url, onDone) {
 			if (ctx.state === "running" || ctx.state === "suspended") {
 				const src = ctx.createMediaElementSource(audio);
 				const gain = ctx.createGain();
-				gain.gain.value = VOICE_GAIN;
+				gain.gain.value = boost || VOICE_GAIN;
 				src.connect(gain);
 				gain.connect(ctx.destination);
 			} else {
@@ -349,7 +351,7 @@ function playBoosted(url, onDone) {
 	if (!ctx) {
 		// 没有增益通道：元素音量尽量拉高（上限 1）
 		try {
-			audio.volume = Math.min(1, audioBaseVolume() * (VOICE_GAIN * 0.8));
+			audio.volume = Math.min(1, audioBaseVolume() * ((boost || VOICE_GAIN) * 0.8));
 		} catch (e) {}
 	}
 	const cleanup = () => {
@@ -1948,6 +1950,32 @@ export function installLixinFx() {
 						const url = /^https?:/i.test(parsed) ? parsed : lib.assetURL + parsed;
 						playBoosted(url, null);
 						return;
+					}
+					// 【三轮霞】阴流 / 束缚 的台词：比引擎原音量再响一倍（增益 2），其它角色与音频仍走引擎原逻辑
+					if (/(?:^|\/)(?:skill|die)\//i.test(path) && /shuoye_(?:yinliu|shufu)1(?:\.mp3)?$/i.test(path)) {
+						if (_status.video && !options.video) {
+							return;
+						}
+						if (lib.config && lib.config.background_speak === false) {
+							return;
+						}
+						// 绕过了引擎的 playAudio，录像的 addVideo 记录得自己补，否则回放里没这几句
+						if (options.addVideo !== false) {
+							try {
+								game.addVideo("playAudio", null, path);
+							} catch (e) {}
+						}
+						let sanlunParsed = path;
+						if (sanlunParsed.startsWith("ext:")) {
+							sanlunParsed = sanlunParsed.replace(/^ext:/, "extension/");
+						} else if (!/^https?:/i.test(sanlunParsed)) {
+							sanlunParsed = sanlunParsed.startsWith("audio/") ? sanlunParsed : "audio/" + sanlunParsed;
+						}
+						// 增益通道自己拼 URL，没有后缀就按引擎默认补 .mp3，否则放不出声
+						if (!/\.(mp3|ogg|wav|m4a)$/i.test(sanlunParsed)) {
+							sanlunParsed += ".mp3";
+						}
+						return playBoosted(/^https?:/i.test(sanlunParsed) ? sanlunParsed : lib.assetURL + sanlunParsed, null, SANLUN_VOICE_GAIN);
 					}
 				} catch (e) {}
 				return originPlayAudio.apply(this, args);

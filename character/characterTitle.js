@@ -30,5 +30,6 @@ const characterTitles = {
     shuoye_bojiaoyang: "困兽之笼",
     shuoye_weiyan: "是",
     shuoye_leidianyayi: "雷之律者",
+    shuoye_sanlunxia: "最终BOSS",
 };
 export default characterTitles;

@@ -1127,6 +1127,45 @@ if (!lib.shuoyeIf) {
             if (!silent) game.log("无量空处", "的领域消散了");
         },
         // ---------------- 视频 / 背景 / BGM ----------------
+        // 视频公共预处理（照【乙骨忧太】那套）：内联播放 + 透明 poster。
+        // 手机端（Safari / 微信 X5）在视频还没解出第一帧、又没给 poster 时，
+        // 会把 <video> 画成一个「播放按钮」占位图标，看起来就像闪了一帧播放键。
+        primeVideo(video) {
+            try {
+                if (!video) return video;
+                video.setAttribute("playsinline", "");
+                video.setAttribute("webkit-playsinline", "");
+                video.setAttribute("x5-playsinline", "");
+                video.setAttribute("x5-video-player-type", "h5-page");
+                video.setAttribute("disablepictureinpicture", "");
+                try {
+                    video.disablePictureInPicture = true;
+                } catch (e) {}
+                video.controls = false;
+                // 1x1 透明 GIF：有了 poster，各端就不再画「播放按钮」占位
+                video.setAttribute("poster", "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7");
+            } catch (e) {}
+            return video;
+        },
+        // 真的能出画面（readyState>=3 / canplay / playing）之后再显示，超时兜底别一直看不见。
+        // 乙骨忧太的 showVideo 就是 opacity:0 → canplay 才显示，所以只有它没有这帧播放按钮。
+        revealWhenReady(video, fallbackMs) {
+            if (!video) return;
+            const go = function () {
+                try {
+                    video.style.opacity = "1";
+                } catch (e) {}
+            };
+            try {
+                if (video.readyState >= 3) {
+                    go();
+                    return;
+                }
+            } catch (e) {}
+            video.addEventListener("canplay", go, { once: true });
+            video.addEventListener("playing", go, { once: true });
+            setTimeout(go, typeof fallbackMs === "number" ? fallbackMs : 1200);
+        },
         playVideo(path, opt) {
             const options = opt || {};
             try {
@@ -1137,6 +1176,7 @@ if (!lib.shuoyeIf) {
                         video.muted = true;
                         video.playsInline = true;
                         video.preload = "auto";
+                        lib.shuoyeIf.primeVideo(video);
                         video.loop = !!config.loop;
                         video.style.cssText = "position:fixed;left:0;top:0;width:100%;height:100%;object-fit:" + (config.fit || "cover") + ";background:#000;z-index:" + (config.zIndex || 2147483600) + ";pointer-events:none;opacity:0;transition:opacity .4s linear;";
                         document.body.appendChild(video);
@@ -1189,7 +1229,8 @@ if (!lib.shuoyeIf) {
                     video.loop = true;
                     video.playsInline = true;
                     video.preload = "auto";
-                    video.style.cssText = "position:absolute;left:0;top:0;width:100%;height:100%;object-fit:cover;pointer-events:none;";
+                    lib.shuoyeIf.primeVideo(video);
+                    video.style.cssText = "position:absolute;left:0;top:0;width:100%;height:100%;object-fit:cover;pointer-events:none;opacity:0;transition:opacity .2s linear;";
                     node.appendChild(video);
                     try {
                         document.body.insertBefore(node, ui.window);
@@ -1197,6 +1238,7 @@ if (!lib.shuoyeIf) {
                         document.body.appendChild(node);
                     }
                     ui.shuoyeIfBgNode = node;
+                    lib.shuoyeIf.revealWhenReady(video);
                     Promise.resolve(video.play()).catch(function () {});
                 } catch (e) {}
             }, enable);
@@ -1349,6 +1391,7 @@ if (!lib.shuoyeIf) {
                     video.playsInline = true;
                     video.preload = "auto";
                     video.loop = false;
+                    lib.shuoyeIf.primeVideo(video);
                     video.style.cssText = "position:absolute;left:0;top:0;width:100%;height:100%;object-fit:cover;object-position:center;background:transparent;pointer-events:none;z-index:3;opacity:0;transition:opacity .25s linear;";
                     avatar.appendChild(video);
                     ui.shuoyeIfAwakenVideo = video;
@@ -1367,9 +1410,8 @@ if (!lib.shuoyeIf) {
                         } catch (e) {}
                     }
                     const play = function () {
-                        try {
-                            video.style.opacity = "1";
-                        } catch (e) {}
+                        // 照【乙骨忧太】：这里只负责起播；显示交给 revealWhenReady，
+                        // 免得第一帧还没解出来时元素被画成「播放按钮」占位。
                         try {
                             const p = video.play();
                             if (p && p.catch) p.catch(function () {});
@@ -1382,6 +1424,7 @@ if (!lib.shuoyeIf) {
                         } catch (e) {}
                         if (ui.shuoyeIfAwakenVideo === video) ui.shuoyeIfAwakenVideo = null;
                     });
+                    lib.shuoyeIf.revealWhenReady(video);
                     play();
                 } catch (e) {}
             }, player);
@@ -4797,7 +4840,7 @@ const skills = {
             player.storage.shuoye_qiyuan_stack = times;
             // X 为此技能已发动次数，且不超过目标当前体力值
             const num = Math.max(0, Math.min(times, target.hp));
-            game.log(player, "发动了", "【祈愿】", "（第", times, "次，X为", num, "）");
+            game.log(player, "发动了", "【祈愿】");
             if (num > 0) {
                 await target.loseHp(num);
                 await target.changeHujia(num, null, true);
@@ -14367,6 +14410,7 @@ const skills = {
                     video.muted = true;
                     video.playsInline = true;
                     video.preload = "auto";
+                    lib.shuoyeIf.primeVideo(video);
                     video.style.cssText = "position:absolute;left:0;top:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .2s linear;background:transparent;";
                     let useFallback = false;
                     const setSrc = function () {
@@ -14393,7 +14437,8 @@ const skills = {
                 let current = v1;
                 let next = v2;
                 const commit = function (incoming, outgoing) {
-                    incoming.style.opacity = "1";
+                    // 照【乙骨忧太】：等新视频真能出画面再显示，别在循环切换时闪出播放按钮占位
+                    lib.shuoyeIf.revealWhenReady(incoming);
                     outgoing.style.opacity = "0";
                     current = incoming;
                     next = outgoing;
@@ -14442,7 +14487,7 @@ const skills = {
                 };
                 v1.addEventListener("ended", switchToNext);
                 v2.addEventListener("ended", switchToNext);
-                current.style.opacity = "1";
+                lib.shuoyeIf.revealWhenReady(current);
                 try {
                     const promise = current.play();
                     if (promise && promise.catch) promise.catch(function () {});
@@ -21097,20 +21142,27 @@ shuoye_if_xushi: {
                 const who = await player.chooseControl([get.translation(player), get.translation(target)]).set("prompt", "虚式茈：选择本次【杀】的使用者").forResult();
                 user = who.index == 1 ? target : player;
             }
-            // filterTarget 会下发到客机执行，不能引用外层 user；把使用者 playerid 挂到事件上，
-            // 函数里用 this / _status.event 读（客机上外层 user 是 undefined，会导致目标全部不可选）。
+            // 目标：使用者自己也可以被选为【杀】的目标（虚式茈新增效果），其余角色只要求存活。
+            // filterTarget / ai 会被下发到客机执行，不能引用外层 user；使用者 playerid 挂在事件上，
+            // 函数里从 _status.event 读（客机上外层 user 是 undefined）。
             const targetResult = await player
                 .chooseTarget("虚式茈：选择【杀】的目标（可多选）", [1, game.countPlayer()], true)
                 .set("shuoye_if_xushi_userid", user.playerid)
                 .set("filterTarget", function (card, player2, t) {
-                    if (!t.isAlive()) return false;
-                    let uid = null;
-                    try {
-                        uid = this && this.shuoye_if_xushi_userid;
-                    } catch (e) {}
-                    if (!uid && typeof _status !== "undefined" && _status.event) uid = _status.event.shuoye_if_xushi_userid;
-                    if (uid) return t.playerid != uid;
-                    return true;
+                    // 不再排除使用者：自己也可以吃到这一发【杀】
+                    return !!(t && t.isAlive());
+                })
+                .set("ai", function (target) {
+                    if (!target) return 0;
+                    const evt = (typeof _status !== "undefined" && _status.event) || null;
+                    const chooser = evt && evt.player;
+                    const uid = evt && evt.shuoye_if_xushi_userid;
+                    // 使用者自己可以被人类玩家选中，但 AI 不选，避免自杀式结算
+                    if (uid && target.playerid == uid) return -999;
+                    if (chooser && target == chooser) return -999;
+                    if (!chooser) return 0;
+                    const att = get.attitude(chooser, target);
+                    return att < 0 ? -att : 0;
                 })
                 .forResult();
             if (!targetResult.bool) return;
@@ -22284,6 +22336,894 @@ shuoye_weiyan_enter: {
         },
     },
 //#noname-kit-end skill:shuoye_julijialuo_hurt
+//#noname-kit-begin skill:shuoye_sanlun
+    shuoye_sanlun: {
+        audio: "ext:朔夜/audio/skill:1",
+        mark: true,
+        marktext: "适",
+        intro: {
+            markcount: () => 0,
+            mark(dialog, storage, player) {
+                const labels = lib.skill.shuoye_sanlun
+                    .getList(player)
+                    .map(function (key) {
+                        return lib.skill.shuoye_sanlun.getAdaptLabel(key);
+                    })
+                    .filter(function (label) {
+                        return !!label;
+                    });
+                if (!labels.length) {
+                    dialog.addText("尚未适应");
+                    return;
+                }
+                dialog.addText("已适应（" + labels.length + "/" + lib.skill.shuoye_sanlun.limit + "）：");
+                for (let i = 0; i < labels.length; i++) dialog.addText("· " + labels[i]);
+            },
+        },
+        group: [
+            "shuoye_sanlun_card",
+            "shuoye_sanlun_respondcancel",
+            "shuoye_sanlun_respondresult",
+            "shuoye_sanlun_cardask",
+            "shuoye_sanlun_respondask",
+            "shuoye_sanlun_skillask",
+            "shuoye_sanlun_skillban",
+            "shuoye_sanlun_skilldamage",
+            "shuoye_sanlun_losehp",
+            "shuoye_sanlun_losemaxhp",
+            "shuoye_sanlun_turnover",
+            "shuoye_sanlun_damageup",
+            "shuoye_sanlun_discard",
+            "shuoye_sanlun_draw",
+            "shuoye_sanlun_wheel",
+        ],
+        init(player) {
+            lib.skill.shuoye_sanlun.ensureGlobal();
+            lib.skill.shuoye_sanlun.renderWheels(player);
+        },
+        onremove(player) {
+            lib.skill.shuoye_sanlun.clearWheels(player);
+            lib.skill.shuoye_sanlun.clearAdaptMarks(player);
+        },
+        getAdaptLabel(key) {
+            if (!key) return "";
+            if (key.indexOf("card:") === 0) {
+                const parts = key.slice(5).split("|");
+                const name = parts[0] || "";
+                const nature = parts[1] || "";
+                const nameStr = get.translation(name);
+                if (name === "sha") {
+                    if (!nature) return "普通【杀】";
+                    return "【" + (get.translation(nature) || "") + nameStr + "】";
+                }
+                return "【" + nameStr + "】";
+            }
+            if (key.indexOf("skill:") === 0) return get.translation(key.slice(6));
+            const map = {
+                "cls:draw": "摸牌",
+                "cls:discard": "弃牌",
+                "cls:damageup": "伤害+1",
+                "cls:skilldamage": "技能伤害",
+                "cls:losehp": "失去体力",
+                "cls:losemaxhp": "失上限",
+                "cls:turnover": "翻面",
+            };
+            return map[key] || "";
+        },
+        clearAdaptMarks(player) {
+            if (!player || !player.querySelectorAll) return;
+            const nodes = player.querySelectorAll(".shuoye-sanlun-mark");
+            for (let i = 0; i < nodes.length; i++) nodes[i].remove();
+        },
+        renderAdaptMarks(player, labels) {
+            if (!player || !player.node || !player.node.marks || typeof ui === "undefined") return;
+            lib.skill.shuoye_sanlun.clearAdaptMarks(player);
+            if (!labels) {
+                labels = lib.skill.shuoye_sanlun.getList(player).map(function (key) {
+                    return lib.skill.shuoye_sanlun.getAdaptLabel(key);
+                });
+            }
+            labels = (labels || []).filter(function (label) {
+                return !!label;
+            });
+            for (let i = 0; i < labels.length; i++) {
+                const node = ui.create.div(".card.mark.drawinghidden.shuoye-sanlun-mark");
+                player.node.marks.insertBefore(node, player.node.marks.childNodes[1] || null);
+                const bg = ui.create.div(".background.skillmark", node);
+                bg.innerHTML = labels[i];
+                node.name = "shuoye_sanlun";
+                node.skill = "shuoye_sanlun";
+            }
+        },
+        limit: 3,
+        ensureGlobal() {
+            if (!lib.skill.global.includes("shuoye_sanlun_global")) game.addGlobalSkill("shuoye_sanlun_global");
+        },
+        getList(player) {
+            if (!player || !player.storage) return [];
+            return player.storage.shuoye_sanlun_list || [];
+        },
+        hasAdapted(player, key) {
+            if (!key) return false;
+            const list = lib.skill.shuoye_sanlun.getList(player);
+            if (list.includes(key)) return true;
+            if (key.indexOf("card:") !== 0) return false;
+            const want = lib.skill.shuoye_sanlun.normalizeCardKey(key);
+            return list.some(function (item) {
+                return item.indexOf("card:") === 0 && lib.skill.shuoye_sanlun.normalizeCardKey(item) === want;
+            });
+        },
+        normalizeCardKey(key) {
+            if (!key || key.indexOf("card:") !== 0) return key;
+            const parts = key.slice(5).split("|");
+            const name = parts[0] || "";
+            const nature = parts[1] || "";
+            if (name === "sha" && nature) return "card:sha|" + nature;
+            return "card:" + name;
+        },
+        checkRespondBan(card, player, event) {
+            const key = lib.skill.shuoye_sanlun.getCardKey(card);
+            if (!key) return;
+            let evt = event && typeof event === "object" ? event : _status.event;
+            if (!evt || typeof evt !== "object") return;
+            if (evt.name !== "chooseToRespond") {
+                if (typeof evt.getParent !== "function") return;
+                evt = evt.getParent("chooseToRespond");
+            }
+            if (!evt || typeof evt.getParent !== "function") return;
+            let src = null;
+            const origin = evt.getParent("useCard");
+            if (origin && typeof origin === "object" && origin.player) src = origin.player;
+            if (!src) {
+                const parent = evt.getParent();
+                src = parent && parent.player;
+            }
+            if (!src || src === player) return;
+            if (typeof src.hasSkill !== "function" || !src.hasSkill("shuoye_sanlun")) return;
+            if (lib.skill.shuoye_sanlun.hasAdapted(src, key)) return false;
+        },
+        getCardKey(card) {
+            const name = get.name(card);
+            if (!name) return "";
+            if (name !== "sha") return "card:" + name;
+            return "card:sha|" + (get.nature(card, false) || "");
+        },
+        getCardLabel(card) {
+            const name = get.translation(get.name(card));
+            const nature = get.nature(card);
+            const str = nature ? get.translation(nature) : "";
+            return "【" + (str && str !== nature ? str : "") + name + "】";
+        },
+        getSkillCause(event) {
+            if (!event) return null;
+            const evt = event.getParent(function (e) {
+                if (!e || !e.name) return false;
+                if (e.name === "useCard") return true;
+                return !!(lib.skill[e.name] && lib.skill[e.name].content && !lib.card[e.name]);
+            }, false, true);
+            if (!evt || !evt.name || evt.name === "useCard") return null;
+            return evt;
+        },
+        async askAdapt(player, candidates) {
+            if (!player || !player.isIn || !player.isIn()) return;
+            if (!player.hasSkill("shuoye_sanlun")) return;
+            const list = lib.skill.shuoye_sanlun.getList(player);
+            if (list.length >= lib.skill.shuoye_sanlun.limit) return;
+            for (const candidate of candidates || []) {
+                if (!candidate || !candidate.key) continue;
+                const current = lib.skill.shuoye_sanlun.getList(player);
+                if (current.length >= lib.skill.shuoye_sanlun.limit) return;
+                if (lib.skill.shuoye_sanlun.hasAdapted(player, candidate.key)) continue;
+                const result = await player
+                    .chooseBool()
+                    .set("prompt", "三轮：是否适应" + candidate.label + "？（剩余" + (lib.skill.shuoye_sanlun.limit - current.length) + "）")
+                    .set("ai", function () {
+                        return true;
+                    })
+                    .forResult();
+                if (!result || !result.bool) continue;
+                lib.skill.shuoye_sanlun.addAdapt(player, candidate.key, candidate.label);
+            }
+        },
+        addAdapt(player, key, label) {
+            const list = lib.skill.shuoye_sanlun.getList(player).slice();
+            if (lib.skill.shuoye_sanlun.hasAdapted(player, key) || list.length >= lib.skill.shuoye_sanlun.limit) return;
+            list.push(key);
+            game.broadcastAll(
+                function (player, list, key) {
+                    player.storage.shuoye_sanlun_list = list;
+                    if (key === "cls:discard") player.storage.shuoye_sanlun_discarddown = 1;
+                    if (key === "cls:draw") player.storage.shuoye_sanlun_drawup = 1;
+                    player.markSkill("shuoye_sanlun");
+                    player.updateMarks();
+                },
+                player,
+                list,
+                key
+            );
+            if (key.indexOf("skill:") === 0) lib.skill.shuoye_sanlun.registerBan(player, key.slice(6));
+            lib.skill.shuoye_sanlun.addWheel(player);
+            player.popup("适应");
+            game.log(player, "适应了", "#g" + label);
+        },
+        registerBan(player, skill) {
+            game.broadcastAll(
+                function (player, name) {
+                    const triggers = lib.skill.shuoye_sanlun_skillban.trigger.global;
+                    if (!triggers.includes(name)) triggers.push(name);
+                    player.addSkillTrigger("shuoye_sanlun_skillban", false, true);
+                },
+                player,
+                skill + "Begin"
+            );
+        },
+        ensureStyle() {
+            if (typeof document === "undefined") return;
+            if (document.getElementById("shuoye-sanlun-style")) return;
+            const style = document.createElement("style");
+            style.id = "shuoye-sanlun-style";
+            style.innerHTML =
+                "@keyframes shuoyeSanlunSpin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}" +
+                ".shuoye-sanlun-falun{position:absolute;width:64px;height:64px;margin-left:-32px;margin-top:-32px;pointer-events:none;z-index:12;opacity:.94;filter:drop-shadow(0 0 8px rgba(120,220,255,.9));transition:filter .22s ease-out;animation:shuoyeSanlunSpin 15s linear infinite;}" +
+                ".shuoye-sanlun-falun-flash{filter:drop-shadow(0 0 22px #fff) brightness(2.3);}" +
+                ".shuoye-sanlun-host{overflow:visible !important;}";
+            document.head.appendChild(style);
+        },
+        flashWheel(player) {
+            if (!player || !player.node) return;
+            const wheels = (player.storage && player.storage.shuoye_sanlun_wheels) || [];
+            if (!wheels.length) return;
+            const index = Math.floor(Math.random() * wheels.length);
+            game.broadcastAll(
+                function (player, index) {
+                    try {
+                        const nodes = player.querySelectorAll(".shuoye-sanlun-falun");
+                        if (!nodes || !nodes.length) return;
+                        const node = nodes[index % nodes.length];
+                        if (!node || !node.classList) return;
+                        node.classList.remove("shuoye-sanlun-falun-flash");
+                        void node.offsetWidth;
+                        node.classList.add("shuoye-sanlun-falun-flash");
+                        setTimeout(function () {
+                            if (node && node.classList) node.classList.remove("shuoye-sanlun-falun-flash");
+                        }, 420);
+                    } catch (e) {}
+                },
+                player,
+                index
+            );
+            game.trySkillAudio("shuoye_sanlun", player);
+        },
+        renderWheels(player) {
+            if (!player || !player.node || typeof document === "undefined") return;
+            lib.skill.shuoye_sanlun.ensureStyle();
+            const olds = player.querySelectorAll(".shuoye-sanlun-falun");
+            for (let i = 0; i < olds.length; i++) olds[i].remove();
+            const container = player.node.avatar || player;
+            try {
+                container.classList.add("shuoye-sanlun-host");
+                container.style.overflow = "visible";
+                if (player.style) player.style.overflow = "visible";
+            } catch (e) {}
+            const wheels = (player.storage && player.storage.shuoye_sanlun_wheels) || [];
+            for (const pos of wheels) {
+                const img = document.createElement("img");
+                img.className = "shuoye-sanlun-falun";
+                img.src = lib.assetURL + "extension/朔夜/image/shuoye_sanlun_falun.png";
+                img.style.left = pos.left + "%";
+                img.style.top = pos.top + "%";
+                img.style.animationDelay = "-" + pos.delay + "s";
+                container.appendChild(img);
+            }
+        },
+        clearWheels(player) {
+            if (!player || !player.node || typeof document === "undefined") return;
+            const olds = player.querySelectorAll(".shuoye-sanlun-falun");
+            for (let i = 0; i < olds.length; i++) olds[i].remove();
+        },
+        addWheel(player) {
+            const wheels = (player.storage.shuoye_sanlun_wheels || []).slice();
+            if (wheels.length >= 3) return;
+            wheels.push({
+                left: 6 + Math.floor(Math.random() * 76),
+                top: 4 + Math.floor(Math.random() * 38),
+                delay: Math.floor(Math.random() * 5),
+            });
+            game.broadcastAll(
+                function (player, wheels) {
+                    player.storage.shuoye_sanlun_wheels = wheels;
+                    lib.skill.shuoye_sanlun.renderWheels(player);
+                },
+                player,
+                wheels
+            );
+            game.trySkillAudio("shuoye_sanlun", player);
+        },
+        subSkill: {
+            global: {
+                charlotte: true,
+                silent: true,
+                popup: false,
+            },
+            card: {
+                charlotte: true,
+                forced: true,
+                popup: false,
+                trigger: { target: "useCardToBefore", global: "useCardBefore" },
+                filter(event, player, name) {
+                    if (!event || !event.card || event.player === player) return false;
+                    if (name === "useCardBefore") {
+                        if (event.shuoye_judge_target !== player) return false;
+                    } else if (event.target !== player) {
+                        return false;
+                    }
+                    const key = lib.skill.shuoye_sanlun.getCardKey(event.card);
+                    return !!key && lib.skill.shuoye_sanlun.hasAdapted(player, key);
+                },
+                async content(event, trigger, player) {
+                    trigger.cancel();
+                    player.popup("适应");
+                    lib.skill.shuoye_sanlun.flashWheel(player);
+                },
+            },
+            respondcancel: {
+                charlotte: true,
+                silent: true,
+                forced: true,
+                popup: false,
+                trigger: { global: "useCardToBefore" },
+                filter(event, player) {
+                    if (!event || !event.card || event.player === player) return false;
+                    let to = event.respondTo;
+                    if (!to && typeof event.getParent === "function") {
+                        const p = event.getParent("useCard");
+                        if (p && typeof p === "object") to = p.respondTo;
+                    }
+                    if (!to || to[0] !== player) return false;
+                    const key = lib.skill.shuoye_sanlun.getCardKey(event.card);
+                    return !!key && lib.skill.shuoye_sanlun.hasAdapted(player, key);
+                },
+                async content(event, trigger, player) {
+                    trigger.cancel();
+                    player.popup("适应");
+                    lib.skill.shuoye_sanlun.flashWheel(player);
+                    game.log(player, "适应了", "#g" + lib.skill.shuoye_sanlun.getCardLabel(trigger.card), "，其响应无效");
+                },
+            },
+            respondresult: {
+                charlotte: true,
+                silent: true,
+                forced: true,
+                popup: false,
+                trigger: { global: ["chooseToUseEnd", "chooseToRespondEnd"] },
+                filter(event, player) {
+                    if (!event || !event.result || !event.result.bool) return false;
+                    const card = event.result.card || (event.result.cards && event.result.cards[0]);
+                    if (!card) return false;
+                    let src = null;
+                    if (event.respondTo) {
+                        src = event.respondTo[0];
+                    } else if (event.name === "chooseToRespond" && typeof event.getParent === "function") {
+                        const parent = event.getParent();
+                        src = parent && parent.player;
+                    }
+                    if (!src || src !== player) return false;
+                    const key = lib.skill.shuoye_sanlun.getCardKey(card);
+                    return !!key && lib.skill.shuoye_sanlun.hasAdapted(player, key);
+                },
+                async content(event, trigger, player) {
+                    const cards = (trigger.result.cards || []).slice();
+                    const card = trigger.result.card || cards[0];
+                    const responder = trigger.player;
+                    trigger.result = { bool: false };
+                    player.popup("适应");
+                    lib.skill.shuoye_sanlun.flashWheel(player);
+                    if (event.triggername === "chooseToRespondEnd" && cards.length && responder && responder.isIn && responder.isIn()) {
+                        await responder.lose(cards, ui.discardPile);
+                        game.log(player, "适应了", "#g" + lib.skill.shuoye_sanlun.getCardLabel(card), "，其响应无效");
+                    }
+                },
+            },
+            cardask: {
+                charlotte: true,
+                forced: true,
+                popup: false,
+                trigger: { target: "useCardToAfter", global: "useCardAfter" },
+                filter(event, player, name) {
+                    if (!event || !event.card || event.player === player) return false;
+                    if (name === "useCardAfter") {
+                        if (event.shuoye_judge_target !== player) return false;
+                    } else if (event.target !== player) {
+                        return false;
+                    }
+                    const key = lib.skill.shuoye_sanlun.getCardKey(event.card);
+                    return !!key && !lib.skill.shuoye_sanlun.hasAdapted(player, key);
+                },
+                async content(event, trigger, player) {
+                    const key = lib.skill.shuoye_sanlun.getCardKey(trigger.card);
+                    if (!key) return;
+                    await lib.skill.shuoye_sanlun.askAdapt(player, [{ key: key, label: lib.skill.shuoye_sanlun.getCardLabel(trigger.card) }]);
+                },
+            },
+            respondask: {
+                charlotte: true,
+                forced: true,
+                popup: false,
+                trigger: { global: ["respondAfter", "useCardAfter"] },
+                filter(event, player, name) {
+                    if (event.player === player) return false;
+                    if (name === "useCardAfter" && typeof event.getParent === "function") {
+                        const parent = event.getParent();
+                        if (parent && parent.name === "respond") return false;
+                    }
+                    const to = event.respondTo;
+                    if (!to || to[0] !== player) return false;
+                    const key = lib.skill.shuoye_sanlun.getCardKey(event.card);
+                    return !!key && !lib.skill.shuoye_sanlun.hasAdapted(player, key);
+                },
+                async content(event, trigger, player) {
+                    const key = lib.skill.shuoye_sanlun.getCardKey(trigger.card);
+                    if (!key) return;
+                    await lib.skill.shuoye_sanlun.askAdapt(player, [{ key: key, label: lib.skill.shuoye_sanlun.getCardLabel(trigger.card) }]);
+                },
+            },
+            skillask: {
+                charlotte: true,
+                forced: true,
+                popup: false,
+                trigger: { global: ["useSkillAfter", "logSkillAfter"] },
+                filter(event, player) {
+                    if (!event || event.player === player || !event.skill) return false;
+                    if (!event.targets || !event.targets.includes(player)) return false;
+                    return !lib.skill.shuoye_sanlun.hasAdapted(player, "skill:" + event.skill);
+                },
+                async content(event, trigger, player) {
+                    if (!player.isIn()) return;
+                    const skill = trigger.skill;
+                    await lib.skill.shuoye_sanlun.askAdapt(player, [{ key: "skill:" + skill, label: "技能「" + get.translation(skill) + "」" }]);
+                },
+            },
+            skillban: {
+                charlotte: true,
+                forced: true,
+                popup: false,
+                locked: true,
+                priority: 211,
+                trigger: { global: [] },
+                filter(event, player) {
+                    if (!event || !event.name) return false;
+                    const skill = event.name;
+                    if (skill === "shuoye_sanlun" || skill.indexOf("shuoye_sanlun_") === 0) return false;
+                    if (event.player === player) return false;
+                    if (!lib.skill.shuoye_sanlun.hasAdapted(player, "skill:" + skill)) return false;
+                    if (event.target === player) return true;
+                    if (event.targets && event.targets.includes(player)) return true;
+                    return false;
+                },
+                async content(event, trigger, player) {
+                    trigger.cancel();
+                    player.popup("适应");
+                    lib.skill.shuoye_sanlun.flashWheel(player);
+                    game.log(player, "适应了", "#g" + get.translation(trigger.name), "，其对你无效");
+                },
+            },
+            skilldamage: {
+                charlotte: true,
+                forced: true,
+                popup: false,
+                trigger: { player: ["damageBefore", "damageAfter"] },
+                filter(event, player, name) {
+                    if (!lib.skill.shuoye_sanlun.getSkillCause(event)) return false;
+                    const adapted = lib.skill.shuoye_sanlun.hasAdapted(player, "cls:skilldamage");
+                    return name === "damageBefore" ? adapted : !adapted;
+                },
+                async content(event, trigger, player) {
+                    if (event.triggername === "damageBefore") {
+                        trigger.cancel();
+                        player.popup("适应");
+                        lib.skill.shuoye_sanlun.flashWheel(player);
+                        return;
+                    }
+                    if (!player.isIn()) return;
+                    await lib.skill.shuoye_sanlun.askAdapt(player, [{ key: "cls:skilldamage", label: "技能造成的伤害" }]);
+                },
+            },
+            losehp: {
+                charlotte: true,
+                forced: true,
+                popup: false,
+                trigger: { player: ["loseHpBefore", "loseHpAfter"] },
+                filter(event, player, name) {
+                    const adapted = lib.skill.shuoye_sanlun.hasAdapted(player, "cls:losehp");
+                    return name === "loseHpBefore" ? adapted : !adapted;
+                },
+                async content(event, trigger, player) {
+                    if (event.triggername === "loseHpBefore") {
+                        trigger.cancel();
+                        player.popup("适应");
+                        lib.skill.shuoye_sanlun.flashWheel(player);
+                        return;
+                    }
+                    if (!player.isIn()) return;
+                    await lib.skill.shuoye_sanlun.askAdapt(player, [{ key: "cls:losehp", label: "失去体力" }]);
+                },
+            },
+            losemaxhp: {
+                charlotte: true,
+                forced: true,
+                popup: false,
+                trigger: { player: ["loseMaxHpBefore", "loseMaxHpAfter"] },
+                filter(event, player, name) {
+                    const adapted = lib.skill.shuoye_sanlun.hasAdapted(player, "cls:losemaxhp");
+                    return name === "loseMaxHpBefore" ? adapted : !adapted;
+                },
+                async content(event, trigger, player) {
+                    if (event.triggername === "loseMaxHpBefore") {
+                        trigger.cancel();
+                        player.popup("适应");
+                        lib.skill.shuoye_sanlun.flashWheel(player);
+                        return;
+                    }
+                    if (!player.isIn()) return;
+                    await lib.skill.shuoye_sanlun.askAdapt(player, [{ key: "cls:losemaxhp", label: "失去体力上限" }]);
+                },
+            },
+            turnover: {
+                charlotte: true,
+                forced: true,
+                popup: false,
+                trigger: { player: ["turnOverBefore", "turnOverAfter"] },
+                filter(event, player, name) {
+                    const adapted = lib.skill.shuoye_sanlun.hasAdapted(player, "cls:turnover");
+                    if (name === "turnOverBefore") return adapted && !player.isTurnedOver();
+                    return !adapted;
+                },
+                async content(event, trigger, player) {
+                    if (event.triggername === "turnOverBefore") {
+                        trigger.cancel();
+                        player.popup("适应");
+                        lib.skill.shuoye_sanlun.flashWheel(player);
+                        return;
+                    }
+                    if (!player.isIn()) return;
+                    await lib.skill.shuoye_sanlun.askAdapt(player, [{ key: "cls:turnover", label: "翻面" }]);
+                },
+            },
+            damageup: {
+                charlotte: true,
+                forced: true,
+                popup: false,
+                trigger: { source: ["damageBegin1", "damageAfter"] },
+                filter(event, player, name) {
+                    if (!event.player || event.player === player) return false;
+                    const adapted = lib.skill.shuoye_sanlun.hasAdapted(player, "cls:damageup");
+                    return name === "damageBegin1" ? adapted : !adapted;
+                },
+                async content(event, trigger, player) {
+                    if (event.triggername === "damageBegin1") {
+                        trigger.num += 1;
+                        lib.skill.shuoye_sanlun.flashWheel(player);
+                        return;
+                    }
+                    if (!player.isIn()) return;
+                    await lib.skill.shuoye_sanlun.askAdapt(player, [{ key: "cls:damageup", label: "造成伤害" }]);
+                },
+            },
+            discard: {
+                charlotte: true,
+                forced: true,
+                popup: false,
+                trigger: { player: "discardAfter" },
+                filter(event, player) {
+                    return !!(event.cards && event.cards.length);
+                },
+                mod: {
+                    maxHandcardFinal(player, num) {
+                        return num + (player.storage.shuoye_sanlun_discarddown || 0);
+                    },
+                },
+                async content(event, trigger, player) {
+                    if (!lib.skill.shuoye_sanlun.hasAdapted(player, "cls:discard")) {
+                        if (!player.isIn()) return;
+                        await lib.skill.shuoye_sanlun.askAdapt(player, [{ key: "cls:discard", label: "弃牌" }]);
+                        return;
+                    }
+                    game.broadcastAll(function (player) {
+                        player.storage.shuoye_sanlun_discarddown = (player.storage.shuoye_sanlun_discarddown || 0) + 1;
+                    }, player);
+                    lib.skill.shuoye_sanlun.flashWheel(player);
+                },
+            },
+            draw: {
+                charlotte: true,
+                forced: true,
+                popup: false,
+                trigger: { player: ["drawBegin", "drawAfter"] },
+                filter(event, player, name) {
+                    return true;
+                },
+                async content(event, trigger, player) {
+                    if (event.triggername === "drawBegin") {
+                        const bonus = Math.min(3, player.storage.shuoye_sanlun_drawup || 0);
+                        if (bonus > 0 && !trigger.numFixed) trigger.num += bonus;
+                        return;
+                    }
+                    if (!lib.skill.shuoye_sanlun.hasAdapted(player, "cls:draw")) {
+                        if (!player.isIn()) return;
+                        await lib.skill.shuoye_sanlun.askAdapt(player, [{ key: "cls:draw", label: "摸牌" }]);
+                        return;
+                    }
+                    game.broadcastAll(function (player) {
+                        player.storage.shuoye_sanlun_drawup = Math.min(3, (player.storage.shuoye_sanlun_drawup || 0) + 1);
+                    }, player);
+                    lib.skill.shuoye_sanlun.flashWheel(player);
+                },
+            },
+            wheel: {
+                charlotte: true,
+                forced: true,
+                popup: false,
+                trigger: { player: "phaseBegin" },
+                filter(event, player) {
+                    return !!(player.storage.shuoye_sanlun_wheels && player.storage.shuoye_sanlun_wheels.length);
+                },
+                content(event, trigger, player) {
+                    try {
+                        player.updateMarks();
+                    } catch (e) {}
+                    game.broadcastAll(function (player) {
+                        lib.skill.shuoye_sanlun.renderWheels(player);
+                    }, player);
+                },
+            },
+        },
+    },
+//#noname-kit-end skill:shuoye_sanlun
+//#noname-kit-begin skill:shuoye_yinliu
+    shuoye_yinliu: {
+        audio: "ext:朔夜/audio/skill:1",
+        enable: "phaseUse",
+        usable: 1,
+        filterCard: () => false,
+        selectCard: -1,
+        selectTarget: 1,
+        filter(event, player) {
+            return game.hasPlayer(function (target) {
+                return target !== player && target.isIn();
+            });
+        },
+        filterTarget(card, player, target) {
+            return target !== player;
+        },
+        async content(event, trigger, player) {
+            const target = event.targets[0];
+            const expire = ["phaseJieshuAfter", "phaseZhunbeiAfter"];
+            target.addTempSkill("shuoye_yinliu_fengyin", expire);
+            player.addTempSkill("shuoye_yinliu_buff", expire);
+            game.broadcastAll(
+                function (player, id) {
+                    player.storage.shuoye_yinliu_target = id;
+                    player.markSkill("shuoye_yinliu_buff");
+                },
+                player,
+                target.playerid
+            );
+            game.log(player, "令", target, "本回合技能失效，且本回合对其使用牌无视距离与使用次数、伤害-1");
+        },
+        ai: {
+            order: 6,
+            result: {
+                target(player, target) {
+                    if (target === player) return 0;
+                    return get.attitude(player, target) < 0 ? 2 : -1;
+                },
+            },
+        },
+        subSkill: {
+            fengyin: {
+                charlotte: true,
+                silent: true,
+                popup: false,
+                mark: true,
+                marktext: "封",
+                init(player, skill) {
+                    player.addSkillBlocker(skill);
+                    game.broadcastAll(function (player) {
+                        if (!player.storage.skill_blocker) player.storage.skill_blocker = [];
+                        if (!player.storage.skill_blocker.includes("shuoye_yinliu_fengyin")) player.storage.skill_blocker.push("shuoye_yinliu_fengyin");
+                        player.update();
+                    }, player);
+                },
+                onremove(player, skill) {
+                    player.removeSkillBlocker(skill);
+                    game.broadcastAll(function (player) {
+                        if (!Array.isArray(player.storage.skill_blocker)) return;
+                        const index = player.storage.skill_blocker.indexOf("shuoye_yinliu_fengyin");
+                        if (index >= 0) player.storage.skill_blocker.splice(index, 1);
+                        if (!player.storage.skill_blocker.length) delete player.storage.skill_blocker;
+                        player.update();
+                    }, player);
+                },
+                skillBlocker(skill, player) {
+                    const info = lib.skill[skill];
+                    return !!info && skill !== "shuoye_yinliu_fengyin" && !info.charlotte && !info.persevereSkill;
+                },
+                intro: {
+                    markcount: () => 0,
+                    content: "本回合技能失效",
+                },
+            },
+            buff: {
+                charlotte: true,
+                silent: true,
+                popup: false,
+                mark: true,
+                marktext: "阴",
+                getTarget(player) {
+                    const id = player.storage.shuoye_yinliu_target;
+                    if (!id) return null;
+                    const list = game.players.concat(game.dead || []);
+                    return list.find(function (p) {
+                        return p.playerid == id;
+                    }) || null;
+                },
+                mod: {
+                    targetInRange(card, player, target) {
+                        const t = lib.skill.shuoye_yinliu_buff.getTarget(player);
+                        if (t && target === t) return true;
+                    },
+                    cardUsableTarget(card, player, target) {
+                        const t = lib.skill.shuoye_yinliu_buff.getTarget(player);
+                        if (t && target === t) return true;
+                    },
+                },
+                trigger: { source: "damageBegin4" },
+                filter(event, player) {
+                    const t = lib.skill.shuoye_yinliu_buff.getTarget(player);
+                    if (!t || event.player !== t) return false;
+                    if (!event.card) return false;
+                    const evt = event.getParent("useCard");
+                    return !!evt && evt.player === player;
+                },
+                content(event, trigger, player) {
+                    trigger.num = Math.max(0, trigger.num - 1);
+                },
+                onremove(player) {
+                    game.broadcastAll(function (player) {
+                        delete player.storage.shuoye_yinliu_target;
+                    }, player);
+                },
+                intro: {
+                    markcount: () => 0,
+                    mark(dialog, storage, player) {
+                        const t = lib.skill.shuoye_yinliu_buff.getTarget(player);
+                        dialog.addText("本回合对" + (t ? get.translation(t) : "该角色") + "使用牌无视距离与使用次数，且伤害-1");
+                    },
+                },
+            },
+        },
+    },
+//#noname-kit-end skill:shuoye_yinliu
+//#noname-kit-begin skill:shuoye_shufu
+    shuoye_shufu: {
+        // 【束缚】的台词挂在主技能上：台词列表只遍历武将自身技能（不含 subSkill），
+        // 实际播放在 use 子技能里显式 game.trySkillAudio，音量由 main/lixinfx.js 的 playAudio 增益放大 2 倍
+        audio: "ext:朔夜/audio/skill:1",
+        group: ["shuoye_shufu_refresh", "shuoye_shufu_use", "shuoye_shufu_debt"],
+        init(player) {
+            lib.skill.shuoye_shufu.sync(player);
+        },
+        getCards(player) {
+            if (!player || !player.getCards) return [];
+            return player.getCards("s", function (card) {
+                return !!(card.hasGaintag && card.hasGaintag("shuoye_shufu"));
+            });
+        },
+        hiddenCard(player, name) {
+            return lib.skill.shuoye_shufu.getCards(player).some(function (card) {
+                return card.name === name;
+            });
+        },
+        sync(player) {
+            if (!player || !player.hasSkill || !player.hasSkill("shuoye_shufu")) return;
+            if (player.isDead() || player.removed) return;
+            if (game.online) return;
+            if (!player.node || !player.node.handcards1 || !player.node.handcards2) return;
+            const own = lib.skill.shuoye_shufu.getCards(player);
+            if (own.length > 1) {
+                for (let i = 1; i < own.length; i++) lib.skill.shuoye_shufu.removeCard(player, own[i]);
+            }
+            if (own.length) return;
+            const pile = ui.cardPile;
+            if (!pile || !pile.childNodes || !pile.childNodes.length) return;
+            const bottom = pile.childNodes[pile.childNodes.length - 1];
+            if (!bottom) return;
+            player.directgains([bottom], null, "shuoye_shufu");
+        },
+        removeCard(player, card) {
+            if (!card) return;
+            const id = card.cardid;
+            if (card.parentNode) card.parentNode.removeChild(card);
+            game.broadcastAll(function (pid, id) {
+                const p = (_status.connectMode ? lib.playerOL : game.playerMap)[pid];
+                if (!p || !p.getCards) return;
+                const list = p.getCards("s");
+                for (let i = 0; i < list.length; i++) {
+                    if (list[i] && list[i].cardid === id) {
+                        if (list[i].parentNode) list[i].parentNode.removeChild(list[i]);
+                        break;
+                    }
+                }
+            }, player.playerid, id);
+        },
+        subSkill: {
+            refresh: {
+                charlotte: true,
+                silent: true,
+                forced: true,
+                popup: false,
+                trigger: { player: ["phaseBegin", "useCardAfter", "gainAfter"], global: ["cardsGotoPileAfter"] },
+                filter(event, player) {
+                    return true;
+                },
+                content(event, trigger, player) {
+                    lib.skill.shuoye_shufu.sync(player);
+                },
+            },
+            use: {
+                charlotte: true,
+                silent: true,
+                forced: true,
+                popup: false,
+                trigger: { player: "useCardBefore" },
+                filter(event, player) {
+                    const cards = event.cards || [];
+                    return cards.some(function (card) {
+                        return !!(card && card.hasGaintag && card.hasGaintag("shuoye_shufu"));
+                    });
+                },
+                async content(event, trigger, player) {
+                    const cards = (trigger.cards || []).filter(function (card) {
+                        return !!(card && card.hasGaintag && card.hasGaintag("shuoye_shufu"));
+                    });
+                    for (const card of cards) {
+                        if (card.removeGaintag) card.removeGaintag("shuoye_shufu");
+                    }
+                    game.broadcastAll(function (player) {
+                        player.storage.shuoye_shufu_debt = (player.storage.shuoye_shufu_debt || 0) + 1;
+                    }, player);
+                    player.popup("束缚");
+                    // 子技能是 silent，引擎不会自动播台词，这里显式播主技能的 audio（引擎会广播给客机）
+                    game.trySkillAudio("shuoye_shufu", player);
+                    game.log(player, "以【束缚】使用或打出了牌堆底的牌", "#g欠弃+1");
+                    lib.skill.shuoye_shufu.sync(player);
+                },
+            },
+            debt: {
+                charlotte: true,
+                silent: true,
+                forced: true,
+                popup: false,
+                trigger: { player: "gainAfter" },
+                filter(event, player) {
+                    if (!(player.storage.shuoye_shufu_debt > 0)) return false;
+                    return !!(event.cards && event.cards.length);
+                },
+                async content(event, trigger, player) {
+                    const debt = player.storage.shuoye_shufu_debt || 0;
+                    if (!debt) return;
+                    game.broadcastAll(function (player) {
+                        player.storage.shuoye_shufu_debt = 0;
+                    }, player);
+                    const num = Math.min(debt, player.countCards("h"));
+                    if (num <= 0) return;
+                    game.log(player, "束缚：需弃置", get.cnNumber(num), "张牌");
+                    await player.chooseToDiscard("h", num, true).set("prompt", "束缚：弃置" + num + "张牌");
+                },
+            },
+        },
+    },
+//#noname-kit-end skill:shuoye_shufu
 };
 
 export default skills;

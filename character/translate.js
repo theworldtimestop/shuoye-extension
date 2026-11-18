@@ -1294,5 +1294,24 @@ shuoye_kuanggu: "狂骨",
     "shuoye_zhuifeng_use": "椎坚【次数】",
     "shuoye_zhuifeng_use_info": "出牌阶段限一次，你可以弃置任意张装备牌，或失去任意点体力，增加等量使用次数。",
 //#noname-kit-end translate:shuoye_zhuifeng_use
+//#noname-kit-begin translate:shuoye_sanlunxia
+    shuoye_sanlunxia: "三轮霞",
+//#noname-kit-end translate:shuoye_sanlunxia
+//#noname-kit-begin translate:shuoye_sanlun
+    shuoye_sanlun: "三轮",
+    shuoye_sanlun_info: `你可${get.poptip("shuoye_sanlun_adapt")}三类效果。`,
+//#noname-kit-end translate:shuoye_sanlun
+//#noname-kit-begin translate:shuoye_yinliu
+    shuoye_yinliu: "阴流",
+    shuoye_yinliu_info: "出牌阶段限一次，你可令一名角色本回合技能失效，然后你对其使用牌无任何限制且牌伤害-1。",
+//#noname-kit-end translate:shuoye_yinliu
+//#noname-kit-begin translate:shuoye_shufu
+    shuoye_shufu: "束缚",
+    shuoye_shufu_info: "牌堆底一张牌对你可见。你可如手牌般使用或打出之，每以此法使用牌时下次获得牌需弃一张牌。",
+//#noname-kit-end translate:shuoye_shufu
+//#noname-kit-begin translate:shuoye_sanlun_adapt
+    shuoye_sanlun_adapt: "适应",
+    shuoye_sanlun_adapt_info: "以下效果各只需适应一次，最多适应 3 种。<br>牌（按牌名，普通杀/火杀/雷杀等属性【杀】分开计算）：该牌对你无效，且不能用于响应你的牌。<br>技能（按技能名）：其指定你时整体取消。<br>技能造成的伤害、失去体力、失去体力上限、翻面：你不会被翻至背面。<br>造成伤害：你造成的伤害 +1。<br>弃牌：弃牌阶段的弃牌数 -1，此后你每弃一次牌再 -1。<br>摸牌：每次摸牌 +1（至多 +3），此后你每摸一次牌再 +1。",
+//#noname-kit-end translate:shuoye_sanlun_adapt
 };
 export default translates;

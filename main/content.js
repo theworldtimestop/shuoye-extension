@@ -361,6 +361,16 @@ export async function content(config, pack) {
             info: "你的回合限一次，开始时或出牌阶段，你可选择自己或里香失去一点体力，你与一名角色【决斗】，期间双方基本牌均视为【杀】。你与因此受到伤害的角色各摸一张牌，若受到伤害角色非你则使用次数+1，然后发动一次【模仿】。",
         });
     }
+    // 【三轮霞】“适应”词条（描述里的超链接）
+    try {
+        if (lib.poptip) {
+            lib.poptip.add({
+                id: "shuoye_sanlun_adapt",
+                name: "适应",
+                info: "以下效果各只需适应一次，最多适应 3 种。<br>牌（按牌名，普通杀/火杀/雷杀等属性【杀】分开计算）：该牌对你无效，且不能用于响应你的牌。<br>技能（按技能名）：其指定你时整体取消。<br>技能造成的伤害、失去体力、失去体力上限、翻面：你不会被翻至背面。<br>造成伤害：你造成的伤害 +1。<br>弃牌：弃牌阶段的弃牌数 -1，此后你每弃一次牌再 -1。<br>摸牌：每次摸牌 +1（至多 +3），此后你每摸一次牌再 +1。",
+            });
+        }
+    } catch (e) {}
     // 【雷之律者】雷电芽衣：名词解释（get.poptip 超链接）、浮雷兜底卡、俱利伽罗副将卡、紫色额外血条样式、BGM 还原
     try {
         if (lib.poptip) {
@@ -450,7 +460,7 @@ export async function content(config, pack) {
             "shuoye_huangquan", "shuoye_kongqirinai", "shuoye_wenyang", "shuoye_ying",
             "shuoye_weiyue", "shuoye_huoguang", "shuoye_longyan",
             "shuoye_majunke", "shuoye_yuantoushanwo", "shuoye_shebengnainyin", "shuoye_quanmoutianbaohuo",
-            "shuoye_luotong", "shuoye_yizhisilang",
+            "shuoye_luotong", "shuoye_yizhisilang", "shuoye_sanlunxia",
         ],
         junk: ["shuoye_xingti", "shuoye_weiershi", "shuoye_ruolian"],
     };

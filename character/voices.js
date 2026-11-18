@@ -118,5 +118,8 @@ const voices = {
 	"#ext:朔夜/audio/skill/shuoye_julijialuo2": "怒吼吧，俱利伽罗！",
 	"#ext:朔夜/audio/die/shuoye_leidianyayi1:die": "对不起，琪亚娜",
 	"#shuoye_leidianyayi:die": "对不起，琪亚娜",
+	// 【三轮霞】阴流 / 束缚（原版技能台词列表与千幻聆音台词页均读此表；键名 = 音频路径）
+	"#ext:朔夜/audio/skill/shuoye_yinliu1": "新阴流·简易领域。",
+	"#ext:朔夜/audio/skill/shuoye_shufu1": "因为穷，还有两个弟弟。",
 };
 export default voices;

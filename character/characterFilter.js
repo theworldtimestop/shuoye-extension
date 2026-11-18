@@ -39,6 +39,7 @@ const quModeAllow = [
 	"shuoye_yizhisilang",
 	"shuoye_richekuanjian",
 	"shuoye_leidianyayi",
+	"shuoye_sanlunxia",
 ];
 
 const characterFilters = {};

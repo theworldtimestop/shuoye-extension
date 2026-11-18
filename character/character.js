@@ -528,6 +528,16 @@ shuoye_weiyan: {
         trashBin: [],
     },
 //#noname-kit-end character:shuoye_leidianyayi
+//#noname-kit-begin character:shuoye_sanlunxia
+    shuoye_sanlunxia: {
+        sex: "female",
+        hp: 3,
+        group: "qun",
+        skills: ["shuoye_sanlun", "shuoye_yinliu", "shuoye_shufu"],
+        img: "extension/朔夜/image/shuoye_sanlunxia.webp",
+        trashBin: [],
+    },
+//#noname-kit-end character:shuoye_sanlunxia
 
 };
 for (let i in characters) {
