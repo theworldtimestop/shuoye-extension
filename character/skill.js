@@ -22742,14 +22742,11 @@ shuoye_weiyan_enter: {
                 charlotte: true,
                 forced: true,
                 popup: false,
-                trigger: { target: "useCardToAfter", global: "useCardAfter" },
-                filter(event, player, name) {
+                trigger: { global: "useCardAfter" },
+                filter(event, player) {
                     if (!event || !event.card || event.player === player) return false;
-                    if (name === "useCardAfter") {
-                        if (event.shuoye_judge_target !== player) return false;
-                    } else if (event.target !== player) {
-                        return false;
-                    }
+                    const toHer = event.shuoye_judge_target === player || (event.targets && event.targets.includes(player));
+                    if (!toHer) return false;
                     const key = lib.skill.shuoye_sanlun.getCardKey(event.card);
                     return !!key && !lib.skill.shuoye_sanlun.hasAdapted(player, key);
                 },
