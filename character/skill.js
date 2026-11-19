@@ -22710,13 +22710,14 @@ shuoye_weiyan_enter: {
                 trigger: { global: ["chooseToUseEnd", "chooseToRespondEnd"] },
                 filter(event, player) {
                     if (!event || !event.result || !event.result.bool) return false;
+                    if (event.player === player) return false;
                     if (event.shuoye_adapted_here) return false;
                     const card = event.result.card || (event.result.cards && event.result.cards[0]);
                     if (!card) return false;
                     let src = null;
-                    if (event.respondTo) {
-                        src = event.respondTo[0];
-                    } else if (event.name === "chooseToRespond" && typeof event.getParent === "function") {
+                    if (event.source && typeof event.source === "object" && event.source.playerid) src = event.source;
+                    if (!src && event.respondTo) src = event.respondTo[0];
+                    if (!src && event.name === "chooseToRespond" && typeof event.getParent === "function") {
                         const parent = event.getParent();
                         src = parent && parent.player;
                     }
