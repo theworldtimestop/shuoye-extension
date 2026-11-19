@@ -22365,6 +22365,7 @@ shuoye_weiyan_enter: {
             "shuoye_sanlun_respondcancel",
             "shuoye_sanlun_respondresult",
             "shuoye_sanlun_cardask",
+            "shuoye_sanlun_shanresult",
             "shuoye_sanlun_respondask",
             "shuoye_sanlun_skillask",
             "shuoye_sanlun_skillban",
@@ -22464,18 +22465,18 @@ shuoye_weiyan_enter: {
         checkRespondBan(card, player, event) {
             const key = lib.skill.shuoye_sanlun.getCardKey(card);
             if (!key) return;
-            let evt = event && typeof event === "object" ? event : _status.event;
-            if (!evt || typeof evt !== "object") return;
-            if (evt.name !== "chooseToRespond") {
-                if (typeof evt.getParent !== "function") return;
-                evt = evt.getParent("chooseToRespond");
-            }
-            if (!evt || typeof evt.getParent !== "function") return;
+            const evt = event && typeof event === "object" ? event : _status.event;
+            if (!evt || typeof evt !== "object" || typeof evt.getParent !== "function") return;
+            const choose = evt.getParent(function (e) {
+                return !!e && (e.name === "chooseToRespond" || e.name === "chooseToUse");
+            }, false, true);
+            if (!choose || typeof choose !== "object") return;
+            if (choose.player === player) return;
             let src = null;
-            const origin = evt.getParent("useCard");
-            if (origin && typeof origin === "object" && origin.player) src = origin.player;
-            if (!src) {
-                const parent = evt.getParent();
+            if (choose.source && typeof choose.source === "object" && choose.source.playerid) src = choose.source;
+            if (!src && choose.respondTo) src = choose.respondTo[0];
+            if (!src && typeof choose.getParent === "function") {
+                const parent = choose.getParent();
                 src = parent && parent.player;
             }
             if (!src || src === player) return;
@@ -22656,6 +22657,39 @@ shuoye_weiyan_enter: {
                 charlotte: true,
                 silent: true,
                 popup: false,
+            },
+            shanresult: {
+                charlotte: true,
+                silent: true,
+                forced: true,
+                popup: false,
+                trigger: {
+                    global: ["bagua_skillAfter", "bazhen_baguaAfter", "rw_bagua_skillAfter", "linglong_baguaAfter", "zc26_bagua_skillAfter"],
+                },
+                filter(event, player) {
+                    const choose = event && event._trigger;
+                    if (!choose || typeof choose !== "object") return false;
+                    if (choose.name !== "chooseToRespond") return false;
+                    if (!choose.result || !choose.result.bool) return false;
+                    const card = choose.result.card || (choose.result.cards && choose.result.cards[0]);
+                    if (!card || get.name(card) !== "shan") return false;
+                    let src = null;
+                    if (choose.source && typeof choose.source === "object" && choose.source.playerid) src = choose.source;
+                    if (!src && choose.respondTo) src = choose.respondTo[0];
+                    if (!src && typeof choose.getParent === "function") {
+                        const parent = choose.getParent();
+                        src = parent && parent.player;
+                    }
+                    if (!src || src !== player) return false;
+                    return lib.skill.shuoye_sanlun.hasAdapted(player, "card:shan");
+                },
+                async content(event, trigger, player) {
+                    const choose = trigger._trigger;
+                    choose.result = { bool: false };
+                    player.popup("适应");
+                    lib.skill.shuoye_sanlun.flashWheel(player);
+                    game.log(player, "适应了", "#g【闪】", "，其响应无效");
+                },
             },
             card: {
                 charlotte: true,
