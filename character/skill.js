@@ -22543,8 +22543,20 @@ shuoye_weiyan_enter: {
             );
             if (key.indexOf("skill:") === 0) lib.skill.shuoye_sanlun.registerBan(player, key.slice(6));
             lib.skill.shuoye_sanlun.addWheel(player);
+            lib.skill.shuoye_sanlun.markAdaptedHere();
             player.popup("适应");
             game.log(player, "适应了", "#g" + label);
+        },
+        markAdaptedHere() {
+            try {
+                const evt = _status.event;
+                if (!evt || typeof evt !== "object" || typeof evt.getParent !== "function") return;
+                const choose = evt.getParent(function (e) {
+                    return !!e && (e.name === "chooseToUse" || e.name === "chooseToRespond");
+                }, false, true);
+                if (choose && typeof choose === "object" && choose !== evt) choose.shuoye_adapted_here = true;
+                if (choose === evt && evt.name && (evt.name === "chooseToUse" || evt.name === "chooseToRespond")) evt.shuoye_adapted_here = true;
+            } catch (e) {}
         },
         registerBan(player, skill) {
             game.broadcastAll(
@@ -22698,6 +22710,7 @@ shuoye_weiyan_enter: {
                 trigger: { global: ["chooseToUseEnd", "chooseToRespondEnd"] },
                 filter(event, player) {
                     if (!event || !event.result || !event.result.bool) return false;
+                    if (event.shuoye_adapted_here) return false;
                     const card = event.result.card || (event.result.cards && event.result.cards[0]);
                     if (!card) return false;
                     let src = null;
@@ -22801,10 +22814,16 @@ shuoye_weiyan_enter: {
                     return false;
                 },
                 async content(event, trigger, player) {
+                    const skill = trigger.name;
+                    const user = trigger.player;
                     trigger.cancel();
                     player.popup("适应");
                     lib.skill.shuoye_sanlun.flashWheel(player);
-                    game.log(player, "适应了", "#g" + get.translation(trigger.name), "，其对你无效");
+                    const info = get.info(skill);
+                    if (info && info.limited && user && typeof user.awakenSkill === "function") {
+                        user.awakenSkill(skill);
+                    }
+                    game.log(player, "适应了", "#g" + get.translation(skill), "，其对你无效");
                 },
             },
             skilldamage: {
@@ -23162,7 +23181,7 @@ shuoye_weiyan_enter: {
                 silent: true,
                 forced: true,
                 popup: false,
-                trigger: { player: ["phaseBegin", "useCardAfter", "gainAfter"], global: ["cardsGotoPileAfter"] },
+                trigger: { player: ["phaseBegin", "useCardAfter", "respondAfter", "gainAfter"], global: ["cardsGotoPileAfter"] },
                 filter(event, player) {
                     return true;
                 },
@@ -23175,7 +23194,7 @@ shuoye_weiyan_enter: {
                 silent: true,
                 forced: true,
                 popup: false,
-                trigger: { player: "useCardBefore" },
+                trigger: { player: ["useCardBefore", "respondBefore"] },
                 filter(event, player) {
                     const cards = event.cards || [];
                     return cards.some(function (card) {
