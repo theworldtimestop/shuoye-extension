@@ -22384,6 +22384,13 @@ shuoye_weiyan_enter: {
         init(player) {
             lib.skill.shuoye_sanlun.ensureGlobal();
             lib.skill.shuoye_sanlun.renderWheels(player);
+            // 【阳间模式】主机权威：三轮上场时再广播一次，避免全局同步技未挂上时
+            // 客机回退到本机配置（描述变了）而主机实际结算仍按旧值（数值没削弱）。
+            try {
+                if (lib.shuoyeIf && typeof lib.shuoyeIf.setQumoshi === "function") {
+                    lib.shuoyeIf.setQumoshi(!!(lib.config && lib.config["extension_朔夜_qumoshi"]));
+                }
+            } catch (e) {}
             lib.skill.shuoye_sanlun.refreshAdaptInfo();
         },
         onremove(player) {
