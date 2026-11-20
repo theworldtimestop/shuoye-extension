@@ -1104,7 +1104,7 @@ const translates = {
 //#noname-kit-end translate:shuoye_qinzheng
 //#noname-kit-begin translate:shuoye_renkang
     shuoye_renkang: "仁抗",
-    shuoye_renkang_info: "每回合各限一次，你使用或打出的牌类别与上一张相同时，可无次数限制使用一张牌并弃置一张牌；不同，则摸一张牌。",
+    shuoye_renkang_info: "你使用或打出的牌类别与上一张相同时，可无次数限制使用一张牌并弃置一张牌；不同，则摸一张牌。",
 //#noname-kit-end translate:shuoye_renkang
 //#noname-kit-begin translate:shuoye_zhiyi
     shuoye_zhiyi: "织衣",

@@ -895,6 +895,9 @@ if (!lib.shuoyeIf) {
                     if (lib.skill && lib.skill.shuoye_sanlun && typeof lib.skill.shuoye_sanlun.refreshAdaptInfo === "function") {
                         lib.skill.shuoye_sanlun.refreshAdaptInfo();
                     }
+                    if (lib.skill && lib.skill.shuoye_renkang && typeof lib.skill.shuoye_renkang.refreshRenkangInfo === "function") {
+                        lib.skill.shuoye_renkang.refreshRenkangInfo();
+                    }
                 } catch (e) {}
             }, value);
         },
@@ -19679,20 +19682,47 @@ const skills = {
                 return "上一张：【" + get.translation(storage) + "】";
             },
         },
+        // 【阳间模式】才限制次数；未开启时保持原版（不限次）。开关为主机权威值，见 lib.shuoyeIf.qumoshi。
+        qumoLimited() {
+            return !!(lib.shuoyeIf && typeof lib.shuoyeIf.qumoshi === "function" && lib.shuoyeIf.qumoshi());
+        },
+        // 回合标识：优先用扩展统一的 lib.shuoyeIf.turnId，缺失时回退 game.phaseNumber
+        qumoTurnId() {
+            try {
+                if (lib.shuoyeIf && typeof lib.shuoyeIf.turnId === "function") return String(lib.shuoyeIf.turnId());
+            } catch (e) {}
+            return String(game.phaseNumber || 0);
+        },
+        renkangInfo() {
+            const base = lib.shuoyeRenkangInfoBase;
+            if (typeof base !== "string") return null;
+            return lib.skill.shuoye_renkang.qumoLimited() ? "每回合各限一次，" + base : base;
+        },
+        refreshRenkangInfo() {
+            const info = lib.skill.shuoye_renkang.renkangInfo();
+            if (!info) return;
+            try {
+                lib.translate["shuoye_renkang_info"] = info;
+            } catch (e) {}
+        },
         filter(event, player) {
             if (player.storage.shuoye_renkang_busy) return false;
             const prev = player.storage.shuoye_renkang_prev;
             if (!prev) return false;
+            if (!lib.skill.shuoye_renkang.qumoLimited()) return true;
+            const turnId = lib.skill.shuoye_renkang.qumoTurnId();
             if (player.storage.shuoye_renkang_last === prev) {
-                return player.storage.shuoye_renkang_turn_use !== game.phaseNumber;
+                return player.storage.shuoye_renkang_turn_use !== turnId;
             }
-            return player.storage.shuoye_renkang_turn_draw !== game.phaseNumber;
+            return player.storage.shuoye_renkang_turn_draw !== turnId;
         },
         async content(event, trigger, player) {
             const last = player.storage.shuoye_renkang_last;
             const prev = player.storage.shuoye_renkang_prev;
+            const limited = lib.skill.shuoye_renkang.qumoLimited();
+            const turnId = limited ? lib.skill.shuoye_renkang.qumoTurnId() : null;
             if (last === prev) {
-                player.storage.shuoye_renkang_turn_use = game.phaseNumber;
+                if (limited) player.storage.shuoye_renkang_turn_use = turnId;
                 player.storage.shuoye_renkang_busy = true;
                 player.addTempSkill("shuoye_renkang_ignore", "phaseUseAfter");
                 try {
@@ -19705,7 +19735,7 @@ const skills = {
                     delete player.storage.shuoye_renkang_busy;
                 }
             } else {
-                player.storage.shuoye_renkang_turn_draw = game.phaseNumber;
+                if (limited) player.storage.shuoye_renkang_turn_draw = turnId;
                 await player.draw();
             }
         },
