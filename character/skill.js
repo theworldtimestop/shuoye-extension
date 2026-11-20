@@ -23024,7 +23024,8 @@ shuoye_weiyan_enter: {
                 async content(event, trigger, player) {
                     const qumoshi = lib.skill.shuoye_sanlun.qumoshi();
                     if (event.triggername === "drawBegin") {
-                        const bonus = qumoshi ? 1 : Math.min(3, player.storage.shuoye_sanlun_drawup || 0);
+                        const adapted = lib.skill.shuoye_sanlun.hasAdapted(player, "cls:draw");
+                        const bonus = qumoshi ? (adapted ? 1 : 0) : Math.min(3, player.storage.shuoye_sanlun_drawup || 0);
                         if (bonus > 0 && !trigger.numFixed) trigger.num += bonus;
                         return;
                     }
