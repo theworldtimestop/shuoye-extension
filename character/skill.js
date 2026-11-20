@@ -19681,12 +19681,18 @@ const skills = {
         },
         filter(event, player) {
             if (player.storage.shuoye_renkang_busy) return false;
-            return !!player.storage.shuoye_renkang_prev;
+            const prev = player.storage.shuoye_renkang_prev;
+            if (!prev) return false;
+            if (player.storage.shuoye_renkang_last === prev) {
+                return player.storage.shuoye_renkang_turn_use !== game.phaseNumber;
+            }
+            return player.storage.shuoye_renkang_turn_draw !== game.phaseNumber;
         },
         async content(event, trigger, player) {
             const last = player.storage.shuoye_renkang_last;
             const prev = player.storage.shuoye_renkang_prev;
             if (last === prev) {
+                player.storage.shuoye_renkang_turn_use = game.phaseNumber;
                 player.storage.shuoye_renkang_busy = true;
                 player.addTempSkill("shuoye_renkang_ignore", "phaseUseAfter");
                 try {
@@ -19699,6 +19705,7 @@ const skills = {
                     delete player.storage.shuoye_renkang_busy;
                 }
             } else {
+                player.storage.shuoye_renkang_turn_draw = game.phaseNumber;
                 await player.draw();
             }
         },
