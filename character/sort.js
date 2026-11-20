@@ -13,6 +13,8 @@ const characterSort = {
 	shuoye_sort_qiongmingsanjie: ["shuoye_weiyue", "shuoye_huoguang", "shuoye_wuxinchan"],
 	shuoye_sort_qunyou: ["shuoye_ruolian"],
 	shuoye_sort_taren: ["shuoye_bojiaoyang"],
+	// 无敌少侠
+	shuoye_sort_wudishaoxia: ["shuoye_nuolan", "shuoye_make"],
 };
 
 const list = Object.values(characterSort).flat();
@@ -38,6 +40,7 @@ const characterSortTranslate = {
 	shuoye_sort_zhanfu: "斩服少女",
 	shuoye_sort_tongsu: "同素异形",
 	shuoye_sort_taren: "他人设计",
+	shuoye_sort_wudishaoxia: "无敌少侠",
 };
 
 export { characterSort, characterSortTranslate };

@@ -288,5 +288,68 @@ const cards = {
         },
     },
 //#noname-kit-end card:shuoye_tianjizhijing
+    // 【维特鲁姆冲击】专属的【兵临城下】变体：展示数 = 4 + 底牌花色种类数
+//#noname-kit-begin card:shuoye_weitelumu_binglin
+    shuoye_weitelumu_binglin: {
+        fullskin: true,
+        image: "image/card/binglinchengxiax.png",
+        type: "trick",
+        enable: true,
+        filterTarget: lib.filter.notMe,
+        async content(event, trigger, player) {
+            const { target } = event;
+            if (!player.isIn() || !target.isIn()) {
+                return;
+            }
+            const suits = (event.cards || []).reduce(function (list, card) {
+                const suit = get.suit(card);
+                if (suit && !list.includes(suit)) {
+                    list.push(suit);
+                }
+                return list;
+            }, []).length;
+            const num = 4 + Math.max(0, suits);
+            event.showCards = get.cards(num, true);
+            await game.cardsGotoOrdering(event.showCards);
+            await player.showCards(event.showCards, get.translation(player) + "使用了【" + get.translation(event.card) + "】", true).set("clearArena", false);
+            if (player.isIn() && target.isIn() && event.showCards.length) {
+                for (const card of event.showCards.slice()) {
+                    if (get.name(card) === "sha" && player.canUse(card, target, false)) {
+                        event.showCards.remove(card);
+                        await player.useCard({
+                            card,
+                            targets: [target],
+                            addCount: false,
+                        });
+                    }
+                }
+            }
+            game.broadcastAll(ui.clear);
+            if (event.showCards.length) {
+                await game.cardsGotoPile(event.showCards.reverse(), "insert");
+            }
+        },
+        ai: {
+            basic: {
+                useful: 4,
+                value: 3,
+            },
+            order: 4,
+            result: {
+                target(player, target, card, isLink) {
+                    if (get.effect(target, { name: "sha" }, player, target) === 0) {
+                        return 0;
+                    }
+                    return -2.5;
+                },
+            },
+            tag: {
+                respond: 1,
+                respondShan: 1,
+                damage: 1,
+            },
+        },
+    },
+//#noname-kit-end card:shuoye_weitelumu_binglin
 };
 export default cards;

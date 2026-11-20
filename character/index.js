@@ -58,6 +58,23 @@ game.import("character", function () {
     if (lib.shuoyeIf && lib.shuoyeIf.qumoshi()) {
         shuoye.translate["shuoye_if_wuliang_info"] = "该模式不可用。";
     }
+    // 【阳间模式】维特鲁姆手刀 / 维特鲁姆锁喉 在该模式下整技禁用（filter 见 skill.js）。
+    // 与【无量空处】一致：这里只存原描述并给个初始值，真正生效的值由房主广播的
+    // _status.shuoyeQumoshi 决定（见 lib.shuoyeIf.setQumoshi → refreshWeitelumuInfo）。
+    if (!lib.shuoyeWeitelumuInfoBase) {
+        lib.shuoyeWeitelumuInfoBase = {
+            shuoye_weitelumu_shoudao: shuoye.translate["shuoye_weitelumu_shoudao_info"],
+            shuoye_weitelumu_suohou: shuoye.translate["shuoye_weitelumu_suohou_info"],
+            shuoye_weitelumu_bainian: shuoye.translate["shuoye_weitelumu_bainian_info"],
+            shuoye_wudi: shuoye.translate["shuoye_wudi_info"],
+        };
+    }
+    if (lib.shuoyeIf && lib.shuoyeIf.qumoshi()) {
+        shuoye.translate["shuoye_weitelumu_shoudao_info"] = "该模式不可用。";
+        shuoye.translate["shuoye_weitelumu_suohou_info"] = "该模式不可用。";
+        shuoye.translate["shuoye_weitelumu_bainian_info"] = "你每回合首次受到或造成伤害后，可与其同时失去一点体力。";
+        shuoye.translate["shuoye_wudi_info"] = "锁定技，你体力值减少一点后，下一次摸牌数+1、下一次回复量+1/2（向下取整）；你每次脱离濒死状态后，本局游戏你造成的伤害+1。";
+    }
     lib.translate["shuoye_character_config"] = "朔夜";
     if (!lib.config[`extension_朔夜_characterPack_shuoye_enable`]) {
 		game.saveExtensionConfig("朔夜", "characterPack_shuoye_enable", true);

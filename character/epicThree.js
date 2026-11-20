@@ -44,7 +44,7 @@ const translates = {
 //#noname-kit-begin translate:shuoye_wuwei
 	shuoye_wuwei: "无为",
 	shuoye_wuwei_info:
-		"你手牌数始终为0。有牌非因使用或打出进入弃牌堆时，你体力上限+1（体力不满改为回复一点体力）（每轮每名角色限一次）。若其中存在可以使用的牌，则你可于此回合结束后使用其中一张。一名角色使用或打出牌后，若其手牌数大于体力上限，弃置一张牌。",
+		"你手牌数始终为0。有牌非因使用或打出进入弃牌堆时，你体力上限+1（体力不满改为回复一点体力）（每轮每名角色限一次）。若其中存在可以使用的牌，则你可于此回合结束后使用其中一张，你可以失去1点体力上限，令你以此法使用的牌不可响应。一名角色使用或打出牌后，若其手牌数大于体力上限，弃置一张牌。",
 //#noname-kit-end translate:shuoye_wuwei
 //#noname-kit-begin translate:shuoye_xituo
 	shuoye_xituo: "希拓",
@@ -79,7 +79,7 @@ const skills = {
 //#noname-kit-begin skill:shuoye_wuwei
 	shuoye_wuwei: {
 		forced: true,
-		group: ["shuoye_wuwei_hand", "shuoye_wuwei_overflow", "shuoye_wuwei_reset", "shuoye_wuwei_after"],
+		group: ["shuoye_wuwei_hand", "shuoye_wuwei_overflow", "shuoye_wuwei_reset", "shuoye_wuwei_after", "shuoye_wuwei_noresponse"],
 		trigger: { global: ["loseAfter", "cardsDiscardAfter", "loseAsyncAfter"] },
 		filter(event, player) {
 			if (event.name.startsWith("lose")) {
@@ -135,6 +135,31 @@ const skills = {
 				}
 			}
 			return _status.currentPhase || null;
+		},
+		// 「令其不可响应」只对真能被响应的牌有意义：普通锦囊可被【无懈可击】响应，伤害牌可被目标响应。
+		// 延时锦囊的【无懈可击】询问发生在判定时（phaseJudge），useCard 上的 nowuxie 覆盖不到，故不询问。
+		canBeResponded(card) {
+			if (!card) {
+				return false;
+			}
+			const type = get.type(card);
+			if (type === "trick") {
+				return true;
+			}
+			if ((get.tag(card, "damage") || 0) > 0) {
+				return true;
+			}
+			return ["juedou", "jiedao", "nanman", "wanjian"].includes(get.name(card));
+		},
+		// 人机是否愿意付体力上限：满体力时不付（此时扣上限等于真掉一点体力），只在响应会影响结果的牌上付
+		shouldPayMaxHp(player, card) {
+			if (!player || !card || player.maxHp <= 1) {
+				return false;
+			}
+			if (player.hp >= player.maxHp) {
+				return false;
+			}
+			return lib.skill.shuoye_wuwei.canBeResponded(card);
 		},
 		async content(event, trigger, player) {
 			const source = lib.skill.shuoye_wuwei.getSource(trigger);
@@ -222,31 +247,94 @@ const skills = {
 				async content(event, trigger, player) {
 					const pool = Array.isArray(player.storage.shuoyeWuweiPending) ? player.storage.shuoyeWuweiPending.slice() : [];
 					player.storage.shuoyeWuweiPending = [];
-					const cards = pool.filter(card => get.position(card, true) === "d" && player.hasUseTarget(card));
-					if (!cards.length) {
+					const usable = pool.filter(card => get.position(card, true) === "d" && player.hasUseTarget(card));
+					if (!usable.length) {
 						return;
 					}
 					const prefix = "shuoye_wuwei_after_";
-					const list = cards.map((card, index) => [prefix + index, "使用【" + get.translation(card) + "】"]);
+					const list = usable.map((card, index) => [prefix + index, "使用【" + get.translation(card) + "】"]);
 					const next = player.chooseButton(["###无为：是否使用本回合进入弃牌堆的牌？###<div class=\"text center\">只能选择其中一张使用，或取消</div>", [list, "tdnodes"]], [0, 1]);
-					if (!_status.connectMode) {
-						next.set("ai", button => {
-							const player2 = get.player();
-							if (!button || typeof button.link !== "string" || !button.link.startsWith(prefix)) return 0;
-							const card = cards[parseInt(button.link.slice(prefix.length))];
-							return card ? player2.getUseValue(card) : 0;
-						});
-					}
+					// ai 不闭包外层变量：牌表挂在事件上，函数只从 get.event()/get.player() 取值，客机执行也安全
+					next.set("shuoyeWuweiPick", usable);
+					next.set("ai", button => {
+						const player2 = get.player();
+						const cards2 = get.event().shuoyeWuweiPick;
+						if (!button || typeof button.link !== "string" || !Array.isArray(cards2)) {
+							return 0;
+						}
+						const prefix2 = "shuoye_wuwei_after_";
+						if (button.link.indexOf(prefix2) !== 0) {
+							return 0;
+						}
+						const card = cards2[parseInt(button.link.slice(prefix2.length))];
+						return card ? player2.getUseValue(card) : 0;
+					});
 					const result = await next.forResult();
-					if (result && result.bool && result.links && result.links.length) {
-						const link = result.links[0];
-						if (typeof link === "string" && link.startsWith(prefix)) {
-							const card = cards[parseInt(link.slice(prefix.length))];
-							if (card && get.position(card, true) === "d" && player.hasUseTarget(card)) {
-								await player.chooseUseTarget(card, true).forResult();
+					if (!result || !result.bool || !Array.isArray(result.links) || !result.links.length) {
+						return;
+					}
+					const link = result.links[0];
+					if (typeof link !== "string" || link.indexOf(prefix) !== 0) {
+						return;
+					}
+					const card = usable[parseInt(link.slice(prefix.length))];
+					if (!card || get.position(card, true) !== "d" || !player.hasUseTarget(card)) {
+						return;
+					}
+					// 增强：你可以失去1点体力上限，令你以此法使用的这张牌不可响应
+					let noresponse = false;
+					if (player.maxHp > 1 && lib.skill.shuoye_wuwei.canBeResponded(card)) {
+						const willing = lib.skill.shuoye_wuwei.shouldPayMaxHp(player, card);
+						const bool = await player
+							.chooseBool("无为：是否失去1点体力上限，令你使用的" + get.translation(card) + "不可响应？")
+							.set("shuoyeWuweiPay", !!willing)
+							.set("ai", () => !!get.event().shuoyeWuweiPay)
+							.forResult();
+						if (bool && bool.bool) {
+							await player.loseMaxHp();
+							if (!player.isAlive()) {
+								return;
 							}
+							if (!player.hasUseTarget(card)) {
+								// 失去上限后该牌已无合法目标：返还上限，避免白付代价
+								await player.gainMaxHp();
+								game.log(player, "无法使用", card, "，返还了体力上限");
+								return;
+							}
+							noresponse = true;
 						}
 					}
+					if (noresponse) {
+						player.storage.shuoyeWuweiNoResponse = true;
+					}
+					try {
+						await player.chooseUseTarget(card, true).forResult();
+					} finally {
+						delete player.storage.shuoyeWuweiNoResponse;
+					}
+				},
+			},
+			noresponse: {
+				charlotte: true,
+				forced: true,
+				silent: true,
+				popup: false,
+				trigger: { player: "useCard" },
+				filter(event, player) {
+					return !!player.storage.shuoyeWuweiNoResponse;
+				},
+				async content(event, trigger, player) {
+					delete player.storage.shuoyeWuweiNoResponse;
+					if (!Array.isArray(trigger.directHit)) {
+						trigger.directHit = [];
+					}
+					// directHit：目标不能使用/打出牌响应；nowuxie：不能被【无懈可击】响应
+					trigger.directHit.addArray(game.players);
+					if (Array.isArray(game.dead) && game.dead.length) {
+						trigger.directHit.addArray(game.dead);
+					}
+					trigger.nowuxie = true;
+					game.log(player, "令", trigger.card, "不可响应");
 				},
 			},
 		},

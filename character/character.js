@@ -538,7 +538,27 @@ shuoye_weiyan: {
         trashBin: [],
     },
 //#noname-kit-end character:shuoye_sanlunxia
-
+    // ===== 【无敌少侠】全局侠 / Invincible =====
+//#noname-kit-begin character:shuoye_nuolan
+    shuoye_nuolan: {
+        sex: "male",
+        hp: 4,
+        group: "qun",
+        skills: ["shuoye_zhengfu", "shuoye_weitelumu_feixing", "shuoye_weitelumu_shoudao"],
+        img: "extension/朔夜/image/shuoye_nuolan.png",
+        trashBin: [],
+    },
+//#noname-kit-end character:shuoye_nuolan
+//#noname-kit-begin character:shuoye_make
+    shuoye_make: {
+        sex: "male",
+        hp: 4,
+        group: "qun",
+        skills: ["shuoye_wudi", "shuoye_weitelumu_feixing", "shuoye_weitelumu_bainian", "shuoye_weitelumu_suohou"],
+        img: "extension/朔夜/image/shuoye_make.png",
+        trashBin: [],
+    },
+//#noname-kit-end character:shuoye_make
 };
 for (let i in characters) {
     characters[i].img = characters[i].img || `extension/朔夜/image/character/${i}.jpg`;

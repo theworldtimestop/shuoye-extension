@@ -892,6 +892,9 @@ if (!lib.shuoyeIf) {
                     if (lib.shuoyeIf && typeof lib.shuoyeIf.refreshWuliangInfo === "function") {
                         lib.shuoyeIf.refreshWuliangInfo();
                     }
+                    if (lib.shuoyeIf && typeof lib.shuoyeIf.refreshWeitelumuInfo === "function") {
+                        lib.shuoyeIf.refreshWeitelumuInfo();
+                    }
                     if (lib.skill && lib.skill.shuoye_sanlun && typeof lib.skill.shuoye_sanlun.refreshAdaptInfo === "function") {
                         lib.skill.shuoye_sanlun.refreshAdaptInfo();
                     }
@@ -905,6 +908,27 @@ if (!lib.shuoyeIf) {
             try {
                 lib.translate["shuoye_if_wuliang_info"] = lib.shuoyeIf.qumoshi() ? "该模式不可用。" : base;
             } catch (e) {}
+        },
+        // 按阳间模式刷新【无敌少侠】两名角色的技能描述
+        // （原描述存在 lib.shuoyeWeitelumuInfoBase，由 character/index.js 首次记录）
+        // 手刀/锁喉：整技禁用；拜年：去掉“回复”那一段；无敌：去掉体力上限+1
+        refreshWeitelumuInfo() {
+            const base = lib.shuoyeWeitelumuInfoBase;
+            if (!base || typeof base !== "object") return;
+            const qumoshi = lib.shuoyeIf.qumoshi();
+            const alter = {
+                shuoye_weitelumu_shoudao: "该模式不可用。",
+                shuoye_weitelumu_suohou: "该模式不可用。",
+                shuoye_weitelumu_bainian: "你每回合首次受到或造成伤害后，可与其同时失去一点体力。",
+                shuoye_wudi: "锁定技，你体力值减少一点后，下一次摸牌数+1、下一次回复量+1/2（向下取整）；你每次脱离濒死状态后，本局游戏你造成的伤害+1。",
+            };
+            for (const skill in alter) {
+                const text = base[skill];
+                if (typeof text !== "string") continue;
+                try {
+                    lib.translate[skill + "_info"] = qumoshi ? alter[skill] : text;
+                } catch (e) {}
+            }
         },
         // ---------------- 无量空处：领域状态 ----------------
         domainOwner() {
@@ -23307,6 +23331,1180 @@ shuoye_weiyan_enter: {
         },
     },
 //#noname-kit-end skill:shuoye_shufu
+    // ===== 【无敌少侠】全局侠 / Invincible =====
+//#noname-kit-begin skill:shuoye_weitelumu_feixing
+    shuoye_weitelumu_feixing: {
+        audio: "ext:朔夜/audio/skill:1",
+        trigger: {
+            player: "phaseUseEnd",
+        },
+        filter(event, player) {
+            return game.hasPlayer(function (current) {
+                return current != player && current.isIn() && current.isAlive();
+            });
+        },
+        async cost(event, trigger, player) {
+            event.result = await player
+                .chooseTarget({
+                    prompt: "维特鲁姆飞行：与一名其他角色交换座位",
+                    filterTarget(card, player2, target) {
+                        return target != player2 && target.isIn() && target.isAlive();
+                    },
+                    ai(target) {
+                        return 1 + get.attitude(get.player(), target) / 5;
+                    },
+                })
+                .forResult();
+        },
+        async content(event, trigger, player) {
+            const target = event.targets && event.targets[0];
+            if (!target || !target.isIn() || !player.isIn()) {
+                return;
+            }
+            if (typeof game.swapSeat == "function") {
+                game.broadcastAll(function (player1, player2) {
+                    game.swapSeat(player1, player2);
+                }, player, target);
+                game.log(player, "与", target, "交换了座位");
+            }
+            for (const current of [player, target]) {
+                if (!current.isIn() || !current.isAlive()) {
+                    continue;
+                }
+                if (!current.countCards("hs")) {
+                    continue;
+                }
+                await current
+                    .chooseToUse({
+                        prompt: "维特鲁姆飞行：你可以使用一张牌",
+                    })
+                    .forResult();
+            }
+        },
+    },
+//#noname-kit-end skill:shuoye_weitelumu_feixing
+//#noname-kit-begin skill:shuoye_weitelumu_shoudao
+    shuoye_weitelumu_shoudao: {
+        audio: "ext:朔夜/audio/skill:1",
+        forced: true,
+        locked: true,
+        trigger: {
+            source: "damageAfter",
+        },
+        filter(event, player) {
+            // 【阳间模式】整技禁用
+            if (lib.shuoyeIf && lib.shuoyeIf.qumoshi()) {
+                return false;
+            }
+            const target = event.player;
+            if (!target || !target.isIn() || !target.isAlive()) {
+                return false;
+            }
+            if (!(event.num > 0)) {
+                return false;
+            }
+            const rec = event._shuoyeShoudao;
+            if (rec && typeof rec.hp == "number" && typeof rec.maxHp == "number") {
+                return get.hpColor({ hp: rec.hp, maxHp: rec.maxHp }) != get.hpColor(target);
+            }
+            // 没有记到伤害前的体力时，用本次实际掉血量回推
+            const lost = Math.max(0, event.num - (event.hujia || 0));
+            const hpBefore = Math.min(target.maxHp, Math.max(0, target.hp + lost));
+            return get.hpColor({ hp: hpBefore, maxHp: target.maxHp }) != get.hpColor(target);
+        },
+        async content(event, trigger, player) {
+            const target = trigger.player;
+            if (!target || !target.isIn() || !target.isAlive()) {
+                return;
+            }
+            await target.loseHp(1);
+        },
+        group: ["shuoye_weitelumu_shoudao_record"],
+        subSkill: {
+            record: {
+                sub: true,
+                firstDo: true,
+                forced: true,
+                popup: false,
+                trigger: {
+                    source: "damageBegin1",
+                },
+                filter(event, player) {
+                    if (lib.shuoyeIf && lib.shuoyeIf.qumoshi()) {
+                        return false;
+                    }
+                    return !!event.player;
+                },
+                content(event, trigger, player) {
+                    const target = trigger.player;
+                    if (!target) {
+                        return;
+                    }
+                    trigger._shuoyeShoudao = {
+                        hp: target.hp,
+                        maxHp: target.maxHp,
+                    };
+                },
+            },
+        },
+    },
+//#noname-kit-end skill:shuoye_weitelumu_shoudao
+//#noname-kit-begin skill:shuoye_weitelumu_zitai
+    shuoye_weitelumu_zitai: {
+        audio: "ext:朔夜/audio/skill:1",
+        forced: true,
+        locked: true,
+        mod: {
+            attackRange(player, num) {
+                return Math.max(0, player.maxHp);
+            },
+            cardUsable(card, player, num) {
+                if (card && get.name(card) == "sha") {
+                    return Math.max(0, player.maxHp);
+                }
+            },
+        },
+        group: ["shuoye_weitelumu_zitai_draw"],
+        subSkill: {
+            draw: {
+                sub: true,
+                forced: true,
+                popup: false,
+                trigger: {
+                    player: "phaseDrawBegin2",
+                },
+                filter(event, player) {
+                    return !event.numFixed;
+                },
+                content(event, trigger, player) {
+                    game.trySkillAudio("shuoye_weitelumu_zitai", player);
+                    trigger.num = Math.max(0, player.maxHp);
+                },
+            },
+        },
+    },
+//#noname-kit-end skill:shuoye_weitelumu_zitai
+//#noname-kit-begin skill:shuoye_weitelumu_zhouji
+    shuoye_weitelumu_zhouji: {
+        audio: "ext:朔夜/audio/skill:1",
+        group: ["shuoye_weitelumu_zhouji_give", "shuoye_weitelumu_zhouji_take"],
+        subSkill: {
+            give: {
+                sub: true,
+                trigger: {
+                    source: "damageBegin2",
+                },
+                filter(event, player) {
+                    return event.source == player && event.player && event.player != player && event.player.isIn() && event.player.isAlive();
+                },
+                async cost(event, trigger, player) {
+                    game.trySkillAudio("shuoye_weitelumu_zhouji", player);
+                    event.result = await player
+                        .chooseBool({
+                            prompt: "维特鲁姆肘击：是否摸一张牌令此伤害+1？",
+                        })
+                        .set("ai", function () {
+                            return true;
+                        })
+                        .forResult();
+                },
+                async content(event, trigger, player) {
+                    const target = trigger.player;
+                    await player.draw(1);
+                    trigger.num += 1;
+                    if (!target.isIn() || !target.isAlive() || !target.countCards("he")) {
+                        return;
+                    }
+                    const discard = await target
+                        .chooseToDiscard({
+                            position: "he",
+                            prompt: "维特鲁姆肘击：是否弃置一张牌令此伤害不变？",
+                        })
+                        .set("shuoyeDamage", trigger.num)
+                        .set("ai", function (card) {
+                            const evt = get.event();
+                            const owner = evt.player;
+                            if (!owner) {
+                                return -1;
+                            }
+                            if (owner.hp - evt.shuoyeDamage <= 0) {
+                                return 8 - get.value(card);
+                            }
+                            return -1;
+                        })
+                        .forResult();
+                    if (discard.bool) {
+                        trigger.num -= 1;
+                    }
+                },
+            },
+            take: {
+                sub: true,
+                trigger: {
+                    player: "damageBegin2",
+                },
+                filter(event, player) {
+                    return event.source && event.source != player && event.source.isIn() && event.source.isAlive();
+                },
+                async cost(event, trigger, player) {
+                    game.trySkillAudio("shuoye_weitelumu_zhouji", player);
+                    event.result = await player
+                        .chooseBool({
+                            prompt: "维特鲁姆肘击：是否摸一张牌令此伤害-1？",
+                        })
+                        .set("ai", function () {
+                            return true;
+                        })
+                        .forResult();
+                },
+                async content(event, trigger, player) {
+                    const source = trigger.source;
+                    await player.draw(1);
+                    const before = trigger.num;
+                    trigger.num = Math.max(0, before - 1);
+                    const reduced = before - trigger.num;
+                    if (!source.isIn() || !source.isAlive() || !source.countCards("he")) {
+                        return;
+                    }
+                    const discard = await source
+                        .chooseToDiscard({
+                            position: "he",
+                            prompt: "维特鲁姆肘击：是否弃置一张牌令此伤害不变？",
+                        })
+                        .set("shuoyeLethal", reduced > 0 && player.hp - trigger.num > 0 && player.hp - (trigger.num + reduced) <= 0)
+                        .set("ai", function (card) {
+                            const evt = get.event();
+                            if (evt.shuoyeLethal) {
+                                return 8 - get.value(card);
+                            }
+                            return -1;
+                        })
+                        .forResult();
+                    if (discard.bool) {
+                        trigger.num += reduced;
+                    }
+                },
+            },
+        },
+    },
+//#noname-kit-end skill:shuoye_weitelumu_zhouji
+//#noname-kit-begin skill:shuoye_weitelumu_baoQuan
+    shuoye_weitelumu_baoQuan: {
+        audio: "ext:朔夜/audio/skill:1",
+        enable: "chooseToUse",
+        position: "h",
+        selectCard: 2,
+        filterCard(card, player) {
+            if (get.itemtype(card) != "card") {
+                return false;
+            }
+            const selected = ui.selected.cards;
+            if (!selected || !selected.length) {
+                return true;
+            }
+            return card != selected[0] && get.name(card) == get.name(selected[0]);
+        },
+        filter(event, player) {
+            return lib.skill.shuoye_weitelumu_baoQuan.hasPair(player);
+        },
+        viewAsFilter(player) {
+            return lib.skill.shuoye_weitelumu_baoQuan.hasPair(player);
+        },
+        viewAs(selectedCards) {
+            const card = selectedCards && selectedCards[0];
+            if (!card) {
+                return {
+                    name: "sha",
+                };
+            }
+            const result = {
+                name: get.name(card),
+                extraData: {
+                    shuoyeBaoQuan: true,
+                },
+            };
+            const nature = get.nature(card);
+            if (nature) {
+                result.nature = nature;
+            }
+            return result;
+        },
+        onuse(result, player) {
+            game.trySkillAudio("shuoye_weitelumu_baoQuan", player);
+        },
+        prompt: "将两张同名牌当一张牌使用",
+        check(card) {
+            return 6 - get.value(card);
+        },
+        hasPair(player) {
+            const names = [];
+            for (const card of player.getCards("h")) {
+                const name = get.name(card);
+                if (names.includes(name)) {
+                    return true;
+                }
+                names.push(name);
+            }
+            return false;
+        },
+        isOurs(card) {
+            if (!card) {
+                return false;
+            }
+            if (card.extraData && card.extraData.shuoyeBaoQuan) {
+                return true;
+            }
+            if (Array.isArray(card.cards)) {
+                return card.cards.some(function (card2) {
+                    return card2 && lib.skill.shuoye_weitelumu_baoQuan.isOurs(card2);
+                });
+            }
+            return false;
+        },
+        group: ["shuoye_weitelumu_baoQuan_boost", "shuoye_weitelumu_baoQuan_record", "shuoye_weitelumu_baoQuan_draw"],
+        subSkill: {
+            boost: {
+                sub: true,
+                forced: true,
+                popup: false,
+                charlotte: true,
+                trigger: {
+                    player: "useCard",
+                },
+                filter(event, player) {
+                    return lib.skill.shuoye_weitelumu_baoQuan.isOurs(event.card);
+                },
+                content(event, trigger, player) {
+                    // baseDamage 同时是伤害与回复事件的默认基数（player.recover/damage 里
+                    // next.num = (event.baseDamage || 1)），所以“伤害/回复基数+1”只在这里加一次，
+                    // 不能再额外写 recoverBegin 的 +1，否则桃会变成 1+1+1=3
+                    trigger.baseDamage += 1;
+                    trigger._shuoyeBaoQuanHit = 0;
+                },
+            },
+            record: {
+                sub: true,
+                forced: true,
+                popup: false,
+                charlotte: true,
+                // 同一时机（damageAfter）要排在【维特鲁姆手刀】之前
+                priority: 10,
+                trigger: {
+                    global: ["damageAfter", "recoverAfter"],
+                },
+                filter(event, player) {
+                    if (!lib.skill.shuoye_weitelumu_baoQuan.isOurs(event.card)) {
+                        return false;
+                    }
+                    if (!(event.num > 0)) {
+                        return false;
+                    }
+                    const use = event.getParent("useCard");
+                    return !!(use && lib.skill.shuoye_weitelumu_baoQuan.isOurs(use.card));
+                },
+                content(event, trigger, player) {
+                    const use = trigger.getParent("useCard");
+                    if (use) {
+                        use._shuoyeBaoQuanHit = 1;
+                    }
+                },
+            },
+            draw: {
+                sub: true,
+                forced: true,
+                popup: false,
+                charlotte: true,
+                trigger: {
+                    player: ["useCardAfter", "useCardCancelled"],
+                },
+                filter(event, player) {
+                    if (!lib.skill.shuoye_weitelumu_baoQuan.isOurs(event.card)) {
+                        return false;
+                    }
+                    return event._shuoyeBaoQuanHit !== 1;
+                },
+                async content(event, trigger, player) {
+                    await player.draw(1);
+                },
+            },
+        },
+    },
+//#noname-kit-end skill:shuoye_weitelumu_baoQuan
+//#noname-kit-begin skill:shuoye_weitelumu_chongji
+    shuoye_weitelumu_chongji: {
+        audio: "ext:朔夜/audio/skill:1",
+        enable: "phaseUse",
+        usable: 1,
+        position: "h",
+        selectCard: [2, Infinity],
+        filterCard(card, player) {
+            return get.itemtype(card) == "card";
+        },
+        filter(event, player) {
+            if (player.countCards("h") < 2) {
+                return false;
+            }
+            return game.hasPlayer(function (current) {
+                return current != player && current.isIn() && current.isAlive();
+            });
+        },
+        viewAs: {
+            name: "shuoye_weitelumu_binglin",
+        },
+        onuse(result, player) {
+            game.trySkillAudio("shuoye_weitelumu_chongji", player);
+        },
+        prompt: "将至少两张手牌当【兵临城下】使用",
+        check(card) {
+            return 6 - get.value(card);
+        },
+        ai: {
+            order: 4,
+            result: {
+                target(player, target) {
+                    if (get.effect(target, { name: "sha" }, player, player) === 0) {
+                        return 0;
+                    }
+                    return -2;
+                },
+            },
+        },
+    },
+//#noname-kit-end skill:shuoye_weitelumu_chongji
+//#noname-kit-begin skill:shuoye_zhengfu
+    shuoye_zhengfu: {
+        audio: "ext:朔夜/audio/skill:1",
+        dutySkill: true,
+        enable: "phaseUse",
+        usable: 1,
+        derivation: ["shuoye_weitelumu_chongji", "shuoye_weitelumu_zitai", "shuoye_weitelumu_zhouji", "shuoye_weitelumu_baoQuan"],
+        filter(event, player) {
+            return !player.storage.shuoye_zhengfu;
+        },
+        prompt: "摸两张牌，然后可令一名角色观看并获得你的一张牌",
+        async content(event, trigger, player) {
+            await player.draw(2);
+            if (!player.countCards("h")) {
+                return;
+            }
+            if (!game.hasPlayer(function (current) {
+                return current.isIn() && current.isAlive();
+            })) {
+                return;
+            }
+            const result = await player
+                .chooseTarget({
+                    prompt: "征服：令一名角色观看并获得你的一张牌",
+                    filterTarget(card, player2, target) {
+                        return target.isIn() && target.isAlive();
+                    },
+                    ai(target) {
+                        return target == get.player() ? 0.5 : 1;
+                    },
+                })
+                .forResult();
+            const target = result && result.targets ? result.targets[0] : null;
+            if (!target || !target.isIn() || !target.isAlive()) {
+                return;
+            }
+            lib.skill.shuoye_zhengfu.cleanup(player);
+            const gain = await target
+                .gainPlayerCard({
+                    target: player,
+                    position: "h",
+                    visible: true,
+                    forced: true,
+                    selectButton: 1,
+                    prompt: "征服：观看并获得" + get.translation(player) + "的一张牌",
+                })
+                .forResult();
+            const cards = gain && Array.isArray(gain.cards) ? gain.cards.slice(0) : [];
+            if (!cards.length) {
+                return;
+            }
+            target.addGaintag(cards, "shuoye_zhengfu");
+            // gaintag 会在牌离开区域时被引擎清除，另外在牌对象上记一份，供结算中的伤害/成败判定使用
+            for (const card of cards) {
+                card.shuoye_zhengfu = true;
+                if (card.storage) {
+                    card.storage.shuoye_zhengfu = true;
+                }
+            }
+            target.addSkill("shuoye_zhengfu_buff");
+            player.markSkill("shuoye_zhengfu");
+            game.log(target, "获得了被【征服】标记的牌");
+        },
+        ai: {
+            order: 8,
+            result: {
+                player(player) {
+                    return 2;
+                },
+            },
+        },
+        mark: true,
+        marktext: "征",
+        intro: {
+            content: "使命进行中：被标记的牌无任何限制且不计入次数限制，伤害与回复量+1。",
+        },
+        group: ["shuoye_zhengfu_achieve", "shuoye_zhengfu_fail"],
+        onremove(player) {
+            lib.skill.shuoye_zhengfu.cleanup(player);
+        },
+        cleanup(player) {
+            const tag = "shuoye_zhengfu";
+            const pool = game.players.concat(game.dead);
+            for (const current of pool) {
+                if (current.hasSkill("shuoye_zhengfu_buff")) {
+                    current.removeSkill("shuoye_zhengfu_buff");
+                }
+                const tagged = current.getCards("hejs", function (card) {
+                    return card.hasGaintag && card.hasGaintag(tag);
+                });
+                if (tagged.length) {
+                    current.removeGaintag(tag, tagged);
+                }
+                for (const card of current.getCards("hejsx")) {
+                    if (lib.skill.shuoye_zhengfu_buff.isMarked(card)) {
+                        lib.skill.shuoye_zhengfu_buff.unmark(card);
+                    }
+                }
+            }
+            for (const area of [ui.discardPile, ui.cardPile, ui.ordering, ui.special]) {
+                if (!area) {
+                    continue;
+                }
+                for (const card of Array.from(area.childNodes)) {
+                    if (card && lib.skill.shuoye_zhengfu_buff.isMarked(card)) {
+                        lib.skill.shuoye_zhengfu_buff.unmark(card);
+                    }
+                }
+            }
+            if (player) {
+                player.unmarkSkill("shuoye_zhengfu");
+            }
+        },
+        subSkill: {
+            achieve: {
+                sub: true,
+                forced: true,
+                popup: false,
+                trigger: {
+                    global: "dieAfter",
+                },
+                filter(event, player) {
+                    if (player.storage.shuoye_zhengfu === true) {
+                        return false;
+                    }
+                    const use = event.getParent("useCard");
+                    if (!use || !use.player) {
+                        return false;
+                    }
+                    return lib.skill.shuoye_zhengfu_buff.isMarked(use.card);
+                },
+                async content(event, trigger, player) {
+                    player.awakenSkill("shuoye_zhengfu");
+                    game.log(player, "#g成功完成使命");
+                    lib.skill.shuoye_zhengfu.cleanup(player);
+                    player.addSkill("shuoye_weitelumu_chongji");
+                },
+            },
+            fail: {
+                sub: true,
+                forced: true,
+                popup: false,
+                audio: "ext:朔夜/audio/skill:1",
+                trigger: {
+                    player: ["damageAfter", "recoverAfter"],
+                },
+                filter(event, player) {
+                    if (player.storage.shuoye_zhengfu === true) {
+                        return false;
+                    }
+                    if (lib.skill.shuoye_zhengfu_buff.isMarked(event.card)) {
+                        return true;
+                    }
+                    return (event.cards || []).some(function (card) {
+                        return lib.skill.shuoye_zhengfu_buff.isMarked(card);
+                    });
+                },
+                async content(event, trigger, player) {
+                    player.awakenSkill("shuoye_zhengfu");
+                    // 使命失败专属台词（走 trySkillAudio，联机会广播给客机）
+                    game.trySkillAudio("shuoye_zhengfu_fail", player);
+                    game.log(player, "#g使命失败");
+                    lib.skill.shuoye_zhengfu.cleanup(player);
+                    player.addSkill(["shuoye_weitelumu_zitai", "shuoye_weitelumu_zhouji", "shuoye_weitelumu_baoQuan"]);
+                },
+            },
+        },
+    },
+//#noname-kit-end skill:shuoye_zhengfu
+//#noname-kit-begin skill:shuoye_zhengfu_buff
+    shuoye_zhengfu_buff: {
+        charlotte: true,
+        popup: false,
+        silent: true,
+        onremove(player) {
+            const tag = "shuoye_zhengfu";
+            const tagged = player.getCards("hejs", function (card) {
+                return card.hasGaintag && card.hasGaintag(tag);
+            });
+            if (tagged.length) {
+                player.removeGaintag(tag, tagged);
+            }
+        },
+        isMarked(card) {
+            if (!card) {
+                return false;
+            }
+            const tag = "shuoye_zhengfu";
+            if (card.shuoye_zhengfu) {
+                return true;
+            }
+            if (card.storage && card.storage.shuoye_zhengfu) {
+                return true;
+            }
+            if (typeof card.hasGaintag == "function" && card.hasGaintag(tag)) {
+                return true;
+            }
+            if (Array.isArray(card.cards) && card.cards.some(function (card2) {
+                return lib.skill.shuoye_zhengfu_buff.isMarked(card2);
+            })) {
+                return true;
+            }
+            return false;
+        },
+        unmark(card) {
+            if (!card) {
+                return;
+            }
+            const tag = "shuoye_zhengfu";
+            if (card.shuoye_zhengfu) {
+                delete card.shuoye_zhengfu;
+            }
+            if (card.storage) {
+                delete card.storage.shuoye_zhengfu;
+            }
+            if (typeof card.removeGaintag == "function" && card.gaintag && card.gaintag.includes(tag)) {
+                card.removeGaintag(tag);
+            }
+            if (Array.isArray(card.cards)) {
+                card.cards.forEach(function (card2) {
+                    lib.skill.shuoye_zhengfu_buff.unmark(card2);
+                });
+            }
+        },
+        mod: {
+            targetInRange(card, player, target) {
+                if (lib.skill.shuoye_zhengfu_buff.isMarked(card)) {
+                    return true;
+                }
+            },
+            cardUsableTarget(card, player, target) {
+                if (lib.skill.shuoye_zhengfu_buff.isMarked(card)) {
+                    return true;
+                }
+            },
+            cardUsable(card, player, num) {
+                if (lib.skill.shuoye_zhengfu_buff.isMarked(card)) {
+                    return Infinity;
+                }
+            },
+        },
+        group: ["shuoye_zhengfu_buff_damage", "shuoye_zhengfu_buff_recover", "shuoye_zhengfu_buff_nocount"],
+        subSkill: {
+            damage: {
+                sub: true,
+                forced: true,
+                popup: false,
+                charlotte: true,
+                trigger: {
+                    source: "damageBegin2",
+                },
+                filter(event, player) {
+                    return lib.skill.shuoye_zhengfu_buff.isMarked(event.card);
+                },
+                content(event, trigger, player) {
+                    trigger.num += 1;
+                },
+            },
+            recover: {
+                sub: true,
+                forced: true,
+                popup: false,
+                charlotte: true,
+                trigger: {
+                    global: "recoverBegin",
+                },
+                filter(event, player) {
+                    return lib.skill.shuoye_zhengfu_buff.isMarked(event.card);
+                },
+                content(event, trigger, player) {
+                    trigger.num += 1;
+                },
+            },
+            nocount: {
+                sub: true,
+                forced: true,
+                popup: false,
+                charlotte: true,
+                // 不计入次数限制：useCard 内容里已经先把次数记上了，这里关掉并回退
+                trigger: {
+                    player: "useCard1",
+                },
+                filter(event, player) {
+                    return lib.skill.shuoye_zhengfu_buff.isMarked(event.card);
+                },
+                content(event, trigger, player) {
+                    if (trigger.addCount !== false) {
+                        trigger.addCount = false;
+                        const stat = player.getStat().card;
+                        const name = get.name(trigger.card);
+                        if (typeof stat[name] === "number") {
+                            stat[name]--;
+                        }
+                    }
+                },
+            },
+        },
+    },
+//#noname-kit-end skill:shuoye_zhengfu_buff
+    // ===== 【无敌少侠】马克 =====
+//#noname-kit-begin skill:shuoye_wudi
+    shuoye_wudi: {
+        forced: true,
+        locked: true,
+        trigger: {
+            player: "changeHpAfter",
+        },
+        filter(event, player) {
+            return event.num < 0;
+        },
+        async content(event, trigger, player) {
+            // 【无敌】的音乐：一回合最多播放一次
+            if (!lib.skill.shuoye_wudi.musicPlayed(player)) {
+                lib.skill.shuoye_wudi.markMusic(player);
+                game.trySkillAudio("shuoye_wudi_music", player);
+            }
+            const num = Math.max(1, -trigger.num);
+            // 【阳间模式】不再增加体力上限
+            if (!(lib.shuoyeIf && typeof lib.shuoyeIf.qumoshi === "function" && lib.shuoyeIf.qumoshi())) {
+                await player.gainMaxHp(num);
+            }
+            player.addMark("shuoye_wudi_draw", num, false);
+            // 这里只累加“已损失的体力点数”（整数）；实际回复时再 floor(点数/2)
+            player.addMark("shuoye_wudi_recover", num, false);
+        },
+        // 一回合一次的播放记录（与其它“每回合首次”用同一个回合 id）
+        musicPlayed(player) {
+            const turn = lib.shuoyeIf && lib.shuoyeIf.turnId ? lib.shuoyeIf.turnId() : game.phaseNumber || 0;
+            return String(player.storage.shuoye_wudi_music_turn) === String(turn);
+        },
+        markMusic(player) {
+            const turn = lib.shuoyeIf && lib.shuoyeIf.turnId ? lib.shuoyeIf.turnId() : game.phaseNumber || 0;
+            game.broadcastAll(function (target, value) {
+                if (!target.storage) {
+                    target.storage = {};
+                }
+                target.storage.shuoye_wudi_music_turn = value;
+            }, player, String(turn));
+        },
+        group: ["shuoye_wudi_draw", "shuoye_wudi_recover", "shuoye_wudi_dying", "shuoye_wudi_damage"],
+        subSkill: {
+            // 语音/音乐持有人：不在 group 里，不会自己触发；只在 content 里手动播放
+            music: {
+                sub: true,
+                charlotte: true,
+                popup: false,
+                silent: true,
+                audio: "ext:朔夜/audio/skill:1",
+            },
+            draw: {
+                sub: true,
+                charlotte: true,
+                popup: false,
+                forced: true,
+                trigger: {
+                    player: "drawBegin",
+                },
+                filter(event, player) {
+                    return player.countMark("shuoye_wudi_draw") > 0;
+                },
+                content(event, trigger, player) {
+                    const num = player.countMark("shuoye_wudi_draw");
+                    player.setMark("shuoye_wudi_draw", 0, false);
+                    trigger.num += num;
+                },
+            },
+            recover: {
+                sub: true,
+                charlotte: true,
+                popup: false,
+                forced: true,
+                trigger: {
+                    player: "recoverBegin",
+                },
+                filter(event, player) {
+                    return player.countMark("shuoye_wudi_recover") > 0;
+                },
+                content(event, trigger, player) {
+                    const lost = player.countMark("shuoye_wudi_recover");
+                    if (lost <= 0) {
+                        return;
+                    }
+                    player.setMark("shuoye_wudi_recover", 0, false);
+                    // 每损失 1 点体力 +1/2，回复时向下取整
+                    trigger.num += Math.floor(lost / 2);
+                },
+            },
+            dying: {
+                sub: true,
+                charlotte: true,
+                popup: false,
+                forced: true,
+                trigger: {
+                    player: "dyingAfter",
+                },
+                filter(event, player) {
+                    return player.isAlive() && player.hp > 0;
+                },
+                content(event, trigger, player) {
+                    player.addMark("shuoye_wudi_damage", 1, false);
+                },
+            },
+            damage: {
+                sub: true,
+                forced: true,
+                popup: false,
+                mark: true,
+                marktext: "无",
+                intro: {
+                    name: "无敌",
+                    content(storage, player) {
+                        const damage = player ? player.countMark("shuoye_wudi_damage") : 0;
+                        return "本局游戏造成的伤害+" + damage + "。";
+                    },
+                },
+                trigger: {
+                    source: "damageBegin2",
+                },
+                filter(event, player) {
+                    return player.countMark("shuoye_wudi_damage") > 0;
+                },
+                content(event, trigger, player) {
+                    trigger.num += player.countMark("shuoye_wudi_damage");
+                },
+            },
+        },
+    },
+//#noname-kit-end skill:shuoye_wudi
+//#noname-kit-begin skill:shuoye_weitelumu_bainian
+    shuoye_weitelumu_bainian: {
+        audio: "ext:朔夜/audio/skill:1",
+        group: ["shuoye_weitelumu_bainian_give", "shuoye_weitelumu_bainian_take"],
+        // “每回合首次”：用回合 id 记录本回合是否已经给过机会
+        turnUsed(player) {
+            const turn = lib.shuoyeIf && lib.shuoyeIf.turnId ? lib.shuoyeIf.turnId() : game.phaseNumber || 0;
+            return String(player.storage.shuoye_weitelumu_bainian_turn) === String(turn);
+        },
+        markTurn(player) {
+            const turn = lib.shuoyeIf && lib.shuoyeIf.turnId ? lib.shuoyeIf.turnId() : game.phaseNumber || 0;
+            game.broadcastAll(function (target, value) {
+                if (!target.storage) {
+                    target.storage = {};
+                }
+                target.storage.shuoye_weitelumu_bainian_turn = value;
+            }, player, String(turn));
+        },
+        subSkill: {
+            give: {
+                sub: true,
+                trigger: {
+                    source: "damageAfter",
+                },
+                filter(event, player) {
+                    if (event.source != player || !event.player || event.player == player || !event.player.isIn() || !event.player.isAlive()) {
+                        return false;
+                    }
+                    return !lib.skill.shuoye_weitelumu_bainian.turnUsed(player);
+                },
+                async cost(event, trigger, player) {
+                    // 每回合首次：不管最后选不选发动，本回合的机会都算用掉
+                    lib.skill.shuoye_weitelumu_bainian.markTurn(player);
+                    event.result = await player
+                        .chooseBool({
+                            prompt: "维特鲁姆拜年：是否令你与" + get.translation(trigger.player) + "同时失去1点体力？",
+                        })
+                        .set("ai", function () {
+                            return true;
+                        })
+                        .forResult();
+                },
+                async content(event, trigger, player) {
+                    // 选定发动（即确定要掉血）之后才出语音
+                    game.trySkillAudio("shuoye_weitelumu_bainian", player);
+                    await lib.skill.shuoye_weitelumu_bainian.flow(player, trigger.player);
+                },
+            },
+            take: {
+                sub: true,
+                trigger: {
+                    player: "damageAfter",
+                },
+                filter(event, player) {
+                    if (!event.source || event.source == player || !event.source.isIn() || !event.source.isAlive()) {
+                        return false;
+                    }
+                    return !lib.skill.shuoye_weitelumu_bainian.turnUsed(player);
+                },
+                async cost(event, trigger, player) {
+                    lib.skill.shuoye_weitelumu_bainian.markTurn(player);
+                    event.result = await player
+                        .chooseBool({
+                            prompt: "维特鲁姆拜年：是否令你与" + get.translation(trigger.source) + "同时失去1点体力？",
+                        })
+                        .set("ai", function () {
+                            return true;
+                        })
+                        .forResult();
+                },
+                async content(event, trigger, player) {
+                    // 选定发动（即确定要掉血）之后才出语音
+                    game.trySkillAudio("shuoye_weitelumu_bainian", player);
+                    await lib.skill.shuoye_weitelumu_bainian.flow(player, trigger.source);
+                },
+            },
+        },
+        async flow(player, other) {
+            if (!other || !other.isIn() || !other.isAlive()) {
+                return;
+            }
+            await player.loseHp(1);
+            if (other.isIn() && other.isAlive()) {
+                await other.loseHp(1);
+            }
+            // 【阳间模式】只保留“同时失去体力”，不再回复
+            if (lib.shuoyeIf && typeof lib.shuoyeIf.qumoshi === "function" && lib.shuoyeIf.qumoshi()) {
+                return;
+            }
+            const list = [player, other].filter(function (current) {
+                return current.isIn() && current.isAlive();
+            });
+            if (!list.length) {
+                return;
+            }
+            let min = Infinity;
+            for (const current of list) {
+                if (current.hp < min) {
+                    min = current.hp;
+                }
+            }
+            const candidates = list.filter(function (current) {
+                return current.hp == min;
+            });
+            if (candidates.length > 1) {
+                const otherName = get.translation(other);
+                const result = await player
+                    .chooseControl({
+                        controls: ["令自己回复1点体力", "令" + otherName + "回复1点体力", "取消"],
+                        prompt: "维特鲁姆拜年：令体力较低者回复1点体力",
+                    })
+                    .set("shuoyeOtherFriendly", get.attitude(player, other) > 0)
+                    .set("ai", function () {
+                        const evt = get.event();
+                        if (evt.shuoyeOtherFriendly) {
+                            return evt.controls[1];
+                        }
+                        return evt.controls[0];
+                    })
+                    .forResult();
+                const control = result && result.control;
+                if (typeof control != "string" || control == "取消") {
+                    return;
+                }
+                const target = control == "令自己回复1点体力" ? player : other;
+                if (target.isIn() && target.isAlive()) {
+                    await target.recover(1);
+                }
+                return;
+            }
+            const heal = candidates[0];
+            const friendly = heal == player || get.attitude(player, heal) > 0;
+            const result = await player
+                .chooseBool({
+                    prompt: "维特鲁姆拜年：是否令" + get.translation(heal) + "回复1点体力？",
+                })
+                .set("shuoyeHeal", friendly)
+                .set("ai", function () {
+                    return !!get.event().shuoyeHeal;
+                })
+                .forResult();
+            if (!result.bool) {
+                return;
+            }
+            if (heal.isIn() && heal.isAlive()) {
+                await heal.recover(1);
+            }
+        },
+    },
+//#noname-kit-end skill:shuoye_weitelumu_bainian
+//#noname-kit-begin skill:shuoye_weitelumu_suohou
+    shuoye_weitelumu_suohou: {
+        audio: "ext:朔夜/audio/skill:1",
+        enable: "phaseUse",
+        usable: 1,
+        position: "h",
+        selectCard: 1,
+        discard: false,
+        lose: false,
+        filterCard(card, player) {
+            return get.itemtype(card) == "card";
+        },
+        filter(event, player) {
+            // 【阳间模式】整技禁用
+            if (lib.shuoyeIf && lib.shuoyeIf.qumoshi()) {
+                return false;
+            }
+            if (!player.countCards("h")) {
+                return false;
+            }
+            return game.hasPlayer(function (current) {
+                return current != player && current.isIn() && current.isAlive();
+            });
+        },
+        prompt: "选择一张手牌，封锁该牌名",
+        check(card) {
+            return 4 - get.value(card);
+        },
+        async content(event, trigger, player) {
+            const card = event.cards && event.cards[0];
+            if (!card) {
+                return;
+            }
+            const name = get.name(card);
+            lib.skill.shuoye_weitelumu_suohou.cleanup(player);
+            player.addGaintag([card], "shuoye_weitelumu_suohou");
+            const owner = String(player.playerid);
+            game.broadcastAll(function (ownerId, cardName) {
+                _status.shuoyeSuohou = {
+                    owner: ownerId,
+                    name: cardName,
+                };
+                if (!lib.skill.global.includes("shuoye_weitelumu_suohou_lock")) {
+                    game.addGlobalSkill("shuoye_weitelumu_suohou_lock");
+                }
+            }, owner, name);
+            player.markSkill("shuoye_weitelumu_suohou");
+            game.log(player, "锁定了", "#g【" + get.translation(name) + "】");
+        },
+        mark: true,
+        marktext: "锁",
+        intro: {
+            content(storage, player) {
+                const info = _status.shuoyeSuohou;
+                if (!info || !info.name) {
+                    return "尚未锁定牌名。";
+                }
+                return "在你失去【" + get.translation(info.name) + "】前，手中有同名牌的其他角色不能使用或打出该牌名的牌。";
+            },
+        },
+        group: ["shuoye_weitelumu_suohou_clear"],
+        onremove(player) {
+            lib.skill.shuoye_weitelumu_suohou.cleanup(player);
+        },
+        cleanup(player) {
+            const tag = "shuoye_weitelumu_suohou";
+            const tagged = player.getCards("hejs", function (card) {
+                return card.hasGaintag && card.hasGaintag(tag);
+            });
+            if (tagged.length) {
+                player.removeGaintag(tag, tagged);
+            }
+            game.broadcastAll(function () {
+                if (_status.shuoyeSuohou) {
+                    delete _status.shuoyeSuohou;
+                }
+                if (lib.skill.global.includes("shuoye_weitelumu_suohou_lock")) {
+                    game.removeGlobalSkill("shuoye_weitelumu_suohou_lock");
+                }
+            });
+            player.unmarkSkill("shuoye_weitelumu_suohou");
+        },
+        subSkill: {
+            clear: {
+                sub: true,
+                forced: true,
+                popup: false,
+                forceDie: true,
+                trigger: {
+                    player: ["loseAfter"],
+                    global: ["loseAsyncAfter"],
+                },
+                filter(event, player) {
+                    const info = _status.shuoyeSuohou;
+                    if (!info || String(info.owner) != String(player.playerid)) {
+                        return false;
+                    }
+                    const tag = "shuoye_weitelumu_suohou";
+                    return !player.getCards("h").some(function (card) {
+                        return card.hasGaintag && card.hasGaintag(tag);
+                    });
+                },
+                content(event, trigger, player) {
+                    lib.skill.shuoye_weitelumu_suohou.cleanup(player);
+                },
+            },
+        },
+    },
+//#noname-kit-end skill:shuoye_weitelumu_suohou
+//#noname-kit-begin skill:shuoye_weitelumu_suohou_lock
+    shuoye_weitelumu_suohou_lock: {
+        charlotte: true,
+        popup: false,
+        silent: true,
+        check(card, player) {
+            const info = _status.shuoyeSuohou;
+            if (!info || !info.name || !player || !card) {
+                return;
+            }
+            if (String(player.playerid) == String(info.owner)) {
+                return;
+            }
+            if (get.name(card) != info.name) {
+                return;
+            }
+            const owner = game.players.concat(game.dead).find(function (current) {
+                return String(current.playerid) == String(info.owner);
+            });
+            if (!owner) {
+                return;
+            }
+            const tag = "shuoye_weitelumu_suohou";
+            const holding = owner.getCards("h").some(function (card2) {
+                return card2.hasGaintag && card2.hasGaintag(tag);
+            });
+            if (!holding) {
+                return;
+            }
+            if (!player.countCards("h", { name: info.name })) {
+                return;
+            }
+            return false;
+        },
+        mod: {
+            cardEnabled2(card, player) {
+                return lib.skill.shuoye_weitelumu_suohou_lock.check(card, player);
+            },
+            cardEnabled(card, player) {
+                return lib.skill.shuoye_weitelumu_suohou_lock.check(card, player);
+            },
+            cardRespondable(card, player) {
+                return lib.skill.shuoye_weitelumu_suohou_lock.check(card, player);
+            },
+        },
+    },
+//#noname-kit-end skill:shuoye_weitelumu_suohou_lock
 };
 
 export default skills;

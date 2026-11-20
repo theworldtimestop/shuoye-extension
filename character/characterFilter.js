@@ -25,10 +25,8 @@ const quModeAllow = [
 	"shuoye_qiaolienide",
 	"shuoye_xugouji",
 	"shuoye_xituo",
-	"shuoye_fengchuanxiangzi",
 	"shuoye_lixin",
 	"shuoye_yiguyoutai",
-	"shuoye_nilu",
 	"shuoye_majunke",
 	"shuoye_yuantoushanwo",
 	"shuoye_shebengnainyin",
@@ -40,6 +38,8 @@ const quModeAllow = [
 	"shuoye_richekuanjian",
 	"shuoye_leidianyayi",
 	"shuoye_sanlunxia",
+	"shuoye_nuolan",
+	"shuoye_make",
 ];
 
 const characterFilters = {};

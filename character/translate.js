@@ -1313,5 +1313,66 @@ shuoye_kuanggu: "狂骨",
     shuoye_sanlun_adapt: "适应",
     shuoye_sanlun_adapt_info: "以下效果各只需适应一次，最多适应 3 种。<br>牌（按牌名，普通杀/火杀/雷杀等属性【杀】分开计算）：该牌对你无效，且不能用于响应你的牌。<br>技能（按技能名）：其指定你时整体取消。<br>技能造成的伤害、失去体力、失去体力上限、翻面：你不会被翻至背面。<br>造成伤害：你造成的伤害 +1。<br>弃牌：弃牌阶段的弃牌数 -1，此后你每弃一次牌再 -1。<br>摸牌：每次摸牌 +1（至多 +3），此后你每摸一次牌再 +1。",
 //#noname-kit-end translate:shuoye_sanlun_adapt
+    // ===== 【无敌少侠】全局侠 / Invincible =====
+//#noname-kit-begin translate:shuoye_nuolan
+    shuoye_nuolan: "诺兰",
+//#noname-kit-end translate:shuoye_nuolan
+//#noname-kit-begin translate:shuoye_make
+    shuoye_make: "马克",
+//#noname-kit-end translate:shuoye_make
+//#noname-kit-begin translate:shuoye_zhengfu
+    shuoye_zhengfu: "征服",
+    shuoye_zhengfu_ab: "【征服】",
+    shuoye_zhengfu_info: "使命技，出牌阶段限一次，你可摸两张牌，然后可令一名角色观看并获得你的一张手牌，这些牌无任何限制且不计入次数限制，伤害与回复量+1。成功：其使用这些牌击杀角色，你获得【维特鲁姆冲击】。失败：这些牌对你造成伤害或令你回复体力，你获得【维特鲁姆姿态】【维特鲁姆肘击】【维特鲁姆抱拳】。",
+//#noname-kit-end translate:shuoye_zhengfu
+//#noname-kit-begin translate:shuoye_weitelumu_feixing
+    shuoye_weitelumu_feixing: "维特鲁姆飞行",
+    shuoye_weitelumu_feixing_ab: "【维特鲁姆飞行】",
+    shuoye_weitelumu_feixing_info: "出牌阶段结束时，你可与一名其他角色交换座位，然后你与其各可使用一张牌。",
+//#noname-kit-end translate:shuoye_weitelumu_feixing
+//#noname-kit-begin translate:shuoye_weitelumu_shoudao
+    shuoye_weitelumu_shoudao: "维特鲁姆手刀",
+    shuoye_weitelumu_shoudao_ab: "【维特鲁姆手刀】",
+    shuoye_weitelumu_shoudao_info: "锁定技，你对一名角色造成伤害后，若其体力值颜色发生变化，其失去1点体力。",
+//#noname-kit-end translate:shuoye_weitelumu_shoudao
+//#noname-kit-begin translate:shuoye_weitelumu_zitai
+    shuoye_weitelumu_zitai: "维特鲁姆姿态",
+    shuoye_weitelumu_zitai_ab: "【维特鲁姆姿态】",
+    shuoye_weitelumu_zitai_info: "锁定技，你的摸牌阶段摸牌数、出【杀】次数上限、攻击距离均改为你的体力上限。",
+//#noname-kit-end translate:shuoye_weitelumu_zitai
+//#noname-kit-begin translate:shuoye_weitelumu_zhouji
+    shuoye_weitelumu_zhouji: "维特鲁姆肘击",
+    shuoye_weitelumu_zhouji_ab: "【维特鲁姆肘击】",
+    shuoye_weitelumu_zhouji_info: "当你造成或受到伤害时，你可摸一张牌令此伤害+1或-1；然后受到/造成此伤害的角色可弃置一张牌令此伤害不变。",
+//#noname-kit-end translate:shuoye_weitelumu_zhouji
+//#noname-kit-begin translate:shuoye_weitelumu_baoQuan
+    shuoye_weitelumu_baoQuan: "维特鲁姆抱拳",
+    shuoye_weitelumu_baoQuan_ab: "【维特鲁姆抱拳】",
+    shuoye_weitelumu_baoQuan_info: "你可将两张同名牌当一张牌使用，其伤害/回复基数+1。若此牌未造成伤害也未回复体力，结算后你摸一张牌。",
+//#noname-kit-end translate:shuoye_weitelumu_baoQuan
+//#noname-kit-begin translate:shuoye_weitelumu_chongji
+    shuoye_weitelumu_chongji: "维特鲁姆冲击",
+    shuoye_weitelumu_chongji_ab: "【维特鲁姆冲击】",
+    shuoye_weitelumu_chongji_info: "出牌阶段限一次，你可将至少两张手牌当【兵临城下】使用，此牌的展示数+底牌的花色种类数。",
+//#noname-kit-end translate:shuoye_weitelumu_chongji
+//#noname-kit-begin translate:shuoye_weitelumu_binglin
+    shuoye_weitelumu_binglin: "兵临城下",
+    shuoye_weitelumu_binglin_info: "出牌阶段，对一名其他角色使用。展示牌堆顶的四张牌外加底牌花色种类数张牌，其中每张【杀】依次对该角色使用，其余牌置回牌堆顶。",
+//#noname-kit-end translate:shuoye_weitelumu_binglin
+//#noname-kit-begin translate:shuoye_wudi
+    shuoye_wudi: "无敌",
+    shuoye_wudi_ab: "【无敌】",
+    shuoye_wudi_info: "锁定技，你体力值减少一点后，体力上限+1、下一次摸牌数+1、下一次回复量+1/2（向下取整）；你每次脱离濒死状态后，本局游戏你造成的伤害+1。",
+//#noname-kit-end translate:shuoye_wudi
+//#noname-kit-begin translate:shuoye_weitelumu_bainian
+    shuoye_weitelumu_bainian: "维特鲁姆拜年",
+    shuoye_weitelumu_bainian_ab: "【维特鲁姆拜年】",
+    shuoye_weitelumu_bainian_info: "你每回合首次受到或造成伤害后，可与其同时失去1点体力，然后你可令体力低者回复1点体力。",
+//#noname-kit-end translate:shuoye_weitelumu_bainian
+//#noname-kit-begin translate:shuoye_weitelumu_suohou
+    shuoye_weitelumu_suohou: "维特鲁姆锁喉",
+    shuoye_weitelumu_suohou_ab: "【维特鲁姆锁喉】",
+    shuoye_weitelumu_suohou_info: "出牌阶段限一次，你可选择一张手牌，直到你失去此牌，手中有同名牌的其他角色不能使用或打出该牌名的牌。",
+//#noname-kit-end translate:shuoye_weitelumu_suohou
 };
 export default translates;

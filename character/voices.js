@@ -121,5 +121,17 @@ const voices = {
 	// 【三轮霞】阴流 / 束缚（原版技能台词列表与千幻聆音台词页均读此表；键名 = 音频路径）
 	"#ext:朔夜/audio/skill/shuoye_yinliu1": "新阴流·简易领域。",
 	"#ext:朔夜/audio/skill/shuoye_shufu1": "因为穷，还有两个弟弟。",
+	// 【无敌少侠】诺兰 / 马克（原版台词列表与千幻聆音台词页均读此表；键名 = 音频路径）
+	"#ext:朔夜/audio/skill/shuoye_zhengfu1": "听我说，你知道我是对的",
+	"#ext:朔夜/audio/skill/shuoye_zhengfu_fail1": "是的，是的，我看见了",
+	"#ext:朔夜/audio/skill/shuoye_weitelumu_feixing1": "（飞行音效）",
+	"#ext:朔夜/audio/skill/shuoye_weitelumu_shoudao1": "我随时准备好",
+	"#ext:朔夜/audio/skill/shuoye_weitelumu_zitai1": "还有多少人要死？马克？",
+	"#ext:朔夜/audio/skill/shuoye_weitelumu_zhouji1": "你这么做毫无用处",
+	"#ext:朔夜/audio/skill/shuoye_weitelumu_baoQuan1": "你愿意为了这个星球而死？",
+	"#ext:朔夜/audio/skill/shuoye_weitelumu_chongji1": "加入帝国只会使地球更好",
+	"#ext:朔夜/audio/skill/shuoye_weitelumu_bainian1": "我曾杀了你！",
+	"#ext:朔夜/audio/skill/shuoye_weitelumu_suohou1": "我不会犹豫杀死威胁我家人的人",
+	"#ext:朔夜/audio/skill/shuoye_wudi_music1": "（无敌·片头主题曲）",
 };
 export default voices;
