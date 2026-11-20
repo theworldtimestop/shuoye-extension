@@ -58,14 +58,6 @@ game.import("character", function () {
     if (lib.shuoyeIf && lib.shuoyeIf.qumoshi()) {
         shuoye.translate["shuoye_if_wuliang_info"] = "该模式不可用。";
     }
-    // 【阳间模式】萝统·仁抗：仅该模式下两个分支各限一次（filter/content 见 skill.js）。
-    // 同样只记下原描述、按本机配置给初始值；模式变化时由 setQumoshi 的广播回调刷新。
-    if (typeof lib.shuoyeRenkangInfoBase !== "string") {
-        lib.shuoyeRenkangInfoBase = shuoye.translate["shuoye_renkang_info"];
-    }
-    if (lib.shuoyeIf && lib.shuoyeIf.qumoshi()) {
-        shuoye.translate["shuoye_renkang_info"] = "每回合各限一次，" + lib.shuoyeRenkangInfoBase;
-    }
     lib.translate["shuoye_character_config"] = "朔夜";
     if (!lib.config[`extension_朔夜_characterPack_shuoye_enable`]) {
 		game.saveExtensionConfig("朔夜", "characterPack_shuoye_enable", true);
