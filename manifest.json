@@ -1,6 +1,6 @@
 {
   "version": "0.1.43",
-  "update": "新增三轮霞，修复一些bug",
+  "update": "新增三轮霞，添加阳间模式削弱",
   "files": {
     "audio/die/shuoye_leidianyayi1.mp3": "66aab7f7b989b41419e8b69be8e14413a506f74f",
     "audio/die/shuoye_lixin1.mp3": "38f6358fb73b555f59238043602e0066c78fd674",
@@ -262,7 +262,7 @@
     "character/index.js": "838cc5e11e1e29dda755399c9dc8515090d69b4d",
     "character/intro.js": "c0e6d17a037f41535f60073f9c2ebe18efc98f57",
     "character/pinyin.js": "4cb0d048cc9d37faa4971734298251d1d0f4ce16",
-    "character/skill.js": "b6ca02ad8c983e32f158bb970faa9b1608d59b8c",
+    "character/skill.js": "412809f86a1d133ca4f6d046cf9f01eb753ceecb",
     "character/skill.js.bak-nilu-anim": "0ca573b31e2359403c692043b2a9d7cf996476cb",
     "character/skill.js.bak-nilu-anim2": "67cabbd602699bc5dd1f19dc9f2c4e5f9313343d",
     "character/skillPatch.js": "f6b50867d3c162a8f824ef1f4b2fbed067574be2",
@@ -396,7 +396,7 @@
     "info.json": "12555996880f86b356e49d71c16368ac39b6df77",
     "LICENSE": "7713a1753ce88f2c7e6b054ecc8e4c786df76300",
     "main/config.js": "d1837642af2d0ca5388c6b134fe0ac378b5a7361",
-    "main/content.js": "69c8661f52e7a9fb739d766e91723eba52f5765c",
+    "main/content.js": "ad940406563380ca4abde4d07387dc5e50b0a096",
     "main/lixinfx.js": "7e155bdb7ef8a7b334d8720eea8e17d8c9603d60",
     "main/package.js": "507519d13fd04ac018ca427d7b9f6fea7f14126f",
     "main/precontent.js": "0fb06a7328df7f7737274597bc2817715e2b02fb",

@@ -892,6 +892,9 @@ if (!lib.shuoyeIf) {
                     if (lib.shuoyeIf && typeof lib.shuoyeIf.refreshWuliangInfo === "function") {
                         lib.shuoyeIf.refreshWuliangInfo();
                     }
+                    if (lib.skill && lib.skill.shuoye_sanlun && typeof lib.skill.shuoye_sanlun.refreshAdaptInfo === "function") {
+                        lib.skill.shuoye_sanlun.refreshAdaptInfo();
+                    }
                 } catch (e) {}
             }, value);
         },
@@ -22381,6 +22384,7 @@ shuoye_weiyan_enter: {
         init(player) {
             lib.skill.shuoye_sanlun.ensureGlobal();
             lib.skill.shuoye_sanlun.renderWheels(player);
+            lib.skill.shuoye_sanlun.refreshAdaptInfo();
         },
         onremove(player) {
             lib.skill.shuoye_sanlun.clearWheels(player);
@@ -22437,6 +22441,23 @@ shuoye_weiyan_enter: {
             }
         },
         limit: 3,
+        qumoshi() {
+            if (lib.shuoyeIf && typeof lib.shuoyeIf.qumoshi === "function") return !!lib.shuoyeIf.qumoshi();
+            return !!(lib.config && lib.config["extension_朔夜_qumoshi"]);
+        },
+        adaptInfo() {
+            const base = lib.shuoyeSanlunAdaptInfoBase;
+            if (typeof base !== "string") return null;
+            if (!lib.skill.shuoye_sanlun.qumoshi()) return base;
+            return base.replace("摸牌：每次摸牌 +1（至多 +3），此后你每摸一次牌再 +1。", "摸牌：每次摸牌 +1。");
+        },
+        refreshAdaptInfo() {
+            const info = lib.skill.shuoye_sanlun.adaptInfo();
+            if (!info) return;
+            try {
+                lib.poptip.add({ id: "shuoye_sanlun_adapt", name: "适应", info });
+            } catch (e) {}
+        },
         ensureGlobal() {
             if (!lib.skill.global.includes("shuoye_sanlun_global")) game.addGlobalSkill("shuoye_sanlun_global");
         },
@@ -22994,8 +23015,9 @@ shuoye_weiyan_enter: {
                     return true;
                 },
                 async content(event, trigger, player) {
+                    const qumoshi = lib.skill.shuoye_sanlun.qumoshi();
                     if (event.triggername === "drawBegin") {
-                        const bonus = Math.min(3, player.storage.shuoye_sanlun_drawup || 0);
+                        const bonus = qumoshi ? 1 : Math.min(3, player.storage.shuoye_sanlun_drawup || 0);
                         if (bonus > 0 && !trigger.numFixed) trigger.num += bonus;
                         return;
                     }
@@ -23004,9 +23026,11 @@ shuoye_weiyan_enter: {
                         await lib.skill.shuoye_sanlun.askAdapt(player, [{ key: "cls:draw", label: "摸牌" }]);
                         return;
                     }
-                    game.broadcastAll(function (player) {
-                        player.storage.shuoye_sanlun_drawup = Math.min(3, (player.storage.shuoye_sanlun_drawup || 0) + 1);
-                    }, player);
+                    if (!qumoshi) {
+                        game.broadcastAll(function (player) {
+                            player.storage.shuoye_sanlun_drawup = Math.min(3, (player.storage.shuoye_sanlun_drawup || 0) + 1);
+                        }, player);
+                    }
                     lib.skill.shuoye_sanlun.flashWheel(player);
                 },
             },
