@@ -559,6 +559,19 @@ shuoye_weiyan: {
         trashBin: [],
     },
 //#noname-kit-end character:shuoye_make
+//#noname-kit-begin character:shuoye_zhaoyun
+    shuoye_zhaoyun: {
+        sex: "male",
+        hp: 1,
+        maxHp: 4,
+        hujia: 0,
+        group: "wei",
+        skills: ["shuoye_longhun", "shuoye_juejing", "shuoye_chidan", "shuoye_qinggang"],
+        img: "extension/朔夜/image/shuoye_zhaoyun2.png",
+        dieAudios: ["ext:朔夜/audio/die/shuoye_zhaoyun1.mp3"],
+        trashBin: [],
+    },
+//#noname-kit-end character:shuoye_zhaoyun
 };
 for (let i in characters) {
     characters[i].img = characters[i].img || `extension/朔夜/image/character/${i}.jpg`;

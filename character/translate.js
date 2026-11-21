@@ -1359,6 +1359,31 @@ shuoye_kuanggu: "狂骨",
     shuoye_weitelumu_binglin: "兵临城下",
     shuoye_weitelumu_binglin_info: "出牌阶段，对一名其他角色使用。展示牌堆顶的四张牌外加底牌花色种类数张牌，其中每张【杀】依次对该角色使用，其余牌置回牌堆顶。",
 //#noname-kit-end translate:shuoye_weitelumu_binglin
+//#noname-kit-begin translate:shuoye_zhaoyun
+    shuoye_zhaoyun: "赵云",
+//#noname-kit-end translate:shuoye_zhaoyun
+//#noname-kit-begin translate:shuoye_longhun
+    shuoye_longhun: "龙魂",
+    shuoye_longhun_info: "你可将如下花色视为对应牌使用或打出♥桃♠无懈可击♣闪♦火杀。以此法使用牌后你可弃置一张牌视为使用弃置花色对应牌。若为同花色则可弃置一名角色一张牌。",
+//#noname-kit-end translate:shuoye_longhun
+//#noname-kit-begin translate:shuoye_longhun_use
+    shuoye_longhun_use: "龙魂",
+//#noname-kit-end translate:shuoye_longhun_use
+//#noname-kit-begin translate:shuoye_juejing
+    shuoye_juejing: "绝境",
+    shuoye_juejing_info: "你进入或脱离濒死可摸一张牌。",
+//#noname-kit-end translate:shuoye_juejing
+//#noname-kit-begin translate:shuoye_chidan
+    shuoye_chidan: "赤胆",
+    shuoye_chidan_info: "锁定技，你的手牌上限为体力上限。你体力值变化一点后可交给一名其他角色1张牌，你摸1张牌。",
+//#noname-kit-end translate:shuoye_chidan
+//#noname-kit-begin translate:shuoye_qinggang
+    shuoye_qinggang: "青釭",
+    shuoye_qinggang_info: "你的【杀】造成伤害时获得对方武器。你对一名角色使用【杀】时若其无武器可令其从游戏外获得并装备随机花色点数【青釭剑】。",
+//#noname-kit-end translate:shuoye_qinggang
+//#noname-kit-begin translate:shuoye_longhun_wuxie
+    shuoye_longhun_wuxie: "龙魂",
+//#noname-kit-end translate:shuoye_longhun_wuxie
 //#noname-kit-begin translate:shuoye_wudi
     shuoye_wudi: "无敌",
     shuoye_wudi_ab: "【无敌】",

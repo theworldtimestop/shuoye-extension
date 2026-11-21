@@ -133,5 +133,17 @@ const voices = {
 	"#ext:朔夜/audio/skill/shuoye_weitelumu_bainian1": "我曾杀了你！",
 	"#ext:朔夜/audio/skill/shuoye_weitelumu_suohou1": "我不会犹豫杀死威胁我家人的人",
 	"#ext:朔夜/audio/skill/shuoye_wudi_music1": "（无敌·片头主题曲）",
+	// 【赵云】赤胆游龙（本体 / 千幻介绍页均读此表；键名 = 音频文件名）
+	"#ext:朔夜/audio/skill/shuoye_longhun1": "冲阵斩将者，常山赵子龙也！",
+	"#ext:朔夜/audio/skill/shuoye_longhun2": "凡吾枪所向，必一往无前！",
+	"#ext:朔夜/audio/skill/shuoye_longhun3": "七破绝境，此枪砥砺更利！",
+	"#ext:朔夜/audio/skill/shuoye_juejing1": "纵对千军万马，云亦独往矣！",
+	"#ext:朔夜/audio/skill/shuoye_juejing2": "此战胜已在胸，自立不败之地。",
+	"#ext:朔夜/audio/skill/shuoye_chidan1": "百战征袍不染，枪破万军无还！",
+	"#ext:朔夜/audio/skill/shuoye_qinggang1": "见吾银枪白马，当知胜负已分。",
+	"#ext:朔夜/audio/skill/shuoye_qinggang2": "勇略已超天下将，再炽心气问天高！",
+	"#ext:朔夜/audio/skill/shuoye_zhaoyun_kill1": "古今名将万千，冲阵扶主者，几人？",
+	"#shuoye_zhaoyun:die": "吾平生未有败事，岂料今日，呃啊……",
+	"#ext:朔夜/audio/die/shuoye_zhaoyun1:die": "吾平生未有败事，岂料今日，呃啊……",
 };
 export default voices;

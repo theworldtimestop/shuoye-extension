@@ -23799,7 +23799,8 @@ shuoye_weiyan_enter: {
                         return target.isIn() && target.isAlive();
                     },
                     ai(target) {
-                        return target == get.player() ? 0.5 : 1;
+                        // 人机优先选自己：被标记的牌由自己持有，才能自己吃【桃】/打伤害
+                        return target == get.player() ? 10 : 1;
                     },
                 })
                 .forResult();
@@ -23808,16 +23809,32 @@ shuoye_weiyan_enter: {
                 return;
             }
             lib.skill.shuoye_zhengfu.cleanup(player);
-            const gain = await target
-                .gainPlayerCard({
-                    target: player,
-                    position: "h",
-                    visible: true,
-                    forced: true,
-                    selectButton: 1,
-                    prompt: "征服：观看并获得" + get.translation(player) + "的一张牌",
-                })
-                .forResult();
+            const isSelf = target === player;
+            const gainParams = {
+                target: player,
+                position: "h",
+                visible: true,
+                forced: true,
+                selectButton: 1,
+                prompt: isSelf ? "征服：观看并获得自己的一张牌" : "征服：观看并获得" + get.translation(player) + "的一张牌",
+            };
+            if (isSelf) {
+                // 人机自选时，优先拿【桃】或伤害类牌接受标记
+                gainParams.ai = function (button) {
+                    const card = button && button.link;
+                    if (!card) {
+                        return 0;
+                    }
+                    if (get.name(card) === "tao") {
+                        return 12;
+                    }
+                    if (get.tag(card, "damage")) {
+                        return 10;
+                    }
+                    return 1;
+                };
+            }
+            const gain = await target.gainPlayerCard(gainParams).forResult();
             const cards = gain && Array.isArray(gain.cards) ? gain.cards.slice(0) : [];
             if (!cards.length) {
                 return;
@@ -24505,6 +24522,445 @@ shuoye_weiyan_enter: {
         },
     },
 //#noname-kit-end skill:shuoye_weitelumu_suohou_lock
+//#noname-kit-begin skill:shuoye_longhun
+    shuoye_longhun: {
+        enable: ["chooseToUse", "chooseToRespond"],
+        group: ["shuoye_longhun_wuxie", "shuoye_longhun_use", "shuoye_zhaoyun_kill"],
+        audio: "ext:朔夜/audio/skill:3",
+        logAudio: () => "ext:朔夜/audio/skill/shuoye_longhun1.mp3",
+        position: "hes",
+        selectCard: 1,
+        prompt: "龙魂：选择一张牌",
+        viewAs(cards, player) {
+            if (!cards || !cards.length) {
+                return null;
+            }
+            const suit = get.suit(cards[0], player);
+            if (suit === "heart") {
+                return { name: "tao" };
+            }
+            if (suit === "club") {
+                return { name: "shan" };
+            }
+            if (suit === "diamond") {
+                return { name: "sha", nature: "fire" };
+            }
+            return null;
+        },
+        filterCard(card, player, event) {
+            event = event || _status.event;
+            const filter = event._backup && event._backup.filterCard;
+            if (!filter) {
+                return false;
+            }
+            const suit = get.suit(card, player);
+            if (suit === "heart") {
+                return filter({ name: "tao", cards: [card] }, player, event);
+            }
+            if (suit === "club") {
+                return filter({ name: "shan", cards: [card] }, player, event);
+            }
+            if (suit === "diamond") {
+                return filter({ name: "sha", nature: "fire", cards: [card] }, player, event);
+            }
+            return false;
+        },
+        filter(event, player) {
+            const filter = event.filterCard;
+            if (typeof filter !== "function" || !player.countCards("hes")) {
+                return false;
+            }
+            return player.getCards("hes").some((card) => {
+                const suit = get.suit(card, player);
+                let name = null;
+                let nature = null;
+                if (suit === "heart") {
+                    name = "tao";
+                } else if (suit === "club") {
+                    name = "shan";
+                } else if (suit === "diamond") {
+                    name = "sha";
+                    nature = "fire";
+                }
+                if (!name) {
+                    return false;
+                }
+                return filter({ name, nature, cards: [card] }, player, event);
+            });
+        },
+        check(card) {
+            const player = get.player();
+            const evt = get.event();
+            const suit = get.suit(card, player);
+            let name = null;
+            let nature = null;
+            if (suit === "heart") {
+                name = "tao";
+            } else if (suit === "club") {
+                name = "shan";
+            } else if (suit === "diamond") {
+                name = "sha";
+                nature = "fire";
+            }
+            if (!name) {
+                return 0;
+            }
+            if (evt && evt.type === "phase") {
+                const value = player.getUseValue({ name, nature });
+                if (value <= 0) {
+                    return 0;
+                }
+                return Math.max(0.1, value - get.value(card, player));
+            }
+            return 1;
+        },
+        ai: {
+            respondSha: true,
+            respondShan: true,
+            save: true,
+            skillTagFilter(player, tag) {
+                const map = {
+                    respondSha: "diamond",
+                    respondShan: "club",
+                    save: "heart",
+                };
+                const suit = map[tag];
+                if (!suit) {
+                    return false;
+                }
+                return player.countCards("hes", { suit }) > 0;
+            },
+            order(item, player) {
+                if (!player) {
+                    player = get.player();
+                }
+                if (!player) {
+                    return 0;
+                }
+                const evt = get.event();
+                const type = evt && evt.type;
+                const hasSuit = (suit) => player.countCards("hes", { suit }) > 0;
+                // 出牌阶段（及未标注类型的窗口）：按火杀/桃的取用价值排序
+                if (!type || type === "phase") {
+                    let max = 0;
+                    if (hasSuit("diamond")) {
+                        max = Math.max(max, get.order({ name: "sha", nature: "fire" }));
+                    }
+                    if (hasSuit("heart")) {
+                        max = Math.max(max, get.order({ name: "tao" }));
+                    }
+                    return max;
+                }
+                // 响应/救援窗口（出闪、出杀、救人求桃）：给正分，具体用哪张交给 check 决定
+                if (hasSuit("club") || hasSuit("heart") || hasSuit("diamond")) {
+                    return 10;
+                }
+                return 0;
+            },
+            result: {
+                player: 1,
+            },
+        },
+    },
+//#noname-kit-end skill:shuoye_longhun
+//#noname-kit-begin skill:shuoye_longhun_use
+    shuoye_longhun_use: {
+        trigger: {
+            player: "useCardAfter",
+        },
+        audio: false,
+        filter(event, player) {
+            const skills = ["shuoye_longhun", "shuoye_longhun_wuxie"];
+            return skills.includes(event.skill) && player.isIn() && player.countCards("hes") > 0;
+        },
+        direct: true,
+        async content(event, trigger, player) {
+            const usedSuit = trigger.card ? get.suit(trigger.card, player) : "none";
+            const result = await player
+                .chooseCard({
+                    position: "hes",
+                    selectCard: 1,
+                    prompt: "龙魂：可弃置一张牌",
+                    prompt2: "视为使用与其花色对应的牌（♥桃　♠无懈可击　♣闪　♦火杀）；若与你本次使用的牌花色相同，可弃置一名角色一张牌",
+                    filterCard(card, player2) {
+                        return lib.filter.cardDiscardable(card, player2, "shuoye_longhun_use");
+                    },
+                    ai(card) {
+                        const player2 = get.player();
+                        const evt = get.event();
+                        let value = 10 - get.value(card, player2);
+                        if (evt && evt.longhunSuit === get.suit(card, player2)) {
+                            value += 6;
+                        }
+                        return value;
+                    },
+                })
+                .set("longhunSuit", usedSuit)
+                .forResult();
+            if (!result.bool || !result.cards || !result.cards.length) {
+                return;
+            }
+            const discard = result.cards[0];
+            const discardSuit = get.suit(discard, player);
+            player.logSkill("shuoye_longhun_use");
+            game.trySkillAudio("shuoye_longhun", player, true, null, { audio: "ext:朔夜/audio/skill/shuoye_longhun2.mp3" });
+            await player.discard(result.cards);
+            let name = null;
+            if (discardSuit === "heart") {
+                name = "tao";
+            } else if (discardSuit === "spade") {
+                name = "wuxie";
+            } else if (discardSuit === "club") {
+                name = "shan";
+            } else if (discardSuit === "diamond") {
+                name = "sha";
+            }
+            if (name === "tao") {
+                if (player.isAlive() && player.isDamaged()) {
+                    await player.useCard({ name: "tao", isCard: true }, player);
+                }
+            } else if (name === "sha") {
+                const vcard = { name: "sha", nature: "fire", isCard: true };
+                if (player.isAlive() && player.hasUseTarget(vcard, null, false)) {
+                    await player.chooseUseTarget(vcard, false, false);
+                }
+            }
+            if (discardSuit === usedSuit && player.isAlive() && game.hasPlayer((current) => current.countDiscardableCards(player, "he") > 0)) {
+                const result2 = await player
+                    .chooseTarget("龙魂：是否弃置一名角色的一张牌？", (card, player2, target) => target.countDiscardableCards(player2, "he") > 0)
+                    .set("ai", (target) => {
+                        const player2 = get.player();
+                        if (get.attitude(player2, target) >= 0) {
+                            return -1;
+                        }
+                        return 1 + target.countCards("h");
+                    })
+                    .forResult();
+                if (result2.bool && result2.targets && result2.targets.length) {
+                    game.trySkillAudio("shuoye_longhun", player, true, null, { audio: "ext:朔夜/audio/skill/shuoye_longhun3.mp3" });
+                    await player.discardPlayerCard(result2.targets[0], "he", true);
+                }
+            }
+        },
+    },
+//#noname-kit-end skill:shuoye_longhun_use
+//#noname-kit-begin skill:shuoye_juejing
+    shuoye_juejing: {
+        priority: 1,
+        audio: "ext:朔夜/audio/skill:2",
+        logAudio(trigger, player) {
+            if (player && player.hp > 0) {
+                return "ext:朔夜/audio/skill/shuoye_juejing2.mp3";
+            }
+            return "ext:朔夜/audio/skill/shuoye_juejing1.mp3";
+        },
+        trigger: {
+            player: "changeHp",
+        },
+        filter(event, player) {
+            if (typeof event.originalHp !== "number" || !player.isAlive() || player.removed) {
+                return false;
+            }
+            const die = event.getParent("die", true);
+            if (die && die.name === "die") {
+                return false;
+            }
+            const before = event.originalHp;
+            const after = player.hp;
+            return (before > 0 && after <= 0) || (before <= 0 && after > 0);
+        },
+        async content(event, trigger, player) {
+            await player.draw();
+        },
+    },
+//#noname-kit-end skill:shuoye_juejing
+//#noname-kit-begin skill:shuoye_chidan
+    shuoye_chidan: {
+        audio: "ext:朔夜/audio/skill:1",
+        popup: false,
+        mod: {
+            maxHandcard(player, num) {
+                return num + Math.max(0, player.maxHp - Math.max(player.hp, 0));
+            },
+        },
+        trigger: {
+            player: "changeHp",
+        },
+        filter(event, player) {
+            if (typeof event.originalHp !== "number" || !player.isAlive() || player.removed) {
+                return false;
+            }
+            if (player.hp === event.originalHp) {
+                return false;
+            }
+            const die = event.getParent("die", true);
+            if (die && die.name === "die") {
+                return false;
+            }
+            if (!player.countCards("h")) {
+                return false;
+            }
+            return game.hasPlayer((current) => current !== player && current.isIn());
+        },
+        async content(event, trigger, player) {
+            const num = Math.abs(player.hp - trigger.originalHp);
+            for (let i = 0; i < num; i++) {
+                if (!player.isAlive() || player.removed || !player.countCards("h")) {
+                    break;
+                }
+                if (!game.hasPlayer((current) => current !== player && current.isIn())) {
+                    break;
+                }
+                const result = await player
+                    .chooseCardTarget({
+                        position: "h",
+                        selectCard: 1,
+                        selectTarget: 1,
+                        prompt: "赤胆：可交给一名角色一张手牌",
+                        prompt2: "然后你摸一张牌",
+                        filterCard(card, player2) {
+                            return lib.filter.cardDiscardable(card, player2, "shuoye_chidan");
+                        },
+                        filterTarget(card, player2, target) {
+                            return target !== player2 && target.isIn();
+                        },
+                        ai1(card) {
+                            return 10 - get.value(card, get.player());
+                        },
+                        ai2(target) {
+                            return get.attitude(get.player(), target);
+                        },
+                    })
+                    .forResult();
+                if (!result.bool || !result.cards || !result.cards.length || !result.targets || !result.targets.length) {
+                    break;
+                }
+                const target = result.targets[0];
+                player.logSkill("shuoye_chidan", target);
+                await player.give(result.cards[0], target);
+                await player.draw();
+            }
+        },
+    },
+//#noname-kit-end skill:shuoye_chidan
+//#noname-kit-begin skill:shuoye_qinggang
+    shuoye_qinggang: {
+        audio: "ext:朔夜/audio/skill:2",
+        logAudio(type) {
+            if (type === "give") {
+                return "ext:朔夜/audio/skill/shuoye_qinggang2.mp3";
+            }
+            return "ext:朔夜/audio/skill/shuoye_qinggang1.mp3";
+        },
+        trigger: {
+            source: "damage",
+            player: "useCard",
+        },
+        filter(event, player) {
+            if (event.name === "damage") {
+                if (!player.isAlive() || !event.card || get.name(event.card) !== "sha") {
+                    return false;
+                }
+                const target = event.player;
+                if (!target || !target.isAlive()) {
+                    return false;
+                }
+                return target.getCards("e").some((card) => get.equipNum(card) === 1);
+            }
+            if (event.name === "useCard") {
+                if (!lib.card.qinggang || !event.card || get.name(event.card) !== "sha") {
+                    return false;
+                }
+                return (event.targets || []).some((target) => target.isAlive() && !target.isOut() && !target.getEquip(1));
+            }
+            return false;
+        },
+        direct: true,
+        async content(event, trigger, player) {
+            if (trigger.name === "damage") {
+                const target = trigger.player;
+                if (!target || !target.isAlive()) {
+                    return;
+                }
+                const cards = target.getCards("e").filter((card) => get.equipNum(card) === 1);
+                if (!cards.length) {
+                    return;
+                }
+                const result = await player.chooseBool(`青釭：是否获得${get.translation(target)}的武器牌？`).set("ai", () => true).forResult();
+                if (!result.bool) {
+                    return;
+                }
+                player.logSkill("shuoye_qinggang", target, null, null, ["gain"]);
+                await player.gain(cards, target, "gain2");
+                return;
+            }
+            const targets = (trigger.targets || []).filter((target) => target.isAlive() && !target.isOut() && !target.getEquip(1));
+            for (const target of targets) {
+                if (!lib.card.qinggang || !target.isAlive() || target.getEquip(1)) {
+                    continue;
+                }
+                const result = await player.chooseBool(`青釭：是否令${get.translation(target)}从游戏外获得并装备【青釭剑】？`).set("ai", () => true).forResult();
+                if (!result.bool) {
+                    continue;
+                }
+                player.logSkill("shuoye_qinggang", target, null, null, ["give"]);
+                const card = game.createCard2("qinggang", lib.suit.randomGet(), Math.ceil(Math.random() * 13));
+                await target.gain(card, "gain2");
+                await target.equip(card);
+            }
+        },
+    },
+//#noname-kit-end skill:shuoye_qinggang
+//#noname-kit-begin skill:shuoye_zhaoyun_kill
+    shuoye_zhaoyun_kill: {
+        charlotte: true,
+        silent: true,
+        popup: false,
+        forced: true,
+        audio: false,
+        trigger: {
+            global: "die",
+        },
+        filter(event, player) {
+            if (!event.player || event.player === player || event.source !== player) {
+                return false;
+            }
+            return player.isAlive();
+        },
+        async content(event, trigger, player) {
+            game.trySkillAudio("shuoye_zhaoyun_kill", player, true, null, { audio: "ext:朔夜/audio/skill:1" });
+        },
+    },
+//#noname-kit-end skill:shuoye_zhaoyun_kill
+//#noname-kit-begin skill:shuoye_longhun_wuxie
+    shuoye_longhun_wuxie: {
+        sourceSkill: "shuoye_longhun",
+        audio: "ext:朔夜/audio/skill/shuoye_longhun1.mp3",
+        enable: ["chooseToUse", "chooseToRespond"],
+        position: "hes",
+        selectCard: 1,
+        prompt: "龙魂：选择一张牌",
+        viewAs: { name: "wuxie" },
+        viewAsFilter(player) {
+            return player.countCards("hes", { suit: "spade" }) > 0;
+        },
+        filterCard(card, player) {
+            return get.suit(card, player) === "spade";
+        },
+        check(card) {
+            const player = get.player();
+            const evt = get.event();
+            if (evt && evt.type === "phase") {
+                const value = player.getUseValue({ name: "wuxie" });
+                if (value <= 0) {
+                    return 0;
+                }
+                return Math.max(0.1, value - get.value(card, player));
+            }
+            return 1;
+        },
+    },
+//#noname-kit-end skill:shuoye_longhun_wuxie
 };
 
 export default skills;

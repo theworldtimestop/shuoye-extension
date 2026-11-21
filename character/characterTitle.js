@@ -33,5 +33,6 @@ const characterTitles = {
     shuoye_sanlunxia: "最终BOSS",
 	shuoye_nuolan: "全能侠",
 	shuoye_make: "Invincible",
+	shuoye_zhaoyun: "赤胆游龙",
 };
 export default characterTitles;
