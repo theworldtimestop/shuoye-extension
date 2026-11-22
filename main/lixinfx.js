@@ -214,6 +214,8 @@ function animationOff() {
 const VOICE_GAIN = 3;
 // 【三轮霞】阴流 / 束缚 的台词倍率（1 = 引擎原音量；2 = 比原先再响一倍）
 const SANLUN_VOICE_GAIN = 2;
+// 【赵云 / 诺兰 / 马克】技能台词、赵云阵亡语音的倍率（1 = 引擎原音量；2 = 比原先再响一倍）
+const ZHAOYUN_NUOLAN_MAKE_VOICE_GAIN = 2;
 
 function audioBaseVolume() {
 	const setting = lib.config && lib.config.volumn_audio != null ? lib.config.volumn_audio : 8;
@@ -1976,6 +1978,34 @@ export function installLixinFx() {
 							sanlunParsed += ".mp3";
 						}
 						return playBoosted(/^https?:/i.test(sanlunParsed) ? sanlunParsed : lib.assetURL + sanlunParsed, null, SANLUN_VOICE_GAIN);
+					}
+					// 【赵云 / 诺兰 / 马克】技能台词 + 赵云阵亡语音：比引擎原音量再响一倍（增益 2）
+					// 名单：龙魂/绝境/赤胆/青冈、征服（含使命失败）/维特鲁姆飞行·受到·姿态·肘击·抱摔·冲击·拜年·锁喉、die/shuoye_zhaoyun
+					// 【无敌】片头主题曲 shuoye_wudi_music 是音乐不算台词，不在名单内
+					if (/(?:^|\/)(?:skill|die)\//i.test(path) && /shuoye_(?:longhun|juejing|chidan|qinggang|zhaoyun|zhengfu(?:_fail)?|weitelumu_(?:feixing|shoudao|zitai|zhouji|baoQuan|chongji|bainian|suohou)|tiewan|feixing|zitai|zhili|silie)\d(?:\.mp3)?$/i.test(path)) {
+						if (_status.video && !options.video) {
+							return;
+						}
+						if (lib.config && lib.config.background_speak === false) {
+							return;
+						}
+						// 绕过了引擎的 playAudio，录像的 addVideo 记录得自己补，否则回放里没这几句
+						if (options.addVideo !== false) {
+							try {
+								game.addVideo("playAudio", null, path);
+							} catch (e) {}
+						}
+						let zymParsed = path;
+						if (zymParsed.startsWith("ext:")) {
+							zymParsed = zymParsed.replace(/^ext:/, "extension/");
+						} else if (!/^https?:/i.test(zymParsed)) {
+							zymParsed = zymParsed.startsWith("audio/") ? zymParsed : "audio/" + zymParsed;
+						}
+						// 增益通道自己拼 URL，没有后缀就按引擎默认补 .mp3，否则放不出声
+						if (!/\.(mp3|ogg|wav|m4a)$/i.test(zymParsed)) {
+							zymParsed += ".mp3";
+						}
+						return playBoosted(/^https?:/i.test(zymParsed) ? zymParsed : lib.assetURL + zymParsed, null, ZHAOYUN_NUOLAN_MAKE_VOICE_GAIN);
 					}
 				} catch (e) {}
 				return originPlayAudio.apply(this, args);

@@ -1,5 +1,305 @@
 import { lib, game, ui, get, ai, _status } from "noname";
 
+// ===== 【崔格】摄政王 公共入口：铁腕阵营判定 / 立绘视频 / 体力和上限免疫 =====
+// 这些函数会被 game.broadcastAll 或联机序列化下发给客机执行，
+// 所以挂在全局 lib.shuoyeCuige 上，回调里只依赖全局 lib/game/ui/get/_status，不引用模块闭包变量。
+const SHUOYE_CUIGE_VIDEO = "extension/朔夜/video/shuoye_cuige_zhili.mp4";
+const SHUOYE_CUIGE_PHASE_INFO = [
+    ["phaseZhunbei", "准备阶段"],
+    ["phaseJudge", "判定阶段"],
+    ["phaseDraw", "摸牌阶段"],
+    ["phaseUse", "出牌阶段"],
+    ["phaseDiscard", "弃牌阶段"],
+    ["phaseJieshu", "结束阶段"],
+];
+// 身份 → 阵营（主忠方、反贼、内奸、平民各成一营）
+const SHUOYE_CUIGE_CAMP_BY_IDENTITY = {
+    zhu: "zhuzhong",
+    zhong: "zhuzhong",
+    mingzhong: "zhuzhong",
+    fan: "fan",
+    nei: "nei",
+    commoner: "commoner",
+};
+// 身份 → 与我同阵营的身份（里香式写法：主忠方归为忠臣，其余沿用原身份）
+const SHUOYE_CUIGE_ALLIED_IDENTITY = {
+    zhu: "zhong",
+    zhong: "zhong",
+    mingzhong: "mingzhong",
+    fan: "fan",
+    nei: "nei",
+    commoner: "commoner",
+    rZhu: "rZhong",
+    rZhong: "rZhong",
+    rNei: "rNei",
+    bZhu: "bZhong",
+    bZhong: "bZhong",
+    bNei: "bNei",
+};
+if (!lib.shuoyeCuige) {
+    lib.shuoyeCuige = {
+        phases: SHUOYE_CUIGE_PHASE_INFO.map((item) => item[0]),
+        phaseName(phase) {
+            const found = SHUOYE_CUIGE_PHASE_INFO.find((item) => item[0] === phase);
+            return found ? found[1] : phase;
+        },
+        campOf(current) {
+            const id = (current && current.identity) || "";
+            if (SHUOYE_CUIGE_CAMP_BY_IDENTITY[id]) {
+                return SHUOYE_CUIGE_CAMP_BY_IDENTITY[id];
+            }
+            if (/^r(Zhu|Zhong)$/.test(id)) {
+                return "rzhuzhong";
+            }
+            if (id === "rNei") {
+                return "rnei";
+            }
+            if (/^b(Zhu|Zhong)$/.test(id)) {
+                return "bzhuzhong";
+            }
+            if (id === "bNei") {
+                return "bnei";
+            }
+            if (id === "ye") {
+                return "ye";
+            }
+            // 非身份局没有身份，退回按势力判断
+            return current && current.group ? "group_" + current.group : "none";
+        },
+        alliedIdentity(current) {
+            const id = current && current.identity;
+            return SHUOYE_CUIGE_ALLIED_IDENTITY[id] || id || "fan";
+        },
+        // 真改身份：主机改完再把身份牌显示同步给客机
+        changeIdentity(target, identity, source) {
+            const from = target.identity;
+            game.broadcastAll(
+                function (current, newIdentity) {
+                    current.identity = newIdentity;
+                    current.identityShown = true;
+                    if (current.ai) {
+                        current.ai.shown = 1;
+                    }
+                    if (typeof current.setIdentity === "function") {
+                        current.setIdentity();
+                    }
+                    if (current.node && current.node.identity) {
+                        current.node.identity.classList.remove("guessing");
+                    }
+                },
+                target,
+                identity,
+            );
+            game.log(target, "的身份由", "#b" + get.translation(from || "无"), "调整为", "#b" + get.translation(identity));
+            if (source && typeof source.line === "function") {
+                source.line(target, "green");
+            }
+        },
+        // 维特鲁姆之力 · 立绘切换视频：在武将立绘框内播一次，无控制条，播完移除
+        playVideo(player) {
+            game.broadcastAll(
+                function (target, path) {
+                    try {
+                        const node = target && target.node && target.node.avatar;
+                        if (!node) {
+                            return;
+                        }
+                        const doc = node.ownerDocument || (typeof document !== "undefined" ? document : null);
+                        if (!doc) {
+                            return;
+                        }
+                        const old = node.querySelector(".shuoye-cuige-video");
+                        if (old) {
+                            // 复用已有元素：撕裂多段结算 / 连续免疫时反复建拆 <video>（重新解码 440KB）会明显卡帧
+                            try {
+                                old.currentTime = 0;
+                                old.playbackRate = 0.3;
+                                old.style.opacity = "1";
+                                Promise.resolve(old.play()).catch(function () {});
+                            } catch (e) {}
+                            return;
+                        }
+                        const view = doc.defaultView;
+                        if (view && view.getComputedStyle && view.getComputedStyle(node).position === "static") {
+                            node.style.position = "relative";
+                        }
+                        const video = doc.createElement("video");
+                        video.className = "shuoye-cuige-video";
+                        video.muted = true;
+                        video.autoplay = true;
+                        video.playsInline = true;
+                        video.loop = false;
+                        video.controls = false;
+                        video.setAttribute("muted", "");
+                        video.setAttribute("playsinline", "");
+                        video.setAttribute("webkit-playsinline", "");
+                        video.setAttribute("x5-playsinline", "");
+                        video.setAttribute("x5-video-player-type", "h5-page");
+                        video.setAttribute("disablepictureinpicture", "");
+                        // 透明 poster + 内联播放：手机端（Safari / 微信 X5）在解出第一帧之前
+                        // 不会把 <video> 画成「播放键」占位图标（同【乙骨忧太】的 primeVideo）
+                        video.setAttribute("poster", "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7");
+                        video.preload = "auto";
+                        video.setAttribute("controlslist", "nodownload nofullscreen noremoteplayback");
+                        // 慢放 0.3 倍速（defaultPlaybackRate + playbackRate 都设，避免被默认值盖回）
+                        video.defaultPlaybackRate = 0.3;
+                        video.playbackRate = 0.3;
+                        video.style.cssText = "position:absolute;left:0;top:0;width:100%;height:100%;object-fit:cover;object-position:50% 20%;pointer-events:none;z-index:6;opacity:0;transition:opacity .4s linear;";
+                        let done = false;
+                        const cleanup = function () {
+                            if (done) {
+                                return;
+                            }
+                            done = true;
+                            try {
+                                video.pause();
+                            } catch (e) {}
+                            try {
+                                video.remove();
+                            } catch (e) {}
+                        };
+                        video.addEventListener("ended", cleanup);
+                        video.addEventListener("error", cleanup);
+                        // 部分内核会在 metadata 就绪时把播放速率重置回默认值，这里再补一次
+                        video.addEventListener("loadedmetadata", function () {
+                            try {
+                                video.playbackRate = 0.3;
+                            } catch (e) {}
+                        });
+                        // 解出第一帧（canplay / playing）再显示：透明阶段不会被画成播放键
+                        const reveal = function () {
+                            try {
+                                video.style.opacity = "1";
+                            } catch (e) {}
+                        };
+                        video.addEventListener("canplay", reveal, { once: true });
+                        video.addEventListener("playing", reveal, { once: true });
+                        video.src = lib.assetURL + path;
+                        node.appendChild(video);
+                        const played = video.play();
+                        if (played && typeof played.catch === "function") {
+                            played.catch(function () {
+                                cleanup();
+                            });
+                        }
+                        // 兵底：canplay 迟迟不来也别一直看不见
+                        setTimeout(reveal, 1500);
+                        setTimeout(cleanup, 6000);
+                    } catch (e) {}
+                },
+                player,
+                SHUOYE_CUIGE_VIDEO,
+            );
+        },
+        // 维特鲁姆之力 · 免疫：语音 + 立绘视频 + 摸等量牌
+        async immune(player, num) {
+            const amount = Math.max(0, Math.floor(Number(num) || 0));
+            player.logSkill("shuoye_zhili", null, null, null, [1]);
+            lib.shuoyeCuige.playVideo(player);
+            game.log(player, "的", "#g【维特鲁姆之力】", "免疫了本次", get.cnNumber(Math.max(amount, 1)), "点减少");
+            if (amount > 0) {
+                await player.draw(amount);
+            }
+        },
+        // 铁腕可剥夺的技能
+        skillList(target) {
+            if (!target) {
+                return [];
+            }
+            return target.getSkills(null, false, false).filter((skill) => {
+                const info = get.info(skill);
+                if (!info) {
+                    return false;
+                }
+                if (info.charlotte || info.sub || info.hiddenSkill || info.nopop || info.persevereSkill) {
+                    return false;
+                }
+                if (!lib.translate[skill]) {
+                    return false;
+                }
+                return true;
+            });
+        },
+        losePhase(target, phase) {
+            const list = Array.isArray(target.storage.shuoye_tiewan_phase) ? target.storage.shuoye_tiewan_phase.slice(0) : [];
+            if (!list.includes(phase)) {
+                list.push(phase);
+            }
+            target.addSkill("shuoye_tiewan_phase");
+            target.setStorage("shuoye_tiewan_phase", list);
+            target.markSkill("shuoye_tiewan_phase");
+            game.log(target, "永久失去了", "#g" + lib.shuoyeCuige.phaseName(phase));
+        },
+        loseSkill(target, skill) {
+            if (!skill) {
+                return;
+            }
+            game.log(target, "永久失去了技能", "#g【" + get.translation(skill) + "】");
+            target.removeSkill(skill);
+        },
+    };
+}
+
+// 失去体力 / 失去体力上限的免疫拦截（原引擎在这两个事件上没有结算前钩子）
+function shuoyeCuigeInstallImmunePatch() {
+    const proto = lib.element && lib.element.player;
+    if (!proto || typeof proto.loseHp !== "function" || typeof proto.loseMaxHp !== "function") {
+        return;
+    }
+    if (!proto.loseHp._shuoyeCuigeZhiliPatched) {
+        const origin = proto.loseHp;
+        const patched = function (num) {
+            const player = this;
+            const amount = num === undefined || num === null ? 1 : Number(num);
+            // 先判数值再看技能：hasSkill 内部会重建 getSkills/expandSkills，不先短路会让全局每次 loseHp 都白跑一遍
+            if (amount >= 2 && player && typeof player.hasSkill === "function" && player.hasSkill("shuoye_zhili")) {
+                const next = game.createEvent("loseHp");
+                next.player = player;
+                next.num = amount;
+                next.setContent(async (event, trigger, player2) => {
+                    await lib.shuoyeCuige.immune(player2, amount);
+                });
+                return next;
+            }
+            return origin.apply(this, arguments);
+        };
+        patched._shuoyeCuigeZhiliPatched = true;
+        proto.loseHp = patched;
+    }
+    if (!proto.loseMaxHp._shuoyeCuigeZhiliPatched) {
+        const origin = proto.loseMaxHp;
+        const patched = function (params) {
+            const player = this;
+            let amount = 1;
+            if (typeof params === "number") {
+                amount = params;
+            } else if (params && typeof params === "object" && typeof params.num === "number") {
+                amount = params.num;
+            }
+            if (amount >= 2 && player && typeof player.hasSkill === "function" && player.hasSkill("shuoye_zhili")) {
+                const next = game.createEvent("loseMaxHp");
+                next.player = player;
+                next.num = amount;
+                next.setContent(async (event, trigger, player2) => {
+                    await lib.shuoyeCuige.immune(player2, amount);
+                });
+                return next;
+            }
+            return origin.apply(this, arguments);
+        };
+        patched._shuoyeCuigeZhiliPatched = true;
+        proto.loseMaxHp = patched;
+    }
+}
+try {
+    shuoyeCuigeInstallImmunePatch();
+} catch (e) {}
+try {
+    if (Array.isArray(lib.arenaReady)) {
+        lib.arenaReady.push(shuoyeCuigeInstallImmunePatch);
+    }
+} catch (e) {}
+
 // ===== 【雷之律者】雷电芽衣 公共入口：台词 / 浮雷判定 / 否极技 / 俱利伽罗血条 / BGM =====
 // 这些函数会被 game.broadcastAll 或联机序列化下发给客机执行，
 // 回调里只依赖全局 lib/game/ui/get/_status，不引用模块闭包变量。
@@ -5357,7 +5657,7 @@ const skills = {
     },
 //#noname-kit-end skill:shuoye_yuqi
 //#noname-kit-begin skill:shuoye_weituan
-    shuoye_weituan: {
+shuoye_weituan: {
         trigger: {
             player: ["shuoye_yuqi_beginAfter", "shuoye_yuqi_addAfter", "shuoye_yuqi_removeAfter"],
         },
@@ -5368,7 +5668,7 @@ const skills = {
             const skills = [];
             const num = player.countMark("shuoye_yuqi");
             if (num >= 10) skills.add("shuoye_dinghan");
-            if (num >= 40) skills.add("shuoye_shenxian");
+            if (num >= 40) skills.add("shuoye_shanxian");
             if (num >= 70) skills.add("shuoye_powei");
             if (num >= 100) skills.add("shuoye_dengshen");
             player.addAdditionalSkill("shuoye_weituan", skills, true);
@@ -25077,6 +25377,769 @@ shuoye_weiyan_enter: {
         },
     },
 //#noname-kit-end skill:shuoye_longhun_wuxie
+//#noname-kit-begin skill:shuoye_shanxian
+shuoye_shanxian: {
+        trigger: {
+            global: ["loseAfter", "loseAsyncAfter"],
+        },
+        forced: true,
+        locked: false,
+        filter(event, player) {
+            if (event.type !== "discard" || event.getlx === false) return false;
+            if (event.name === "lose" && event.player === player) return false;
+            if (typeof event.getl !== "function") return false;
+            // 被弃置的牌：单张 lose 与 discard 系列的 loseAsync 都有 event.cards；
+            // 防御：个别技能自建的 loseAsync 不写 cards，此时用各角色的失去记录汇总，避免直接报错中断结算
+            const cards = Array.isArray(event.cards) ? event.cards.slice(0) : [];
+            if (!cards.length) {
+                for (const target of game.players) {
+                    const lost = event.getl(target);
+                    if (lost) cards.addArray(lost.cards || []);
+                }
+            }
+            const selfLost = event.getl(player);
+            if (selfLost) cards.removeArray(selfLost.cards || []);
+            return cards.some(card => {
+                return get.type(card, null, event.hs && event.hs.includes(card) ? event.player : false) === "basic" && card.original !== "j";
+            });
+        },
+        async content(event, trigger, player) {
+            if (trigger.delay == false) await game.delay();
+            await player.draw();
+        },
+        ai: {
+            threaten: 1.5,
+        },
+    },
+//#noname-kit-end skill:shuoye_shanxian
+//#noname-kit-begin skill:shuoye_tiewan
+    // ===== 【崔格】铁腕（主公技）=====
+    shuoye_tiewan: {
+        audio: "ext:朔夜/audio/skill:2",
+        zhuSkill: true,
+        direct: true,
+        popup: false,
+        trigger: {
+            global: ["gameStart", "die"],
+        },
+        logAudio(line) {
+            return "ext:朔夜/audio/skill/" + (line === 2 ? "shuoye_tiewan2" : "shuoye_tiewan1");
+        },
+        // 注意：filter 的 event 是被触发的原始事件（gameStart 时是 game 事件），
+        // 时机名要看第 3 个参数 name；content 里用 event.triggername。
+        filter(event, player, name) {
+            if (!player.isIn() || player.isDead()) {
+                return false;
+            }
+            const helper = lib.shuoyeCuige;
+            if (name === "gameStart") {
+                const mine = helper.campOf(player);
+                return game.hasPlayer((current) => {
+                    return current !== player && current.isIn() && !current.isDead() && helper.campOf(current) !== mine;
+                });
+            }
+            const source = event.source;
+            if (!source || !source.isIn() || event.player === source) {
+                return false;
+            }
+            return helper.campOf(source) === helper.campOf(player);
+        },
+        async content(event, trigger, player) {
+            const helper = lib.shuoyeCuige;
+            if (event.triggername === "gameStart") {
+                const mine = helper.campOf(player);
+                const newIdentity = helper.alliedIdentity(player);
+                const list = game
+                    .filterPlayer((current) => current !== player && current.isIn() && !current.isDead() && helper.campOf(current) !== mine)
+                    .sortBySeat();
+                if (!list.length) {
+                    return;
+                }
+                player.logSkill("shuoye_tiewan", null, null, null, [1]);
+                // 记录投降顺序：若与你阵营不同的角色全部投降，最后一名投降者死亡
+                const converted = [];
+                for (const current of list) {
+                    if (!current.isIn() || current.isDead()) {
+                        continue;
+                    }
+                    if (helper.campOf(current) === helper.campOf(player)) {
+                        continue;
+                    }
+                    const result = await current
+                        .chooseBool("铁腕：是否调整至同阵营？")
+                        .set("ai", function () {
+                            const me = get.player();
+                            const lord = get.event().shuoyeTieWanLord;
+                            return !!lord && get.attitude(me, lord) > 0;
+                        })
+                        .set("shuoyeTieWanLord", player)
+                        .forResult();
+                    if (!result.bool) {
+                        continue;
+                    }
+                    helper.changeIdentity(current, newIdentity, player);
+                    converted.push(current);
+                }
+                // 若均投降，则最后一名（最后一个选择投降的）死亡。
+                // 无来源死亡，不触发身份奖惩。
+                if (list.length && converted.length === list.length) {
+                    const sacrifice = converted[converted.length - 1];
+                    if (sacrifice && sacrifice.isIn() && !sacrifice.isDead()) {
+                        game.log(sacrifice, "作为", "#g【铁腕】", "的最后一名投降者死亡");
+                        await sacrifice.die();
+                    }
+                }
+                return;
+            }
+            // 与你阵营相同的角色击杀另一名角色后：令一名角色失去一个阶段/技能
+            const goon = await player
+                .chooseBool("铁腕：是否令其失去阶段/技能？")
+                .set("ai", function () {
+                    const me = get.player();
+                    return game.hasPlayer((current) => {
+                        return current !== me && get.attitude(me, current) < 0 && lib.shuoyeCuige.skillList(current).length > 0;
+                    });
+                })
+                .forResult();
+            if (!goon.bool) {
+                return;
+            }
+            const targetResult = await player
+                .chooseTarget(
+                    "铁腕：选择一名角色",
+                    function (card, player2, target) {
+                        return target.isIn() && !target.isDead();
+                    },
+                    function (target) {
+                        const me = get.player();
+                        return -get.attitude(me, target) + (target === me ? -10 : 0);
+                    },
+                )
+                .forResult();
+            const target = targetResult.targets && targetResult.targets[0];
+            if (!targetResult.bool || !target || !target.isIn() || target.isDead()) {
+                return;
+            }
+            player.logSkill("shuoye_tiewan", [target], null, null, [2]);
+            const skillList = helper.skillList(target);
+            const lostPhases = Array.isArray(target.storage.shuoye_tiewan_phase) ? target.storage.shuoye_tiewan_phase : [];
+            const phaseList = helper.phases.filter((phase) => !lostPhases.includes(phase));
+            const controls = [];
+            if (phaseList.length) {
+                controls.push("失去一个阶段");
+            }
+            if (skillList.length) {
+                controls.push("失去一个技能");
+            }
+            if (!controls.length) {
+                return;
+            }
+            const aiType = controls.includes("失去一个技能") ? "失去一个技能" : "失去一个阶段";
+            const typeResult = await player
+                .chooseControl(controls)
+                .set("prompt", "铁腕：选择一个阶段/技能")
+                .set("ai", function () {
+                    return get.event().shuoyeTieWanType;
+                })
+                .set("shuoyeTieWanType", aiType)
+                .forResult();
+            const control = controls.includes(typeResult.control) ? typeResult.control : controls[0];
+            if (control === "失去一个技能") {
+                const names = skillList.map((skill) => get.translation(skill));
+                const aiSkill = skillList[skillList.length - 1];
+                const aiName = get.translation(aiSkill);
+                const skillResult = await player
+                    .chooseControl(names)
+                    .set("prompt", "铁腕：选择一个技能")
+                    .set("ai", function () {
+                        const name = get.event().shuoyeTieWanSkill;
+                        return get.event().shuoyeTieWanSkillList.includes(name) ? name : get.event().shuoyeTieWanSkillList[0];
+                    })
+                    .set("shuoyeTieWanSkill", aiName)
+                    .set("shuoyeTieWanSkillList", names)
+                    .forResult();
+                const index = names.indexOf(skillResult.control);
+                if (index >= 0) {
+                    helper.loseSkill(target, skillList[index]);
+                }
+                return;
+            }
+            const phaseNames = phaseList.map((phase) => helper.phaseName(phase));
+            const aiPhase = helper.phaseName(phaseList.includes("phaseUse") ? "phaseUse" : phaseList[0]);
+            const phaseResult = await player
+                .chooseControl(phaseNames)
+                .set("prompt", "铁腕：选择一个阶段")
+                .set("ai", function () {
+                    const name = get.event().shuoyeTieWanPhase;
+                    return get.event().shuoyeTieWanPhaseList.includes(name) ? name : get.event().shuoyeTieWanPhaseList[0];
+                })
+                .set("shuoyeTieWanPhase", aiPhase)
+                .set("shuoyeTieWanPhaseList", phaseNames)
+                .forResult();
+            const phaseIndex = phaseNames.indexOf(phaseResult.control);
+            if (phaseIndex >= 0) {
+                helper.losePhase(target, phaseList[phaseIndex]);
+            }
+        },
+    },
+//#noname-kit-end skill:shuoye_tiewan
+//#noname-kit-begin skill:shuoye_tiewan_phase
+    // 铁腕造成的“永久失去阶段”状态（顶层技能，避免 subSkill 展开时机问题）
+    shuoye_tiewan_phase: {
+        charlotte: true,
+        // nopop：武将悬浮面板不列此条，只留「缺」角标（与禁牌/技能失效一致）
+        nopop: true,
+        forced: true,
+        popup: false,
+        silent: true,
+        mark: true,
+        marktext: "缺",
+        intro: {
+            markcount() {
+                return 0;
+            },
+            content(storage) {
+                if (!Array.isArray(storage) || !storage.length) {
+                    return "已失去的阶段：无";
+                }
+                return "已失去的阶段：" + storage.map((phase) => lib.shuoyeCuige.phaseName(phase)).join("、");
+            },
+        },
+        trigger: {
+            player: "phaseBeforeStart",
+        },
+        filter(event, player) {
+            const list = player.storage.shuoye_tiewan_phase;
+            return Array.isArray(list) && list.length > 0 && Array.isArray(event.phaseList);
+        },
+        content(event, trigger, player) {
+            const list = player.storage.shuoye_tiewan_phase;
+            const lost = trigger.phaseList.filter((phase) => list.includes(phase));
+            if (!lost.length) {
+                return;
+            }
+            trigger.phaseList = trigger.phaseList.filter((phase) => !list.includes(phase));
+            game.log(player, "因", "#g【铁腕】", "失去了", lost.map((phase) => lib.shuoyeCuige.phaseName(phase)).join("、"));
+        },
+    },
+//#noname-kit-end skill:shuoye_tiewan_phase
+//#noname-kit-begin skill:shuoye_feixing
+    // ===== 维特鲁姆飞行 =====
+    shuoye_feixing: {
+        audio: "ext:朔夜/audio/skill:1",
+        direct: true,
+        trigger: {
+            global: "phaseEnd",
+        },
+        filter(event, player) {
+            if (!player.isIn() || player.isDead()) {
+                return false;
+            }
+            // 每 X 个回合限一次（X = 场上存活人数）。用总回合数 game.phaseNumber 计冷却，
+            // 不用 game.roundNumber：本技能自己会交换座位，而轮数判定按座次比较
+            // （content.ts:4682-4690 的 seatNum 分支），座位一变就可能被当成新一轮而提前重置。
+            const gap = Math.max(1, game.countPlayer());
+            const lastTurn = player.storage.shuoye_feixing_turn;
+            if (typeof lastTurn === "number" && game.phaseNumber - lastTurn < gap) {
+                return false;
+            }
+            const source = event.player;
+            if (!source || !source.isIn() || source.isDead()) {
+                return false;
+            }
+            return game.hasPlayer((current) => {
+                return current !== source && current.isIn() && !current.isDead();
+            });
+        },
+        async content(event, trigger, player) {
+            const source = trigger.player;
+            if (!source || !source.isIn() || source.isDead()) {
+                return;
+            }
+            if (!game.hasPlayer((current) => current !== source && current.isIn() && !current.isDead())) {
+                return;
+            }
+            const result = await player
+                .chooseTarget(
+                    "维特鲁姆飞行：选择一名角色",
+                    function (card, player2, target) {
+                        return target !== get.event().shuoyeFeixingSource;
+                    },
+                    function (target) {
+                        const me = get.player();
+                        return 1 + get.attitude(me, target) / 5;
+                    },
+                )
+                .set("shuoyeFeixingSource", source)
+                .forResult();
+            const target = result.targets && result.targets[0];
+            if (!result.bool || !target || !target.isIn() || target.isDead()) {
+                return;
+            }
+            player.logSkill("shuoye_feixing", [source, target]);
+            player.setStorage("shuoye_feixing_turn", game.phaseNumber);
+            // 交换座位：主机结算，客机一起改 dataset 与座次编号
+            game.broadcastAll(
+                function (player1, player2) {
+                    if (typeof game.swapSeat === "function") {
+                        game.swapSeat(player1, player2, false);
+                    }
+                },
+                source,
+                target,
+            );
+            game.log(source, "与", target, "交换了座位");
+            const order = [source];
+            if (!order.includes(target)) {
+                order.push(target);
+            }
+            for (const current of order) {
+                if (!current.isIn() || current.isDead()) {
+                    continue;
+                }
+                if (!current.countCards("hs")) {
+                    continue;
+                }
+                await current.chooseToUse("维特鲁姆飞行：选择一张牌").forResult();
+            }
+        },
+    },
+//#noname-kit-end skill:shuoye_feixing
+//#noname-kit-begin skill:shuoye_zitai
+    // ===== 维特鲁姆姿态 =====
+    shuoye_zitai: {
+        audio: "ext:朔夜/audio/skill:1",
+        forced: true,
+        mod: {
+            cardUsable(card, player, num) {
+                if (card && card.name === "sha") {
+                    return Math.max(0, player.maxHp);
+                }
+            },
+            attackRangeBase(player) {
+                return Math.max(0, player.maxHp);
+            },
+        },
+        trigger: {
+            player: "phaseDrawBegin2",
+        },
+        filter(event, player) {
+            return !event.numFixed;
+        },
+        content(event, trigger, player) {
+            trigger.num = Math.max(0, player.maxHp);
+            trigger.numFixed = true;
+        },
+    },
+//#noname-kit-end skill:shuoye_zitai
+//#noname-kit-begin skill:shuoye_zhili
+    // ===== 维特鲁姆之力 =====
+    shuoye_zhili: {
+        audio: "ext:朔夜/audio/skill:2",
+        persevereSkill: true,
+        forced: true,
+        popup: false,
+        trigger: {
+            player: "damageBegin4",
+        },
+        // 你使用伤害牌造成伤害的那部分交给两个子技能：
+        // shuoye_zhili_keep（damageBefore 封掉取消）+ shuoye_zhili_final（damageBegin4 保底）
+        group: ["shuoye_zhili_keep", "shuoye_zhili_final"],
+        logAudio(line) {
+            const index = line >= 1 && line <= 3 ? line : 1;
+            return "ext:朔夜/audio/skill/shuoye_zhili" + index;
+        },
+        filter(event, player) {
+            // 只处理“你受到的伤害”：一次不小于 2 点则免疫
+            return (event.num || 0) >= 2;
+        },
+        async content(event, trigger, player) {
+            const num = trigger.num || 0;
+            trigger.cancel();
+            await lib.shuoyeCuige.immune(player, num);
+        },
+    },
+//#noname-kit-end skill:shuoye_zhili
+//#noname-kit-begin skill:shuoye_silie
+    // ===== 维特鲁姆撕裂 =====
+    shuoye_silie: {
+        audio: "ext:朔夜/audio/skill:3",
+        persevereSkill: true,
+        forced: true,
+        popup: false,
+        trigger: {
+            source: "damageAfter",
+            target: "damageAfter",
+        },
+        logAudio(line) {
+            const index = line >= 1 && line <= 3 ? line : 1;
+            return "ext:朔夜/audio/skill/shuoye_silie" + index;
+        },
+        filter(event, player) {
+            if (!player.isIn() || player.isDead()) {
+                return false;
+            }
+            if (!event.num || event.num <= 0) {
+                return false;
+            }
+            const target = event.source === player ? event.player : event.source;
+            if (!target || target === player || !target.isIn() || target.isDead()) {
+                return false;
+            }
+            // 非因此法：由撕裂自己使用的牌造成的伤害不再触发
+            const useCard = event.getParent("useCard");
+            if (useCard && useCard.name === "useCard" && useCard.shuoyeSilie) {
+                return false;
+            }
+            return true;
+        },
+        async content(event, trigger, player) {
+            const target = trigger.source === player ? trigger.player : trigger.source;
+            if (!target || !target.isIn() || target.isDead()) {
+                return;
+            }
+            const isSource = trigger.source === player;
+            // 强制调整：受到你造成伤害 → 手牌数；对你造成伤害 → 体力上限
+            if (isSource) {
+                const diff = target.countCards("h") - player.countCards("h");
+                if (diff > 0) {
+                    player.logSkill("shuoye_silie", [target], null, null, [1]);
+                    game.log(player, "的", "#g【维特鲁姆撕裂】", "将", target, "的手牌数调整为与自己相同");
+                    await target.chooseToDiscard("h", true, diff);
+                }
+                if (target.countCards("h") >= player.countCards("h")) {
+                    return;
+                }
+            } else {
+                const diff = target.maxHp - player.maxHp;
+                if (diff > 0) {
+                    player.logSkill("shuoye_silie", [target], null, null, [1]);
+                    game.log(player, "的", "#g【维特鲁姆撕裂】", "将", target, "的体力上限调整为与自己相同");
+                    await target.loseMaxHp({ num: diff });
+                }
+                if (target.maxHp >= player.maxHp) {
+                    return;
+                }
+            }
+            if (!player.isIn() || player.isDead() || !target.isIn() || target.isDead()) {
+                return;
+            }
+            // 否则：可令其本回合无法使用牌，然后对其使用一张牌
+            const goon = await player
+                .chooseBool("维特鲁姆撕裂：是否令其无法使用牌？")
+                .set("ai", function () {
+                    const me = get.player();
+                    const current = get.event().shuoyeSilieTarget;
+                    if (!current || !current.isIn()) {
+                        return false;
+                    }
+                    if (get.attitude(me, current) >= 0) {
+                        return false;
+                    }
+                    return me.countCards("hes") > 0;
+                })
+                .set("shuoyeSilieTarget", target)
+                .forResult();
+            if (!goon.bool) {
+                return;
+            }
+            player.logSkill("shuoye_silie", [target], null, null, [2]);
+            target.addTempSkill("shuoye_silie_nouse", "phaseAfter");
+            target.setStorage("shuoye_silie_nouse", true);
+            target.markSkill("shuoye_silie_nouse");
+            game.log(target, "本回合无法使用牌");
+            // 没有能对该角色使用的牌就不开空的选牌框
+            const usable = player.getCards("hes").some((card) => target.isIn() && !target.isDead() && player.canUse(card, target, false));
+            if (!usable) {
+                return;
+            }
+            const cardResult = await player
+                .chooseCard({
+                    prompt: "维特鲁姆撕裂：选择一张牌",
+                    position: "hes",
+                    filterCard(card, player2) {
+                        const target2 = get.event().shuoyeSilieTarget;
+                        if (!target2 || !target2.isIn() || target2.isDead()) {
+                            return false;
+                        }
+                        return player2.canUse(card, target2, false);
+                    },
+                    ai(card) {
+                        const player2 = get.player();
+                        const target2 = get.event().shuoyeSilieTarget;
+                        if (!target2) {
+                            return 0;
+                        }
+                        return Math.max(0, get.effect(target2, card, player2, player2));
+                    },
+                })
+                .set("shuoyeSilieTarget", target)
+                .forResult();
+            if (!cardResult.bool || !cardResult.cards || !cardResult.cards.length) {
+                return;
+            }
+            const card = cardResult.cards[0];
+            const hpBefore = target.hp;
+            const useNext = player.useCard({
+                card: card,
+                targets: [target],
+                addCount: false,
+                noai: true,
+                shuoyeSilie: true,
+            });
+            useNext.directHit = [target];
+            await useNext;
+            if (!target.isIn() || target.isDead() || !player.isIn() || player.isDead()) {
+                return;
+            }
+            if (!get.tag(card, "damage")) {
+                return;
+            }
+            if (target.hp < hpBefore) {
+                return;
+            }
+            // 体力值未减少：可令其本回合技能失效，然后额外结算直到体力值减少
+            const again = await player
+                .chooseBool("维特鲁姆撕裂：是否令其技能失效？")
+                .set("ai", function () {
+                    const me = get.player();
+                    const current = get.event().shuoyeSilieTarget;
+                    return !!current && current.isIn() && get.attitude(me, current) < 0;
+                })
+                .set("shuoyeSilieTarget", target)
+                .forResult();
+            if (!again.bool) {
+                return;
+            }
+            player.logSkill("shuoye_silie", [target], null, null, [3]);
+            const skills = target.getSkills(null, false, false).filter((skill) => {
+                const info = get.info(skill);
+                return info && !info.persevereSkill && !info.charlotte;
+            });
+            if (skills.length) {
+                target.tempBanSkill(skills, "phaseAfter");
+                // 角标：技能本回合失效；同时让这些技能在武将面板变灰（skillBlocker）
+                target.setStorage("shuoye_silie_ban", skills.slice(0));
+                target.addTempSkill("shuoye_silie_ban", "phaseAfter");
+                target.markSkill("shuoye_silie_ban");
+                game.broadcastAll(
+                    function (current, name) {
+                        if (typeof current.addSkillBlocker !== "function") {
+                            return;
+                        }
+                        // 同一回合多次撕裂时不要重复登记（remove 只删一条，重复会留脏数据）
+                        const list = current.storage.skill_blocker;
+                        if (Array.isArray(list) && list.includes(name)) {
+                            return;
+                        }
+                        current.addSkillBlocker(name);
+                    },
+                    target,
+                    "shuoye_silie_ban",
+                );
+            }
+            for (let index = 0; index < 10; index++) {
+                if (!target.isIn() || target.isDead() || !player.isIn() || player.isDead()) {
+                    break;
+                }
+                const next = player.useCard({
+                    card: card,
+                    targets: [target],
+                    addCount: false,
+                    noai: true,
+                    shuoyeSilie: true,
+                });
+                next.directHit = [target];
+                await next;
+                if (target.hp < hpBefore) {
+                    break;
+                }
+            }
+        },
+    },
+//#noname-kit-end skill:shuoye_silie
+//#noname-kit-begin skill:shuoye_silie_nouse
+    // 撕裂：本回合无法使用牌（状态标记，不占技能面板）
+    shuoye_silie_nouse: {
+        charlotte: true,
+        // nopop：武将悬浮面板不列此条，只留圆盘角标
+        nopop: true,
+        mark: true,
+        marktext: "禁",
+        intro: {
+            markcount() {
+                return 0;
+            },
+            content() {
+                return "本回合无法使用或打出牌";
+            },
+        },
+        mod: {
+            // 无法使用牌
+            cardEnabled() {
+                return false;
+            },
+            // 无法打出 / 响应（闪、杀、无懈等作为响应时走 cardRespondable）
+            cardRespondable() {
+                return false;
+            },
+            // 濒死求桃走的是 cardSavable 而不是 cardEnabled（library/index.js:11014）
+            cardSavable() {
+                return false;
+            },
+        },
+        onremove(player, skill) {
+            if (player.storage[skill] !== undefined) {
+                delete player.storage[skill];
+            }
+            if (player.marks && player.marks[skill]) {
+                player.unmarkSkill(skill);
+            }
+        },
+    },
+//#noname-kit-end skill:shuoye_silie_nouse
+//#noname-kit-begin skill:shuoye_zhili_final
+    // 维特鲁姆之力 · 最终结算：本次伤害最终不足 2 点时保底为 2；被技能取消的伤害继续结算
+    // 时机参考朔夜【法咒】（damageBegin4 + lastDo + priority 抢最后一次结算），
+    // 复活写法参考阴阳师杀·烈关羽【傲意】（finished / _cancelled / _triggered 复原）。
+    shuoye_zhili_final: {
+        charlotte: true,
+        forced: true,
+        silent: true,
+        popup: false,
+        trigger: {
+            source: ["damageBegin4", "damageCancelled"],
+        },
+        // 排在鸽府包【伤害】(priority -9999) 之后、帝录天锋【法咒】(priority -10000) 之前：
+        // 法咒最后覆盖，所以体力上限不大于 4 的帝录天锋仍只吃 1 点。
+        lastDo: true,
+        priority: -9999.5,
+        filter(event, player, name) {
+            if (!player.isIn() || player.isDead()) {
+                return false;
+            }
+            // 只认“你使用的伤害牌”造成的伤害
+            const card = event.card;
+            if (!card || !get.tag(card, "damage")) {
+                return false;
+            }
+            const use = event.getParent("useCard");
+            if (!use || use.name !== "useCard" || use.player !== player) {
+                return false;
+            }
+            if (name === "damageCancelled") {
+                // 同一段伤害只复活一次，防止反复取消/复活成死循环
+                return !event.shuoye_zhili_revived;
+            }
+            return true;
+        },
+        async content(event, trigger, player) {
+            if (event.triggername === "damageCancelled") {
+                // 伤害被技能取消：把事件复原，让它继续走到 damageBegin4 再保底到 2 点
+                trigger.shuoye_zhili_revived = true;
+                trigger._cancelled = false;
+                trigger.finished = false;
+                trigger._triggered = true;
+                return;
+            }
+            const num = trigger.num || 0;
+            // 已经不小于 2 点：保底语义下不做任何改动，也不摸牌
+            if (num >= 2) {
+                return;
+            }
+            trigger.num = 2;
+            // 增伤（保底 2）也播立绘视频
+            lib.shuoyeCuige.playVideo(player);
+            player.logSkill("shuoye_zhili", trigger.player ? [trigger.player] : null, null, null, [2]);
+            await player.draw(1);
+        },
+    },
+//#noname-kit-end skill:shuoye_zhili_final
+//#noname-kit-begin skill:shuoye_zhili_keep
+    // 维特鲁姆之力 · 强制生效：你使用的伤害牌造成的这段伤害不能被技能取消
+    // 写法参考鸽府包【伤害】(gf_damage_a) 在伤害最早期封掉 cancel / filterStop 的做法：
+    // 比靠 damageCancelled 复活更确定，不依赖事件队列时序。
+    shuoye_zhili_keep: {
+        charlotte: true,
+        forced: true,
+        silent: true,
+        popup: false,
+        trigger: {
+            source: "damageBefore",
+        },
+        firstDo: true,
+        priority: 1000000000,
+        filter(event, player) {
+            if (!player.isIn() || player.isDead()) {
+                return false;
+            }
+            if (event.shuoye_zhili_kept) {
+                return false;
+            }
+            const card = event.card;
+            if (!card || !get.tag(card, "damage")) {
+                return false;
+            }
+            const use = event.getParent("useCard");
+            return !!use && use.name === "useCard" && use.player === player;
+        },
+        async content(event, trigger, player) {
+            trigger.shuoye_zhili_kept = true;
+            // 这一段伤害不能被打断：取消与提前终止无效
+            trigger.cancel = () => {};
+            trigger.filterStop = () => false;
+        },
+    },
+//#noname-kit-end skill:shuoye_zhili_keep
+//#noname-kit-begin skill:shuoye_silie_ban
+    // 维特鲁姆撕裂 · 技能失效：只作为圆盘角标存在，并让失效技能在武将面板变灰
+    // skillBlocker 写法参考官方【缓夺材】的 blocker 子技能：get.is.blocked → game.filterSkills
+    shuoye_silie_ban: {
+        charlotte: true,
+        popup: false,
+        silent: true,
+        nopop: true,
+        mark: true,
+        marktext: "废",
+        // 被本技能列名的技能，在 get.is.blocked / game.filterSkills 里算作不可用（面板变灰）
+        skillBlocker(skill, player) {
+            const list = player.storage.shuoye_silie_ban;
+            return Array.isArray(list) && list.includes(skill);
+        },
+        intro: {
+            markcount() {
+                return 0;
+            },
+            content(storage) {
+                if (!Array.isArray(storage) || !storage.length) {
+                    return "技能本回合失效";
+                }
+                return "技能本回合失效：" + storage.map((s) => get.translation(s)).join("、");
+            },
+        },
+        onremove(player, skill) {
+            delete player.storage[skill];
+            player.removeSkillBlocker(skill);
+            if (player.marks && player.marks[skill]) {
+                player.unmarkSkill(skill);
+            }
+            // 客机同步清除（主机的上面已经清过，重复调用是安全的空操作）
+            game.broadcastAll(
+                function (target, name) {
+                    if (typeof target.removeSkillBlocker === "function") {
+                        target.removeSkillBlocker(name);
+                    }
+                    delete target.storage[name];
+                    if (target.marks && target.marks[name]) {
+                        target.unmarkSkill(name);
+                    }
+                },
+                player,
+                skill,
+            );
+        },
+    },
+//#noname-kit-end skill:shuoye_silie_ban
 };
 
 export default skills;

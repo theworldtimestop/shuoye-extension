@@ -1,5 +1,15 @@
 // 【李信】技能台词 / 阵亡台词（千幻聆音与原生台词均读此表）
 const voices = {
+	// 【崔格】技能台词（自原「无敌少侠」包迁入，路径与 audio 声明的 skill id 对齐）
+	"#ext:朔夜/audio/skill/shuoye_tiewan1": "现在我要发布我的第一道命令，找出导致这场背叛的软弱。",
+	"#ext:朔夜/audio/skill/shuoye_tiewan2": "漫淌在我们街头的鲜血，净化了我们。",
+	"#ext:朔夜/audio/skill/shuoye_feixing1": "（飞行音效）",
+	"#ext:朔夜/audio/skill/shuoye_zitai1": "对你我绝不会犯同样的错！",
+	"#ext:朔夜/audio/skill/shuoye_silie1": "不过如此。",
+	"#ext:朔夜/audio/skill/shuoye_silie2": "我给了你光荣赴死的机会！",
+	"#ext:朔夜/audio/skill/shuoye_silie3": "不。",
+	"#ext:朔夜/audio/skill/shuoye_zhili1": "（音效）",
+	"#ext:朔夜/audio/skill/shuoye_zhili2": "下一个就是你们。",
 	// 【尼禄】所多玛之兽
 	"#ext:朔夜/audio/skill/shuoye_huangjinzhibei1": "来吧，开始宴会吧！",
 	"#ext:朔夜/audio/skill/shuoye_huangjinzhibei2": "这个，是敌人太强了吧？余可没有错哦？",

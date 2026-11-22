@@ -216,6 +216,7 @@ const characters = {
         sex: "female",
         hp: 3,
         group: "qun",
+        isZhugong: true,
         skills: ["shuoye_diedai", "shuoye_shouheng", "shuoye_lichang"],
         trashBin: [],
     },
@@ -572,6 +573,38 @@ shuoye_weiyan: {
         trashBin: [],
     },
 //#noname-kit-end character:shuoye_zhaoyun
+//#noname-kit-begin character:shuoye_cuige
+    // 崔格 · 摄政王（原「无敌少侠」独立包，已并入本包）
+    shuoye_cuige: {
+        sex: "male",
+        group: "qun",
+        hp: 5,
+        maxHp: 5,
+        hujia: 0,
+        skills: ["shuoye_tiewan", "shuoye_feixing", "shuoye_zitai", "shuoye_zhili", "shuoye_silie"],
+        isZhugong: true,
+        img: "extension/朔夜/image/shuoye_cuige.png",
+        trashBin: [],
+    },
+//#noname-kit-end character:shuoye_cuige
+//#noname-kit-begin character:shuoye_cuige_boss
+    // 最终的摄政王-崔格（boss 模式专用变体：体力上限 10，其余与原崔格相同）
+    shuoye_cuige_boss: {
+        sex: "male",
+        group: "qun",
+        hp: 10,
+        maxHp: 10,
+        hujia: 0,
+        skills: ["shuoye_tiewan", "shuoye_feixing", "shuoye_zitai", "shuoye_zhili", "shuoye_silie"],
+        isZhugong: true,
+        // 只做 boss 挑战用，写法模仿【U-奥尔加玛丽】：数据里不打 isBoss，
+        // 而是在 main/precontent.js 的 boss 模式 arenaReady 里动态标成 boss；
+        // isUnseen 让它不出现在图鉴 / 点将 / 自由选将 / 设置→武将 列表。
+        isUnseen: true,
+        img: "extension/朔夜/image/shuoye_cuige.png",
+        trashBin: [],
+    },
+//#noname-kit-end character:shuoye_cuige_boss
 };
 for (let i in characters) {
     characters[i].img = characters[i].img || `extension/朔夜/image/character/${i}.jpg`;

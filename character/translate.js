@@ -796,7 +796,7 @@ const translates = {
 //#noname-kit-end translate:shuoye_yuqi
 //#noname-kit-begin translate:shuoye_weituan
     shuoye_weituan:'卫团',
-    shuoye_weituan_info:`你按照幸福度解锁以下技能：10-${get.poptip("shuoye_dinghan")}，40-${get.poptip("shuoye_shenxian")}，70-${get.poptip("shuoye_powei")}，100-${get.poptip("shuoye_dengshen")}。`,
+    shuoye_weituan_info:`你按照幸福度解锁以下技能：10-${get.poptip("shuoye_dinghan")}，40-${get.poptip("shuoye_shanxian")}，70-${get.poptip("shuoye_powei")}，100-${get.poptip("shuoye_dengshen")}。`,
 //#noname-kit-end translate:shuoye_weituan
 //#noname-kit-begin translate:shuoye_dinghan
     shuoye_dinghan:'定汉',
@@ -1384,6 +1384,53 @@ shuoye_kuanggu: "狂骨",
 //#noname-kit-begin translate:shuoye_longhun_wuxie
     shuoye_longhun_wuxie: "龙魂",
 //#noname-kit-end translate:shuoye_longhun_wuxie
+//#noname-kit-begin translate:shuoye_shanxian
+    shuoye_shanxian:'甚贤',
+    shuoye_shanxian_info:'锁定技，当其他角色因弃置而失去基本牌时，你摸一张牌。',
+//#noname-kit-end translate:shuoye_shanxian
+//#noname-kit-begin translate:shuoye_cuige
+    shuoye_cuige: "崔格",
+//#noname-kit-end translate:shuoye_cuige
+//#noname-kit-begin translate:shuoye_tiewan
+    shuoye_tiewan: "铁腕",
+    shuoye_tiewan_ab: "【铁腕】",
+    shuoye_tiewan_info: "主公技，游戏开始时，与你阵营不同角色可选择是否调整至与你阵营相同。与你阵营相同角色击杀不同角色后，你可令一名角色失去一个阶段/技能。若均投降，则最后一名死亡。",
+//#noname-kit-end translate:shuoye_tiewan
+//#noname-kit-begin translate:shuoye_feixing
+    shuoye_feixing: "维特鲁姆飞行",
+    shuoye_feixing_ab: "【维特鲁姆飞行】",
+    shuoye_feixing_info: "每轮限一次，一名角色的回合结束时，你可令其与一名角色交换位置，然后双方各可使用一张牌。",
+//#noname-kit-end translate:shuoye_feixing
+//#noname-kit-begin translate:shuoye_zitai
+    shuoye_zitai: "维特鲁姆姿态",
+    shuoye_zitai_ab: "【维特鲁姆姿态】",
+    shuoye_zitai_info: "你的摸牌/出杀/攻击距离数改为体力上限。",
+//#noname-kit-end translate:shuoye_zitai
+//#noname-kit-begin translate:shuoye_zhili
+    shuoye_zhili: "维特鲁姆之力",
+    shuoye_zhili_ab: "【维特鲁姆之力】",
+    shuoye_zhili_info: "持恒技，你体力值/体力上限减少时，若不小于2，你免疫之，摸等量牌。你使用伤害牌造成伤害时若<2，令伤害改为2，你摸一张牌。",
+//#noname-kit-end translate:shuoye_zhili
+//#noname-kit-begin translate:shuoye_silie
+    shuoye_silie: "维特鲁姆撕裂",
+    shuoye_silie_ab: "【维特鲁姆撕裂】",
+    shuoye_silie_info: "持恒技，一名角色非因此法对/受到你造成伤害时，若其体力上限/手牌数不小于你，调整至与你相同。否则你可令其本回合无法使用或打出牌，然后你对其使用一张牌，此牌不可响应无任何限制且不计入次数。此牌若为伤害牌且结算后其体力值未减少，你可令其本回合技能失效，然后额外结算直到其体力减少。",
+//#noname-kit-end translate:shuoye_silie
+//#noname-kit-begin translate:shuoye_tiewan_phase
+    shuoye_tiewan_phase: "铁腕·失阶",
+    shuoye_tiewan_phase_info: "该角色本局游戏永久失去了部分阶段，回合内将跳过这些阶段。",
+//#noname-kit-end translate:shuoye_tiewan_phase
+//#noname-kit-begin translate:shuoye_silie_nouse
+    shuoye_silie_nouse: "撕裂·禁牌",
+    shuoye_silie_nouse_info: "本回合无法使用或打出牌。",
+//#noname-kit-end translate:shuoye_silie_nouse
+//#noname-kit-begin translate:shuoye_silie_ban
+    shuoye_silie_ban: "撕裂·技能失效",
+    shuoye_silie_ban_info: "该角色本回合技能失效，武将面板中失效的技能会变灰。",
+//#noname-kit-end translate:shuoye_silie_ban
+//#noname-kit-begin translate:shuoye_cuige_boss
+    shuoye_cuige_boss: "最终的摄政王-崔格",
+//#noname-kit-end translate:shuoye_cuige_boss
 //#noname-kit-begin translate:shuoye_wudi
     shuoye_wudi: "无敌",
     shuoye_wudi_ab: "【无敌】",

@@ -1123,6 +1123,11 @@ export async function precontent() {
     lib.arenaReady.push(() => {
         if (get.mode() == "boss") {
             lib.character.shuoye_u_aoerjiamali.isBoss = true;
+            // 最终的摄政王-崔格：只在 boss 挑战里作为 boss 出现（数据里是 isUnseen，
+            // 不参与任何普通选将/点将/图鉴；这里仅在 boss 模式给它打上 isBoss）
+            if (lib.character.shuoye_cuige_boss) {
+                lib.character.shuoye_cuige_boss.isBoss = true;
+            }
             lib.skill.shuoyekuangyan.limited = false;
             lib.skill.shuoyekuangyan.usable = 1;
             // BOSS 模式：奥尔加玛丽的限定技〖惊天〗改为每回合限一次
@@ -1133,5 +1138,6 @@ export async function precontent() {
             }
         }
     });
+
     
 }
