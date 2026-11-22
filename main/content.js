@@ -377,6 +377,27 @@ export async function content(config, pack) {
             }
         }
     } catch (e) {}
+    // 【三轮霞】trigger 类技能的“指定你”询问：player.logSkill 内部用
+    // game.createEvent("logSkill", false) 建事件（_triggered 为 null），不会触发任何事件钩子，
+    // 所以没法用 logSkillAfter 接。这里给 Player.prototype.logSkill 打一层薄补丁，
+    // 只在“技能目标里出现了持有【三轮】的角色”时交给 queueSkillAsk 排一个询问事件，其余原样返回。
+    try {
+        const PlayerProto = lib.element && lib.element.Player && lib.element.Player.prototype;
+        if (PlayerProto && typeof PlayerProto.logSkill === "function" && !PlayerProto.logSkill.shuoyeSanlunPatched) {
+            const originLogSkill = PlayerProto.logSkill;
+            const patchedLogSkill = function (name, targets) {
+                const result = originLogSkill.apply(this, arguments);
+                try {
+                    if (lib.skill && lib.skill.shuoye_sanlun && typeof lib.skill.shuoye_sanlun.queueSkillAsk === "function") {
+                        lib.skill.shuoye_sanlun.queueSkillAsk(this, name, targets);
+                    }
+                } catch (e) {}
+                return result;
+            };
+            patchedLogSkill.shuoyeSanlunPatched = true;
+            PlayerProto.logSkill = patchedLogSkill;
+        }
+    } catch (e) {}
     // 【雷之律者】雷电芽衣：名词解释（get.poptip 超链接）、浮雷兜底卡、俱利伽罗副将卡、紫色额外血条样式、BGM 还原
     try {
         if (lib.poptip) {

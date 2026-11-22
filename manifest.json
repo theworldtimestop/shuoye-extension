@@ -1,6 +1,6 @@
 {
   "version": "0.1.45",
-  "update": "新增赤胆游龙赵云",
+  "update": "新增赤胆游龙赵云，修复一些bug",
   "files": {
     "audio/die/shuoye_leidianyayi1.mp3": "66aab7f7b989b41419e8b69be8e14413a506f74f",
     "audio/die/shuoye_lixin1.mp3": "38f6358fb73b555f59238043602e0066c78fd674",
@@ -284,7 +284,7 @@
     "character/index.js": "6b4551e7a9afb9f4e169e42fe7f4fe133dbab881",
     "character/intro.js": "b3e69cb77887e1095a27bbb91b32786ed28aa340",
     "character/pinyin.js": "4cb0d048cc9d37faa4971734298251d1d0f4ce16",
-    "character/skill.js": "a1fe64afc1e067a52dfd99b44e4b96e9332f18bf",
+    "character/skill.js": "df677edadad7aba3c6e01c86feccd3a9c9955c13",
     "character/skill.js.bak-nilu-anim": "0ca573b31e2359403c692043b2a9d7cf996476cb",
     "character/skill.js.bak-nilu-anim2": "67cabbd602699bc5dd1f19dc9f2c4e5f9313343d",
     "character/skillPatch.js": "f6b50867d3c162a8f824ef1f4b2fbed067574be2",
@@ -421,7 +421,7 @@
     "info.json": "3bb361eafd0e77c5706695f6ce171f00ad23d8d3",
     "LICENSE": "7713a1753ce88f2c7e6b054ecc8e4c786df76300",
     "main/config.js": "db3e142f96afd677e716237b7d16528f39cfa241",
-    "main/content.js": "76260f4815ceaddd4767d4bc7106a0641975a0ba",
+    "main/content.js": "ee2e3b3d172f0abcf680fd426bff7c6f5025b8fd",
     "main/lixinfx.js": "7e155bdb7ef8a7b334d8720eea8e17d8c9603d60",
     "main/package.js": "507519d13fd04ac018ca427d7b9f6fea7f14126f",
     "main/precontent.js": "0fb06a7328df7f7737274597bc2817715e2b02fb",

@@ -22396,6 +22396,7 @@ shuoye_weiyan_enter: {
             "shuoye_sanlun_respondask",
             "shuoye_sanlun_skillask",
             "shuoye_sanlun_skillban",
+            "shuoye_sanlun_skillbanuse",
             "shuoye_sanlun_skilldamage",
             "shuoye_sanlun_losehp",
             "shuoye_sanlun_losemaxhp",
@@ -22610,6 +22611,78 @@ shuoye_weiyan_enter: {
                 if (choose && typeof choose === "object" && choose !== evt) choose.shuoye_adapted_here = true;
                 if (choose === evt && evt.name && (evt.name === "chooseToUse" || evt.name === "chooseToRespond")) evt.shuoye_adapted_here = true;
             } catch (e) {}
+        },
+        // trigger 类技能的 logSkill 事件是 game.createEvent("logSkill", false) 创建的（_triggered 为 null），
+        // 不会触发任何事件钩子，因此没法用 logSkillAfter 这类 trigger 接。
+        // main/content.js 给 Player.prototype.logSkill 打了一层薄补丁转到这里：
+        // 只在“技能目标里出现了持有【三轮】且尚未适应的角色”时排一个询问事件。
+        queueSkillAsk(user, name, targets) {
+            if (!user || !name || typeof name !== "string") return;
+            if (name.indexOf("shuoye_") === 0) return;
+            if (!lib.skill || !lib.skill[name]) return;
+            const info = lib.skill[name];
+            // 装备技 / 子技能的日志不是“武将技能指定你”，不当作可适应对象
+            if (info.equipSkill || info.sub) return;
+            // 该技能是否真的是某人拥有的技能（排除卡牌/装备派生技能）
+            if (typeof user.getSkills === "function" && !user.getSkills(false, false, false).includes(name)) return;
+            // 主动技的询问交给 useSkillAfter（避免同一次发动弹两次）
+            try {
+                const cur = _status.event;
+                if (cur && typeof cur.getParent === "function") {
+                    const used = cur.getParent("useSkill", false, true);
+                    if (used && used.name === "useSkill" && used.skill === name) return;
+                }
+            } catch (e) {}
+            if (!targets) return;
+            const type = get.itemtype(targets);
+            let list;
+            if (type === "player") list = [targets];
+            else if (type === "players") list = targets.slice();
+            else return;
+            for (const target of list) {
+                if (!target || target === user) continue;
+                if (typeof target.hasSkill !== "function" || !target.hasSkill("shuoye_sanlun")) continue;
+                if (typeof target.isIn === "function" && !target.isIn()) continue;
+                const key = "skill:" + name;
+                if (lib.skill.shuoye_sanlun.hasAdapted(target, key)) continue;
+                if (lib.skill.shuoye_sanlun.getList(target).length >= lib.skill.shuoye_sanlun.limit) continue;
+                const queue = (lib.skill.shuoye_sanlun._pendingAsk = lib.skill.shuoye_sanlun._pendingAsk || {});
+                const flag = target.playerid + "|" + name;
+                if (queue[flag]) continue;
+                const host = lib.skill.shuoye_sanlun.findAskHost();
+                if (!host) continue;
+                queue[flag] = true;
+                try {
+                    host.insertAfter(
+                        async function (event, trigger, player) {
+                            try {
+                                delete lib.skill.shuoye_sanlun._pendingAsk[event.shuoyeAskFlag];
+                            } catch (e) {}
+                            if (!player || typeof player.isIn !== "function") return;
+                            if (!player.isIn() || !player.hasSkill("shuoye_sanlun")) return;
+                            await lib.skill.shuoye_sanlun.askAdapt(player, [
+                                { key: event.shuoyeAskKey, label: "技能「" + get.translation(event.shuoyeAskSkill) + "」" },
+                            ]);
+                        },
+                        { player: target, shuoyeAskKey: key, shuoyeAskSkill: name, shuoyeAskFlag: flag }
+                    );
+                } catch (e) {
+                    delete queue[flag];
+                }
+            }
+        },
+        findAskHost() {
+            let evt = _status.event;
+            let guard = 0;
+            while (evt && guard < 40) {
+                if (typeof evt.insertAfter === "function" && !evt.finished) return evt;
+                if (typeof evt.getParent !== "function") return null;
+                const parent = evt.getParent();
+                if (!parent || typeof parent.insertAfter !== "function") return null;
+                evt = parent;
+                guard++;
+            }
+            return null;
         },
         registerBan(player, skill) {
             game.broadcastAll(
@@ -22878,6 +22951,49 @@ shuoye_weiyan_enter: {
                     if (!player.isIn()) return;
                     const skill = trigger.skill;
                     await lib.skill.shuoye_sanlun.askAdapt(player, [{ key: "skill:" + skill, label: "技能「" + get.translation(skill) + "」" }]);
+                },
+            },
+            skillbanuse: {
+                charlotte: true,
+                silent: true,
+                forced: true,
+                popup: false,
+                locked: true,
+                priority: 213,
+                trigger: { global: "useSkillBefore" },
+                filter(event, player) {
+                    if (!event || event.player === player || !event.skill) return false;
+                    if (!event.targets || !event.targets.includes(player)) return false;
+                    return lib.skill.shuoye_sanlun.hasAdapted(player, "skill:" + event.skill);
+                },
+                async content(event, trigger, player) {
+                    const skill = trigger.skill;
+                    const user = trigger.player;
+                    const info = get.info(skill) || {};
+                    // 主动技的内容跑在 useSkill 里（不存在名为 <技能> 的事件），
+                    // 所以只能在 useSkillBefore 取消；但引擎的消耗记录写在 useSkill 的 content 里，
+                    // 取消后就跳过了，这里按引擎同样的规则补记，以免无限制重复使用。
+                    try {
+                        const stat = user.stat[user.stat.length - 1];
+                        if (stat) {
+                            if (trigger.addCount != false) {
+                                stat.skill[skill] = (stat.skill[skill] || 0) + 1;
+                                const sourceSkill = info.sourceSkill;
+                                if (sourceSkill) stat.skill[sourceSkill] = (stat.skill[sourceSkill] || 0) + 1;
+                            }
+                            stat.allSkills = (stat.allSkills || 0) + 1;
+                        }
+                    } catch (e) {}
+                    if (info.limited && typeof user.awakenSkill === "function") user.awakenSkill(skill);
+                    if (typeof info.precontent === "function") {
+                        try {
+                            await info.precontent(trigger, trigger.getTrigger ? trigger.getTrigger() : undefined, user);
+                        } catch (e) {}
+                    }
+                    trigger.cancel();
+                    player.popup("适应");
+                    lib.skill.shuoye_sanlun.flashWheel(player);
+                    game.log(player, "适应了", "#g" + get.translation(skill), "，其对你无效");
                 },
             },
             skillban: {
