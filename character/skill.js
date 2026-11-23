@@ -1250,6 +1250,15 @@ if (!lib.shuoyeIf) {
                         : taoBase;
                 }
             } catch (e) {}
+            // 万煌：阳间模式取消阳形态的「伤害+1」，描述里只保留「出杀数+1」
+            try {
+                const wanhuangBase = lib.shuoyeWanhuangInfoBase;
+                if (typeof wanhuangBase === "string") {
+                    lib.translate["shuoye_wanhuang_info"] = qumoshi
+                        ? "转换技，初始阳，造成/受到你伤害的其他角色获得【讨】直到脱离濒死，拥有【讨】角色造成/受到你伤害后，你摸一张牌，阳：你出杀数+1，获得【破夜】【星火】。阴：你造成伤害改为弃置目标两倍牌，获得【幻羽】【列卿】。"
+                        : wanhuangBase;
+                }
+            } catch (e) {}
         },
         // ---------------- 无量空处：领域状态 ----------------
         domainOwner() {

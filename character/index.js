@@ -93,6 +93,13 @@ game.import("character", function () {
     if (lib.shuoyeIf && lib.shuoyeIf.qumoshi()) {
         shuoye.translate["shuoye_dihuang_tao_info"] = "拥有【讨】的角色无法使用或打出非伤害牌；该角色脱离濒死状态后移除【讨】。";
     }
+    // 【万煌】阳形态的「伤害+1」在阳间模式取消：描述里只保留「出杀数+1」
+    if (!lib.shuoyeWanhuangInfoBase) {
+        lib.shuoyeWanhuangInfoBase = shuoye.translate["shuoye_wanhuang_info"];
+    }
+    if (lib.shuoyeIf && lib.shuoyeIf.qumoshi()) {
+        shuoye.translate["shuoye_wanhuang_info"] = "转换技，初始阳，造成/受到你伤害的其他角色获得【讨】直到脱离濒死，拥有【讨】角色造成/受到你伤害后，你摸一张牌，阳：你出杀数+1，获得【破夜】【星火】。阴：你造成伤害改为弃置目标两倍牌，获得【幻羽】【列卿】。";
+    }
     lib.translate["shuoye_character_config"] = "朔夜";
     if (!lib.config[`extension_朔夜_characterPack_shuoye_enable`]) {
 		game.saveExtensionConfig("朔夜", "characterPack_shuoye_enable", true);
