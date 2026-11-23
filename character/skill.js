@@ -25771,6 +25771,8 @@ shuoye_shanxian: {
             source: "damageAfter",
             target: "damageAfter",
         },
+        // 判定要用“受伤之前”的数值，由这个子技能在 damageBegin1 快照
+        group: ["shuoye_silie_snap"],
         logAudio(line) {
             const index = line >= 1 && line <= 3 ? line : 1;
             return "ext:朔夜/audio/skill/shuoye_silie" + index;
@@ -25798,28 +25800,38 @@ shuoye_shanxian: {
             if (!target || !target.isIn() || target.isDead()) {
                 return;
             }
-            const isSource = trigger.source === player;
-            // 强制调整：受到你造成伤害 → 手牌数；对你造成伤害 → 体力上限
-            if (isSource) {
-                const diff = target.countCards("h") - player.countCards("h");
-                if (diff > 0) {
-                    player.logSkill("shuoye_silie", [target], null, null, [1]);
-                    game.log(player, "的", "#g【维特鲁姆撕裂】", "将", target, "的手牌数调整为与自己相同");
-                    await target.chooseToDiscard("h", true, diff);
-                }
-                if (target.countCards("h") >= player.countCards("h")) {
-                    return;
-                }
-            } else {
-                const diff = target.maxHp - player.maxHp;
-                if (diff > 0) {
+            // 判定基准：伤害结算前的快照（shuoye_silie_snap 在 damageBegin1 记录）
+            const snap = trigger.shuoyeSilieSnap;
+            const otherMax = snap ? snap.other.maxHp : target.maxHp;
+            const otherHand = snap ? snap.other.hand : target.countCards("h");
+            const selfMax = snap ? snap.self.maxHp : player.maxHp;
+            const selfHand = snap ? snap.self.hand : player.countCards("h");
+            const maxDiff = otherMax - selfMax;
+            const handDiff = otherHand - selfHand;
+            // 体力上限不小于你 → 调整至与你相同
+            // 下限保护：loseMaxHp 会把 maxHp≤0 的角色直接杀死（content.ts:12308），
+            // 差额按快照算，若目标在结算中上限已被别的技能压低，夹到至少剩 1 点。
+            if (maxDiff > 0) {
+                const adjMax = Math.max(0, Math.min(maxDiff, target.maxHp - 1));
+                if (adjMax > 0) {
                     player.logSkill("shuoye_silie", [target], null, null, [1]);
                     game.log(player, "的", "#g【维特鲁姆撕裂】", "将", target, "的体力上限调整为与自己相同");
-                    await target.loseMaxHp({ num: diff });
+                    await target.loseMaxHp({ num: adjMax });
                 }
-                if (target.maxHp >= player.maxHp) {
-                    return;
+            }
+            // 手牌数不小于你 → 调整至与你相同
+            // 差额按快照算，目标当前手牌可能已经变少，夹到现有手牌数，避免出现凑不够的强制弃牌
+            if (handDiff > 0) {
+                const adjHand = Math.min(handDiff, target.countCards("h"));
+                if (adjHand > 0) {
+                    player.logSkill("shuoye_silie", [target], null, null, [1]);
+                    game.log(player, "的", "#g【维特鲁姆撕裂】", "将", target, "的手牌数调整为与自己相同");
+                    await target.chooseToDiscard("h", true, adjHand);
                 }
+            }
+            // 两项都不小于你：没有用牌环节
+            if (maxDiff >= 0 && handDiff >= 0) {
+                return;
             }
             if (!player.isIn() || player.isDead() || !target.isIn() || target.isDead()) {
                 return;
@@ -26140,6 +26152,49 @@ shuoye_shanxian: {
         },
     },
 //#noname-kit-end skill:shuoye_silie_ban
+//#noname-kit-begin skill:shuoye_silie_snap
+    // 维特鲁姆撕裂 · 伤害前快照：记录伤害结算前的体力上限/手牌数
+    // （撕裂的判定要“按受伤之前来算”，damageAfter 时再读会被伤害结算过程改变）
+    shuoye_silie_snap: {
+        charlotte: true,
+        forced: true,
+        silent: true,
+        popup: false,
+        trigger: {
+            source: ["damageBegin1"],
+            target: ["damageBegin1"],
+        },
+        firstDo: true,
+        filter(event, player) {
+            if (!player.isIn() || player.isDead()) {
+                return false;
+            }
+            if (!event.num || event.num <= 0) {
+                return false;
+            }
+            const other = event.source === player ? event.player : event.source;
+            if (!other || other === player || !other.isIn() || other.isDead()) {
+                return false;
+            }
+            // 非因此法：撕裂自己用的牌造成的伤害不需要快照
+            const useCard = event.getParent("useCard");
+            if (useCard && useCard.name === "useCard" && useCard.shuoyeSilie) {
+                return false;
+            }
+            return true;
+        },
+        async content(event, trigger, player) {
+            const other = trigger.source === player ? trigger.player : trigger.source;
+            if (!other) {
+                return;
+            }
+            trigger.shuoyeSilieSnap = {
+                other: { maxHp: other.maxHp, hand: other.countCards("h") },
+                self: { maxHp: player.maxHp, hand: player.countCards("h") },
+            };
+        },
+    },
+//#noname-kit-end skill:shuoye_silie_snap
 };
 
 export default skills;

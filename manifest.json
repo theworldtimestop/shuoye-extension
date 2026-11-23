@@ -1,6 +1,6 @@
 {
   "version": "0.1.46",
-  "update": "新增：摄政王崔格，BOSS崔格",
+  "update": "新增摄政王崔格以及boss，修复bug",
   "files": {
     "audio/die/shuoye_leidianyayi1.mp3": "66aab7f7b989b41419e8b69be8e14413a506f74f",
     "audio/die/shuoye_lixin1.mp3": "38f6358fb73b555f59238043602e0066c78fd674",
@@ -293,7 +293,7 @@
     "character/index.js": "6b4551e7a9afb9f4e169e42fe7f4fe133dbab881",
     "character/intro.js": "3a4d15253f12b03ccaa23f4a16a1319d0a7b0448",
     "character/pinyin.js": "4cb0d048cc9d37faa4971734298251d1d0f4ce16",
-    "character/skill.js": "18b8536afbd1331e18d86a968aa4b077f8faa612",
+    "character/skill.js": "0cd0c70b2f9d9626cd95ab91230d2f72a96d5c2f",
     "character/skill.js.bak-nilu-anim": "0ca573b31e2359403c692043b2a9d7cf996476cb",
     "character/skill.js.bak-nilu-anim2": "67cabbd602699bc5dd1f19dc9f2c4e5f9313343d",
     "character/skillPatch.js": "f6b50867d3c162a8f824ef1f4b2fbed067574be2",
