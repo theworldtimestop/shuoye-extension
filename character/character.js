@@ -605,6 +605,20 @@ shuoye_weiyan: {
         trashBin: [],
     },
 //#noname-kit-end character:shuoye_cuige_boss
+//#noname-kit-begin character:shuoye_dihuangzhirong
+    // 帝皇之戎（赛尔号）：阳形态=帝皇之钺（男），阴形态=帝皇之御（女）。
+    // 立绘 / 性别 / 技能组随【万煌】切换，阴形态立绘走 characterSubstitute（见 character/index.js）。
+    shuoye_dihuangzhirong: {
+        sex: "male",
+        group: "wei",
+        hp: 3,
+        maxHp: 3,
+        hujia: 0,
+        skills: ["shuoye_wanhuang"],
+        img: "extension/朔夜/image/shuoye_dihuangzhirong.png",
+        trashBin: [],
+    },
+//#noname-kit-end character:shuoye_dihuangzhirong
 };
 for (let i in characters) {
     characters[i].img = characters[i].img || `extension/朔夜/image/character/${i}.jpg`;

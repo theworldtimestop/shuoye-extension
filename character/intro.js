@@ -67,5 +67,7 @@ const characterIntro = {
 	// 【无敌少侠】全能侠 / Invincible
 	shuoye_nuolan: "并不全能的全能侠，维特鲁姆帝国的战士。",
 	shuoye_make: "Invincible！",
+	// 【帝皇之戎】直至烈阳升起
+	shuoye_dihuangzhirong: "异度的暗影侵蚀宇宙，圣殿的战土们挺身而出，将秩序的新阳高高筑起。",
 };
 export default characterIntro;

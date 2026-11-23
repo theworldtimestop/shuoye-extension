@@ -39,6 +39,8 @@ game.import("character", function () {
 			shuoye_yiguyoutai: [["shuoye_yiguyoutai_2", ["ext:朔夜/image/shuoye_yiguyoutai_2.jpg"]]],
 			shuoye_liixiang: [["shuoye_liixiang_fo", ["ext:朔夜/image/shuoye_liixiang_fo.jpg"]]],
 			shuoye_yuantoushanwo: [["shuoye_yuantoushanwo_awaken", ["ext:朔夜/image/shuoye_yuantoushanwo_awaken.jpg"]]],
+			// 【帝皇之戎】阴形态（帝皇之御）立绘，由【万煌】切换时 player.changeSkin 调用
+			shuoye_dihuangzhirong: [["shuoye_dihuangzhirong_yu", ["ext:朔夜/image/shuoye_dihuangzhirong_yu.png"]]],
 		},
 		dynamicTranslate: { ...dynamicTranslates },
 		characterIntro: { ...characterIntros },
@@ -74,6 +76,22 @@ game.import("character", function () {
         shuoye.translate["shuoye_weitelumu_suohou_info"] = "该模式不可用。";
         shuoye.translate["shuoye_weitelumu_bainian_info"] = "你每回合首次受到或造成伤害后，可与其同时失去一点体力。";
         shuoye.translate["shuoye_wudi_info"] = "锁定技，你体力值减少一点后，下一次摸牌数+1、下一次回复量+1/2（向下取整）；你每次脱离濒死状态后，本局游戏你造成的伤害+1。";
+    }
+    // 【阳间模式】星火：该模式下取消「受到你的伤害+1」（判定见 skill.js 的 shuoye_xinghuo）。
+    // 与【无量空处】/【维特鲁姆】一致：这里只存原描述并给个初始值，真正生效的值由房主广播的
+    // _status.shuoyeQumoshi 决定（见 lib.shuoyeIf.setQumoshi → refreshXinghuoInfo）。
+    if (!lib.shuoyeXinghuoInfoBase) {
+        lib.shuoyeXinghuoInfoBase = shuoye.translate["shuoye_xinghuo_info"];
+    }
+    if (lib.shuoyeIf && lib.shuoyeIf.qumoshi()) {
+        shuoye.translate["shuoye_xinghuo_info"] = "锁定技，拥有【讨】角色无法使用或打出非伤害牌。";
+    }
+    // 【讨】的标记说明也随模式变（悬停文案在 skill.js 的 shuoye_dihuang_tao.intro 里实时判定）
+    if (!lib.shuoyeTaoInfoBase) {
+        lib.shuoyeTaoInfoBase = shuoye.translate["shuoye_dihuang_tao_info"];
+    }
+    if (lib.shuoyeIf && lib.shuoyeIf.qumoshi()) {
+        shuoye.translate["shuoye_dihuang_tao_info"] = "拥有【讨】的角色无法使用或打出非伤害牌；该角色脱离濒死状态后移除【讨】。";
     }
     lib.translate["shuoye_character_config"] = "朔夜";
     if (!lib.config[`extension_朔夜_characterPack_shuoye_enable`]) {

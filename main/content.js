@@ -411,6 +411,12 @@ export async function content(config, pack) {
                 name: "俱利伽罗",
                 info: "雷电芽衣的副将。体力1，优先承担雷电芽衣受到的伤害与体力流失且不会溢出；一张黑色牌非因使用进入弃牌堆时，获得之置于武将牌上称为【鸣】；雷电芽衣受到或造成伤害后，将一张【鸣】当做【闪】对来源或目标使用。",
             });
+            // 【帝皇之戎】绝毁伤害：描述里的超链接词条（get.poptip("shuoye_juehui")）
+            lib.poptip.add({
+                id: "shuoye_juehui",
+                name: "绝毁伤害",
+                info: "无法被免疫、转移或减少，且会给予你真正的死亡。",
+            });
         }
     } catch (e) {}
     // 【浮雷】是核心 SP 包的延时锦囊：本局没启用该包时补一份最小定义，保证描述里的超链接能正常显示与解释
@@ -478,7 +484,7 @@ export async function content(config, pack) {
     // 评级：SSS -> legend，SS -> epic，S -> rare，A -> junk
     const shuoyeRarity = {
         legend: ["shuoye_u_aoerjiamali", "shuoye_taikongyishitaer", "shuoye_shuoye", "shuoye_zhenshiqiaotelude", "shuoye_yiguyoutai", "shuoye_lixin", "shuoye_shengyuxieyan", "shuoye_nilu", "shuoye_cuige"],
-        epic: ["shuoye_ifwutiaowu", "shuoye_weiyan", "shuoye_chengjinji", "shuoye_miaoshitiannv", "shuoye_tianqixinghun", "shuoye_xituo", "shuoye_qiaolienide", "shuoye_chongtiansiling", "shuoye_luxi", "shuoye_wuweijuezhe", "shuoye_kongyuanxingzhe", "shuoye_wuxinchan", "shuoye_dilutianfeng", "shuoye_lx_guang", "shuoye_lx_an", "shuoye_richekuanjian", "shuoye_mankanshizhenzi", "shuoye_bojiaoyang", "shuoye_leidianyayi", "shuoye_nuolan"],
+        epic: ["shuoye_ifwutiaowu", "shuoye_weiyan", "shuoye_chengjinji", "shuoye_miaoshitiannv", "shuoye_tianqixinghun", "shuoye_xituo", "shuoye_qiaolienide", "shuoye_chongtiansiling", "shuoye_luxi", "shuoye_wuweijuezhe", "shuoye_kongyuanxingzhe", "shuoye_wuxinchan", "shuoye_dilutianfeng", "shuoye_lx_guang", "shuoye_lx_an", "shuoye_richekuanjian", "shuoye_mankanshizhenzi", "shuoye_bojiaoyang", "shuoye_leidianyayi", "shuoye_nuolan", "shuoye_dihuangzhirong"],
         rare: [
             "shuoye_zuguoren", "shuoye_ailisi", "shuoye_feiniaomashi", "shuoye_fengchuanxiangzi",
             "shuoye_nutaocanglan", "shuoye_wujishengwu", "shuoye_wutiaowu", "shuoye_xier",

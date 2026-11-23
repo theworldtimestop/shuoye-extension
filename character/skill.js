@@ -1198,6 +1198,9 @@ if (!lib.shuoyeIf) {
                     if (lib.skill && lib.skill.shuoye_sanlun && typeof lib.skill.shuoye_sanlun.refreshAdaptInfo === "function") {
                         lib.skill.shuoye_sanlun.refreshAdaptInfo();
                     }
+                    if (lib.shuoyeIf && typeof lib.shuoyeIf.refreshXinghuoInfo === "function") {
+                        lib.shuoyeIf.refreshXinghuoInfo();
+                    }
                 } catch (e) {}
             }, value);
         },
@@ -1229,6 +1232,24 @@ if (!lib.shuoyeIf) {
                     lib.translate[skill + "_info"] = qumoshi ? alter[skill] : text;
                 } catch (e) {}
             }
+        },
+        // 按阳间模式刷新【星火】的描述（原描述存在 lib.shuoyeXinghuoInfoBase）
+        refreshXinghuoInfo() {
+            const base = lib.shuoyeXinghuoInfoBase;
+            const taoBase = lib.shuoyeTaoInfoBase;
+            const qumoshi = lib.shuoyeIf.qumoshi();
+            try {
+                if (typeof base === "string") {
+                    lib.translate["shuoye_xinghuo_info"] = qumoshi ? "锁定技，拥有【讨】角色无法使用或打出非伤害牌。" : base;
+                }
+            } catch (e) {}
+            try {
+                if (typeof taoBase === "string") {
+                    lib.translate["shuoye_dihuang_tao_info"] = qumoshi
+                        ? "拥有【讨】的角色无法使用或打出非伤害牌；该角色脱离濒死状态后移除【讨】。"
+                        : taoBase;
+                }
+            } catch (e) {}
         },
         // ---------------- 无量空处：领域状态 ----------------
         domainOwner() {
@@ -2340,6 +2361,222 @@ if (!lib.shuoyeNilu) {
             } catch (e) {}
             return null;
         },
+    };
+}
+
+// ===== 【帝皇之戎】绝毁伤害 =====
+// 真伤：生成伤害事件后立刻锁死「取消 / 防止 / 转移 / 减免」四条通路。
+// 写法参考鸽府包【伤害】(gf_damage_a) 在伤害最早期封掉 cancel / filterStop，
+// 以及错乱时空 cl_abdamage 的「峰值保底 + 强制目标」；这里直接锁事件字段，
+// 不额外挂监听技能，联机时只在主机结算，客机不需要额外状态。
+async function shuoyeJuehuiDamage(target, num, source) {
+    if (!target || typeof target.damage !== "function" || typeof num !== "number" || num <= 0) return null;
+    const next = source ? target.damage({ num, source }) : target.damage({ num, nosource: true });
+    // 标记：【万煌】阴形态的「伤害改为弃牌」跳过绝毁伤害
+    next._shuoye_juehui = true;
+    // 不可取消 / 不可终止
+    next.cancel = () => {};
+    next.untrigger = () => {};
+    next.filterStop = () => false;
+    try {
+        // 不可被「免疫」跳过结算：鸽府包 gf_immuneDamage 这类免疫靠 unreal + goto(6) 直接跳过伤害结算
+        next.goto = () => next;
+        Object.defineProperty(next, "unreal", {
+            configurable: true,
+            get() {
+                return false;
+            },
+            set() {},
+        });
+        // 免疫写法还会把 _triggered 置空来吞掉 damageEnd/After：这里只接受数字（引擎生命周期写入的都是数字）
+        let shuoyeTriggered = next._triggered;
+        Object.defineProperty(next, "_triggered", {
+            configurable: true,
+            get() {
+                return shuoyeTriggered;
+            },
+            set(value) {
+                if (typeof value === "number") shuoyeTriggered = value;
+            },
+        });
+        // 不可转移：受伤害角色锁定
+        Object.defineProperty(next, "player", {
+            configurable: true,
+            get() {
+                return target;
+            },
+            set() {},
+        });
+        // 不可减免：数值只允许升高（增伤照常生效，减伤 / 归零无效）
+        let peak = num;
+        Object.defineProperty(next, "num", {
+            configurable: true,
+            get() {
+                return peak;
+            },
+            set(value) {
+                if (typeof value === "number" && value > peak) peak = value;
+            },
+        });
+    } catch (e) {}
+    game.log(target, "受到了" + (source ? "来自" + get.translation(source) + "的" : "无来源的"), "#y" + num, "点", "#y绝毁伤害");
+    await next;
+    // 隐藏效果：绝毁伤害结算后体力不大于-1 → 检索其死亡条件并强制死亡
+    if (target && !target.isDead() && target.isAlive() && typeof target.hp === "number" && target.hp <= -1) {
+        await shuoyeForceDeath(target, source);
+    }
+    return next;
+}
+
+// 检索一个角色身上「可能维持其不死」的技能（濒死 / 死亡 / 体力变化 / 回复伤害类触发）
+function shuoyeDeathConditionSkills(player) {
+    const list = [];
+    if (!player || typeof player.getSkills !== "function") return list;
+    const patterns = ["dying", "die", "changeHp", "recover", "loseHp", "damage"];
+    let skills = [];
+    try {
+        skills = player.getSkills();
+    } catch (e) {
+        return list;
+    }
+    const matchTrigger = function (trigger) {
+        if (!trigger) return false;
+        for (const role of ["player", "global"]) {
+            let evts = trigger[role];
+            if (!evts) continue;
+            if (!Array.isArray(evts)) evts = [evts];
+            const hit = evts.some(function (evt) {
+                return (
+                    typeof evt === "string" &&
+                    patterns.some(function (prefix) {
+                        return evt.startsWith(prefix);
+                    })
+                );
+            });
+            if (hit) return true;
+        }
+        return false;
+    };
+    for (const skill of skills) {
+        const info = lib.skill[skill];
+        if (!info || info.superCharlotte) continue;
+        let hit = matchTrigger(info.trigger);
+        // 免死也可能写在 subSkill 里（菜月昴【死亡回归】、六魂花存档等）：
+        // 摘掉父技能后，expandSkills 就不再展开这些子技能
+        if (!hit && info.subSkill) {
+            for (const key in info.subSkill) {
+                const sub = info.subSkill[key];
+                if (sub && matchTrigger(sub.trigger)) {
+                    hit = true;
+                    break;
+                }
+            }
+        }
+        if (hit) list.push(skill);
+    }
+    return list;
+}
+
+// 强制阵亡：无视免死 / 复活 / 存档类的「死亡条件」
+async function shuoyeForceDeath(target, source) {
+    if (!target || target.isDead() || !target.isAlive()) return false;
+    const reason = { source: source || null };
+    // 死亡前把体力压到 -1 以下：免疫「回复至1点」类免死
+    const clampHp = function () {
+        game.broadcastAll(function (p) {
+            if (typeof p.hp === "number" && p.hp > -1) p.hp = -1;
+            if (p.update) p.update();
+        }, target);
+    };
+    // 强制死亡期间封住复活：免死 / 救援类效果大多走 player.revive（含其他角色的救援技能）
+    // 只在本次强杀窗口内生效，窗口结束后原样放行
+    try {
+        game.broadcastAll(function (p) {
+            if (!p || p._shuoyeReviveHook) return;
+            p._shuoyeReviveOriginal = p.revive;
+            p.revive = function () {
+                if (this._shuoyeForceDying) return this;
+                var fn = this._shuoyeReviveOriginal;
+                if (typeof fn !== "function") return this;
+                return fn.apply(this, arguments);
+            };
+            p._shuoyeReviveHook = true;
+        }, target);
+        game.broadcastAll(function (p, flag) {
+            if (p) p._shuoyeForceDying = flag;
+        }, target, true);
+    } catch (e) {}
+    const dieOnce = function () {
+        // 优先调用引擎原型上的 die：绕过角色实例上被改写的 die（如 FGO 的 player.die = function(){}）
+        const base = lib.element && lib.element.player && typeof lib.element.player.die === "function" ? lib.element.player.die : null;
+        const evt = base ? base.call(target, reason) : target.die(reason);
+        if (!evt) return null;
+        // 本次阵亡不可被取消 / 终止
+        evt.cancel = () => {};
+        evt.untrigger = () => {};
+        evt.filterStop = () => false;
+        evt.shuoyeForceDie = true;
+        return evt;
+    };
+    // 被“非 revive 方式”的免死从死亡名单里拉回时（只改 class / 不改名单），先清理名单再重杀，
+    // 避免重复入 game.dead
+    const normalize = function () {
+        game.broadcastAll(function (p) {
+            if (!p || !game.dead || !p.isAlive()) return;
+            if (game.dead.includes(p)) game.dead.remove(p);
+        }, target);
+    };
+    let banned = [];
+    try {
+        for (let i = 0; i < 5; i++) {
+            if (target.isDead() || !target.isAlive()) break;
+            normalize();
+            clampHp();
+            // 前两次照常阵亡；仍被救回则先无视其死亡条件再强杀
+            if (i >= 2 && !banned.length) {
+                const list = shuoyeDeathConditionSkills(target);
+                for (const skill of list) {
+                    if (!target.hasSkill(skill)) continue;
+                    target.removeSkill(skill, true);
+                    banned.push(skill);
+                }
+                if (banned.length) game.log(target, "的", "#y" + banned.length, "个与死亡条件相关的技能被无视");
+            }
+            const evt = dieOnce();
+            if (!evt) break;
+            await evt;
+        }
+    } finally {
+        // 解除复活封锁（广播，保持客机一致）
+        try {
+            game.broadcastAll(function (p, flag) {
+                if (p) p._shuoyeForceDying = flag;
+            }, target, false);
+        } catch (e) {}
+        // 没死成：把无视掉的技能还回去
+        if (!target.isDead() && target.isAlive() && banned.length) {
+            for (const skill of banned) {
+                if (!target.hasSkill(skill)) target.addSkill(skill);
+            }
+            banned = [];
+        }
+    }
+    const dead = target.isDead() || !target.isAlive();
+    if (dead) {
+        game.log(target, "的体力不大于", "#y-1", "，被", "#g绝毁伤害", "强制阵亡");
+    } else {
+        game.log(target, "在", "#g绝毁伤害", "下仍未阵亡");
+    }
+    return dead;
+}
+
+// 技能 content 在联机时会下发到客机执行，统一挂到全局 lib.shuoyeDihuang 上，
+// 回调里只依赖 lib/game/get 等全局，不引用模块闭包变量
+if (!lib.shuoyeDihuang) {
+    lib.shuoyeDihuang = {
+        juehui: (target, num, source) => shuoyeJuehuiDamage(target, num, source),
+        forceDeath: (target, source) => shuoyeForceDeath(target, source),
+        deathSkills: (player) => shuoyeDeathConditionSkills(player),
     };
 }
 
@@ -26197,6 +26434,470 @@ shuoye_shanxian: {
         },
     },
 //#noname-kit-end skill:shuoye_silie_snap
+//#noname-kit-begin skill:shuoye_wanhuang
+    //【帝皇之戎】万煌：转换技（初始阳）。
+    // 阳：你造成的伤害+1（阳间模式取消）、使用【杀】的次数上限+1，拥有【破夜】【星火】；
+    // 阴：你造成的伤害改为令目标弃置两倍伤害数的牌，拥有【幻羽】【列卿】。
+    // 其他角色「对你造成伤害」或「受到你造成的伤害」后：其获得【讨】→ 你摸一张牌 → 阴阳互换。
+    shuoye_wanhuang: {
+        derivation: ["shuoye_poye", "shuoye_xinghuo", "shuoye_huanyu", "shuoye_lieqing"],
+        mark: true,
+        marktext: "☯",
+        // 转换技：storage 为真 = 阴（初始阳）。
+        // changeZhuanhuanji 只把标记动画广播出去，形态相关的 storage / 立绘 / 性别 / 技能组都在这里显式同步，
+        // 否则客机的 mod（出杀次数）与 filter 会读到旧形态。
+        zhuanhuanji(player, skill) {
+            const yin = !player.storage[skill];
+            player.storage[skill] = yin;
+            try {
+                game.broadcastAll(function (pid, name, value) {
+                    const list = (game.players || []).concat(game.dead || []);
+                    for (let i = 0; i < list.length; i++) {
+                        const p = list[i];
+                        if (p && p.playerid == pid) {
+                            if (!p.storage) p.storage = {};
+                            p.storage[name] = value;
+                            break;
+                        }
+                    }
+                }, player.playerid, skill, yin);
+            } catch (e) {}
+            // 形态立绘：阳=帝皇之钺（本体），阴=帝皇之御（characterSubstitute 换肤）
+            try {
+                player.changeSkin({ characterName: "shuoye_dihuangzhirong" }, yin ? "shuoye_dihuangzhirong_yu" : "shuoye_dihuangzhirong");
+            } catch (e) {}
+            // 形态性别
+            try {
+                game.broadcastAll(function (p, sex) {
+                    if (p) p.sex = sex;
+                }, player, yin ? "female" : "male");
+            } catch (e) {}
+            // 形态技能组
+            try {
+                player.addAdditionalSkill(skill, yin ? ["shuoye_huanyu", "shuoye_lieqing"] : ["shuoye_poye", "shuoye_xinghuo"]);
+            } catch (e) {}
+            player.markSkill(skill);
+            try {
+                player.update();
+            } catch (e) {}
+            game.log(player, "切换为", yin ? "#y阴" : "#y阳", "形态");
+        },
+        intro: {
+            // 标记说明随形态与阳间模式变化
+            content(storage) {
+                const qumoshi = lib.shuoyeIf && typeof lib.shuoyeIf.qumoshi === "function" && lib.shuoyeIf.qumoshi();
+                if (storage) return "当前形态：阴——你造成的伤害改为令该角色弃置两倍伤害数的牌；你拥有【幻羽】【列卿】。";
+                if (qumoshi) return "当前形态：阳——使用【杀】的次数上限+1；你拥有【破夜】【星火】。";
+                return "当前形态：阳——你造成的伤害+1，使用【杀】的次数上限+1；你拥有【破夜】【星火】。";
+            },
+        },
+        init(player, skill) {
+            player.storage[skill] = !!player.storage[skill];
+            try {
+                player.addAdditionalSkill(skill, player.storage[skill] ? ["shuoye_huanyu", "shuoye_lieqing"] : ["shuoye_poye", "shuoye_xinghuo"]);
+            } catch (e) {}
+            // 标记由 addSkill 根据 mark:true 自动挂载，这里不再重复 markSkill（init 时节点可能未就绪）
+        },
+        mod: {
+            // 阳：使用【杀】的次数上限+1
+            cardUsable(card, player, num) {
+                if (!card || card.name != "sha") return;
+                if (player.storage.shuoye_wanhuang) return;
+                return num + 1;
+            },
+        },
+        group: ["shuoye_wanhuang_me", "shuoye_wanhuang_other", "shuoye_wanhuang_yang", "shuoye_wanhuang_yin"],
+        // 万煌联动（阴形态的转换也走这里，保证顺序一致）：
+        // ①其他角色获得【讨】 ②其拥有【讨】→ 你摸一张牌 ③阴阳互换
+        async afterDamage(player, other) {
+            if (!player || !other || other === player) return;
+            if (!other.isAlive() || other.isDead()) return;
+            const TAO = "shuoye_dihuang_tao";
+            if (!other.hasSkill(TAO) && lib.skill.shuoye_dihuang_tao && typeof lib.skill.shuoye_dihuang_tao.give === "function") {
+                lib.skill.shuoye_dihuang_tao.give(other);
+            }
+            if (!other.hasSkill(TAO)) return;
+            await player.draw();
+            game.log(player, "因", "#g【万煌】", "摸一张牌");
+            lib.skill.shuoye_wanhuang.change(player);
+        },
+        // 切换入口：破夜整段结算期间先挂起，结算结束后补一次，
+        // 避免把破夜后半段的【决斗】伤害也改成弃牌
+        change(player) {
+            if (!player || !player.isAlive() || player.isDead()) return;
+            if (player.storage.shuoye_wanhuang_hold) {
+                player.storage.shuoye_wanhuang_pending = true;
+                return;
+            }
+            player.changeZhuanhuanji("shuoye_wanhuang");
+        },
+        subSkill: {
+            // 其他角色对你造成伤害后
+            me: {
+                forced: true,
+                silent: true,
+                popup: false,
+                trigger: {
+                    player: "damageEnd",
+                },
+                filter(event, player) {
+                    return !!event.source && event.source !== player;
+                },
+                async content(event, trigger, player) {
+                    await lib.skill.shuoye_wanhuang.afterDamage(player, trigger.source);
+                },
+            },
+            // 你造成伤害后
+            other: {
+                forced: true,
+                silent: true,
+                popup: false,
+                trigger: {
+                    source: "damageEnd",
+                },
+                filter(event, player) {
+                    return !!event.player && event.player !== player;
+                },
+                async content(event, trigger, player) {
+                    await lib.skill.shuoye_wanhuang.afterDamage(player, trigger.player);
+                },
+            },
+            // 阳：你造成的伤害+1
+            yang: {
+                forced: true,
+                silent: true,
+                popup: false,
+                trigger: {
+                    source: "damageBegin1",
+                },
+                filter(event, player) {
+                    if (player.storage.shuoye_wanhuang) return false;
+                    // 阳间模式：去除万煌的「造成伤害+1」
+                    if (lib.shuoyeIf && typeof lib.shuoyeIf.qumoshi === "function" && lib.shuoyeIf.qumoshi()) return false;
+                    return typeof event.num === "number" && event.num > 0;
+                },
+                content(event, trigger, player) {
+                    trigger.num += 1;
+                },
+            },
+            // 阴：你造成伤害改为令该角色弃置两倍伤害数的牌（该次伤害不再结算）
+            yin: {
+                forced: true,
+                silent: true,
+                popup: false,
+                trigger: {
+                    source: "damageBegin2",
+                },
+                filter(event, player) {
+                    if (!player.storage.shuoye_wanhuang) return false;
+                    // 绝毁伤害是真伤，不参与「改为弃牌」
+                    if (event._shuoye_juehui) return false;
+                    if (!event.player || event.player === player) return false;
+                    return typeof event.num === "number" && event.num > 0;
+                },
+                async content(event, trigger, player) {
+                    const target = trigger.player;
+                    const num = trigger.num;
+                    // 该次伤害不再结算
+                    trigger.cancel();
+                    game.log(player, "的伤害改为令", target, "弃置", "#y" + num * 2, "张牌");
+                    if (!target.isAlive() || target.isDead()) return;
+                    const can = target.countDiscardableCards(player, "he");
+                    const count = Math.min(num * 2, can);
+                    if (count > 0) {
+                        await target.chooseToDiscard("he", count, true);
+                    }
+                    await lib.skill.shuoye_wanhuang.afterDamage(player, target);
+                },
+            },
+        },
+        _priority: 0,
+    },
+//#noname-kit-end skill:shuoye_wanhuang
+//#noname-kit-begin skill:shuoye_dihuang_tao
+    //【帝皇之戎】讨：由【万煌】授予的标记技，该角色脱离濒死状态后移除。
+    // 拥有【讨】的角色：【星火】在场时不能使用 / 打出 / 濒死求助非伤害牌，
+    // 受到【万煌】拥有者的伤害+1（阳间模式取消加伤，见 shuoye_xinghuo）。
+    shuoye_dihuang_tao: {
+        // 状态标记，不占技能面板（同 shuoye_silie_nouse）：只留武将牌上的「讨」角标。
+        // charlotte 只影响面板/悬浮列表的展示，mod 限制与触发判定不受影响
+        charlotte: true,
+        nopop: true,
+        mark: true,
+        marktext: "讨",
+        intro: {
+            // 悬停说明随阳间模式变化（该模式下不加伤，只留禁牌那半句）
+            content() {
+                if (lib.shuoyeIf && typeof lib.shuoyeIf.qumoshi === "function" && lib.shuoyeIf.qumoshi()) {
+                    return "无法使用或打出非伤害牌";
+                }
+                return "无法使用或打出非伤害牌，受到【万煌】拥有者的伤害+1。";
+            },
+            markcount() {
+                return 0;
+            },
+        },
+        // 是否处于【星火】的限制中（【星火】= 帝皇之戎的阳形态技能）
+        lockOn() {
+            if (!game.players) return false;
+            return game.players.some(function (p) {
+                return !!p && p.isAlive() && p.hasSkill("shuoye_xinghuo");
+            });
+        },
+        give(target) {
+            if (!target || !target.isAlive() || target.isDead()) return;
+            if (target.hasSkill("shuoye_dihuang_tao")) return;
+            target.addSkill("shuoye_dihuang_tao");
+            game.log(target, "获得了", "#g【讨】");
+        },
+        take(target) {
+            if (!target || !target.hasSkill("shuoye_dihuang_tao")) return;
+            target.removeSkill("shuoye_dihuang_tao");
+            game.log(target, "脱离了濒死状态，移除了", "#g【讨】");
+        },
+        group: ["shuoye_dihuang_tao_dying", "shuoye_dihuang_tao_out"],
+        mod: {
+            // 不能使用非伤害牌（实体牌走 cardEnabled2，转化牌走 cardEnabled）
+            cardEnabled2(card, player) {
+                if (!lib.skill.shuoye_dihuang_tao.lockOn()) return;
+                if (get.tag(card, "damage") > 0) return;
+                return false;
+            },
+            cardEnabled(card, player) {
+                if (!lib.skill.shuoye_dihuang_tao.lockOn()) return;
+                if (get.tag(card, "damage") > 0) return;
+                return false;
+            },
+            // 不能打出 / 响应（闪、杀、无懈等作为响应时走 cardRespondable）
+            cardRespondable(card, player) {
+                if (!lib.skill.shuoye_dihuang_tao.lockOn()) return;
+                if (get.tag(card, "damage") > 0) return;
+                return false;
+            },
+            // 濒死求桃走的是 cardSavable 而不是 cardEnabled
+            cardSavable(card, player) {
+                if (!lib.skill.shuoye_dihuang_tao.lockOn()) return;
+                if (get.tag(card, "damage") > 0) return;
+                return false;
+            },
+        },
+        onremove(player, skill) {
+            delete player.storage.shuoye_dihuang_tao_dying;
+        },
+        subSkill: {
+            // 记录「真的进入过濒死」：dying 事件里 hp>0 的提前结束不算
+            dying: {
+                forced: true,
+                silent: true,
+                popup: false,
+                charlotte: true,
+                trigger: {
+                    player: "dying",
+                },
+                content(event, trigger, player) {
+                    player.storage.shuoye_dihuang_tao_dying = true;
+                },
+            },
+            // 脱离濒死：移除【讨】
+            out: {
+                forced: true,
+                silent: true,
+                popup: false,
+                charlotte: true,
+                trigger: {
+                    player: "dyingAfter",
+                },
+                filter(event, player) {
+                    return !!player.storage.shuoye_dihuang_tao_dying;
+                },
+                content(event, trigger, player) {
+                    delete player.storage.shuoye_dihuang_tao_dying;
+                    if (player.isAlive() && player.hp > 0) lib.skill.shuoye_dihuang_tao.take(player);
+                },
+            },
+        },
+        _priority: 0,
+    },
+//#noname-kit-end skill:shuoye_dihuang_tao
+//#noname-kit-begin skill:shuoye_poye
+    //【帝皇之戎】破夜（阳形态）：出牌阶段限一次。
+    // 对一名满体力角色造成1点伤害 → 双方各自把手牌调整至自身体力上限 →
+    // 若其手牌数变化，视为对其使用【决斗】，然后你回复此次决斗伤害数体力。
+    shuoye_poye: {
+        enable: "phaseUse",
+        usable: 1,
+        filter(event, player) {
+            return game.hasPlayer(function (target) {
+                return target !== player && target.isAlive() && target.hp >= target.maxHp;
+            });
+        },
+        filterTarget(card, player, target) {
+            return target !== player && target.isAlive() && target.hp >= target.maxHp;
+        },
+        async content(event, trigger, player) {
+            const target = event.target;
+            // 破夜整段结算期间挂起【万煌】的形态切换：否则首段伤害就会切成阴形态，
+            // 后半段的【决斗】伤害会被「改为弃牌」吃掉，回复量也会变成0。
+            player.storage.shuoye_wanhuang_hold = true;
+            delete player.storage.shuoye_wanhuang_pending;
+            try {
+                await target.damage(1, player);
+                if (!player.isAlive() || !target.isAlive()) return;
+                // ① 双方各自把手牌调整至自身体力上限
+                await lib.skill.shuoye_poye.adjustHand(player);
+                if (!player.isAlive() || !target.isAlive()) return;
+                const before = target.countCards("h");
+                await lib.skill.shuoye_poye.adjustHand(target);
+                if (target.countCards("h") === before) return;
+                // ② 视为对其使用【决斗】
+                if (!player.isAlive() || !target.isAlive()) return;
+                const duel = new lib.element.VCard({ name: "juedou" });
+                if (!player.canUse(duel, target)) return;
+                const beforeHp = { player: player.hp + player.hujia, target: target.hp + target.hujia };
+                const history = game.getGlobalHistory("everything");
+                const index = history ? history.length : 0;
+                await player.useCard(duel, target);
+                // ③ 回复此次决斗的伤害数
+                let num = lib.skill.shuoye_poye.duelDamage(history, index, duel);
+                if (!num) {
+                    // 兜底：按双方体力+护甲的实际损失估算（防其它扩展改写伤害事件）
+                    num = Math.max(0, beforeHp.player - (player.hp + player.hujia)) + Math.max(0, beforeHp.target - (target.hp + target.hujia));
+                }
+                if (num > 0 && player.isAlive()) {
+                    await player.recover(num);
+                }
+            } finally {
+                delete player.storage.shuoye_wanhuang_hold;
+                if (player.storage.shuoye_wanhuang_pending) {
+                    delete player.storage.shuoye_wanhuang_pending;
+                    try {
+                        player.changeZhuanhuanji("shuoye_wanhuang");
+                    } catch (e) {}
+                }
+            }
+        },
+        // 把手牌调整到体力上限：少了摸、多了弃
+        async adjustHand(target) {
+            if (!target || !target.isAlive()) return;
+            const maxHp = Math.max(0, target.maxHp);
+            const count = target.countCards("h");
+            if (count < maxHp) {
+                await target.drawTo(maxHp);
+            } else if (count > maxHp) {
+                await target.chooseToDiscard("h", count - maxHp, true);
+            }
+        },
+        // 统计本次【决斗】造成的伤害点数（双方都算）
+        duelDamage(history, index, duel) {
+            let num = 0;
+            if (!Array.isArray(history)) return 0;
+            for (let i = index; i < history.length; i++) {
+                const evt = history[i];
+                if (!evt || evt.name !== "damage") continue;
+                let match = evt.card === duel;
+                if (!match && typeof evt.getParent === "function") {
+                    const duelEvt = evt.getParent("juedou");
+                    if (duelEvt && duelEvt.card === duel) match = true;
+                }
+                if (match && typeof evt.num === "number" && evt.num > 0) num += evt.num;
+            }
+            return num;
+        },
+        ai: {
+            order: 7,
+            result: {
+                target(player, target) {
+                    let eff = get.effect(target, { name: "sha" }, player, target);
+                    if (target.countCards("h") !== target.maxHp) {
+                        eff = Math.min(eff, get.effect(target, { name: "juedou" }, player, target));
+                    }
+                    return Math.min(-1, eff);
+                },
+            },
+        },
+        _priority: 0,
+    },
+//#noname-kit-end skill:shuoye_poye
+//#noname-kit-begin skill:shuoye_xinghuo
+    //【帝皇之戎】星火（阳形态）：锁定技。
+    // 「拥有【讨】的角色不能使用或打出非伤害牌」写在【讨】的 mod 里（限制必须挂在被限制者身上），
+    // 这里负责「拥有【讨】的角色受到你的伤害+1」，阳间模式下取消加伤。
+    shuoye_xinghuo: {
+        forced: true,
+        locked: true,
+        trigger: {
+            source: "damageBegin1",
+        },
+        filter(event, player) {
+            if (!event.player || event.player === player) return false;
+            if (!event.player.hasSkill("shuoye_dihuang_tao")) return false;
+            // 阳间模式：去除受到你的伤害+1
+            if (lib.shuoyeIf && typeof lib.shuoyeIf.qumoshi === "function" && lib.shuoyeIf.qumoshi()) return false;
+            return typeof event.num === "number" && event.num > 0;
+        },
+        content(event, trigger, player) {
+            trigger.num += 1;
+            game.log(trigger.player, "受到", player, "的伤害", "#y+1");
+        },
+        _priority: 0,
+    },
+//#noname-kit-end skill:shuoye_xinghuo
+//#noname-kit-begin skill:shuoye_huanyu
+    //【帝皇之戎】幻羽（阴形态）：你使用牌指定一名其他角色为目标后，
+    // 随机弃置其一张与此牌花色相同的牌；若其没有该花色的牌，你对其造成1点【绝毁伤害】。
+    shuoye_huanyu: {
+        forced: true,
+        locked: true,
+        trigger: {
+            player: "useCardToPlayer",
+        },
+        filter(event, player) {
+            return !!event.card && !!event.target && event.target !== player && event.target.isAlive();
+        },
+        async content(event, trigger, player) {
+            const target = trigger.target;
+            const suit = get.suit(trigger.card, player);
+            let cards = [];
+            if (suit && suit !== "none") {
+                cards = target.getDiscardableCards(player, "he", function (card) {
+                    return get.suit(card, target) === suit;
+                });
+            }
+            if (cards.length) {
+                const picked = cards.randomGet();
+                game.log(player, "对", target, "发动了", "#g【幻羽】", "：随机弃置", picked);
+                await target.discard(picked).set("discarder", player);
+            } else {
+                game.log(player, "对", target, "发动了", "#g【幻羽】", "：没有同花色的牌，造成1点【绝毁伤害】");
+                await lib.shuoyeDihuang.juehui(target, 1, player);
+            }
+        },
+        _priority: 0,
+    },
+//#noname-kit-end skill:shuoye_huanyu
+//#noname-kit-begin skill:shuoye_lieqing
+    //【帝皇之戎】列卿（阴形态）：锁定技。
+    // 对你造成伤害的角色受到等量、无来源的【绝毁伤害】。
+    shuoye_lieqing: {
+        forced: true,
+        locked: true,
+        trigger: {
+            player: "damageEnd",
+        },
+        filter(event, player) {
+            if (!event.source || event.source === player) return false;
+            if (!event.source.isAlive() || event.source.isDead()) return false;
+            return typeof event.num === "number" && event.num > 0;
+        },
+        async content(event, trigger, player) {
+            const num = Math.max(1, trigger.num || 1);
+            game.log(player, "发动了", "#g【列卿】", "：", trigger.source, "受到等量无来源【绝毁伤害】");
+            await lib.shuoyeDihuang.juehui(trigger.source, num, null);
+        },
+        // 排在【万煌】的形态切换之前：切到阳形态后【列卿】会被移除，否则这次反伤可能被跳过
+        _priority: 100,
+    },
+//#noname-kit-end skill:shuoye_lieqing
 };
 
 export default skills;

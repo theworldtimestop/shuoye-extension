@@ -1431,6 +1431,33 @@ shuoye_kuanggu: "狂骨",
 //#noname-kit-begin translate:shuoye_cuige_boss
     shuoye_cuige_boss: "最终的摄政王-崔格",
 //#noname-kit-end translate:shuoye_cuige_boss
+//#noname-kit-begin translate:shuoye_dihuangzhirong
+    shuoye_dihuangzhirong: "帝皇之戎",
+//#noname-kit-end translate:shuoye_dihuangzhirong
+//#noname-kit-begin translate:shuoye_wanhuang
+    shuoye_wanhuang: "万煌",
+    shuoye_wanhuang_info: "转换技，初始阳，造成/受到你伤害的其他角色获得【讨】直到脱离濒死，拥有【讨】角色造成/受到你伤害后，你摸一张牌，阳：你造成伤害，出杀数+1，获得【破夜】【星火】。阴：你造成伤害改为弃置目标两倍牌，获得【幻羽】【列卿】。",
+//#noname-kit-end translate:shuoye_wanhuang
+//#noname-kit-begin translate:shuoye_poye
+    shuoye_poye: "破夜",
+    shuoye_poye_info: "出牌阶段限一次，你可对一名满体力角色造成一点伤害，然后与其将手牌调整至体力上限。若其手牌数变化，你视为对其使用“决斗”，你恢复此决斗伤害数体力。",
+//#noname-kit-end translate:shuoye_poye
+//#noname-kit-begin translate:shuoye_xinghuo
+    shuoye_xinghuo: "星火",
+    shuoye_xinghuo_info: "锁定技，拥有【讨】角色无法使用或打出非伤害牌，且受到你的伤害+1。",
+//#noname-kit-end translate:shuoye_xinghuo
+//#noname-kit-begin translate:shuoye_huanyu
+    shuoye_huanyu: "幻羽",
+    shuoye_huanyu_info: `你对一名角色使用牌时随机弃置其一张与此牌花色相同的牌，若无则对其造成一点【${get.poptip("shuoye_juehui")}】。`,
+//#noname-kit-end translate:shuoye_huanyu
+//#noname-kit-begin translate:shuoye_lieqing
+    shuoye_lieqing: "列卿",
+    shuoye_lieqing_info: `锁定技，对你造成伤害角色受到等量无来源【${get.poptip("shuoye_juehui")}】。`,
+//#noname-kit-end translate:shuoye_lieqing
+//#noname-kit-begin translate:shuoye_dihuang_tao
+    shuoye_dihuang_tao: "讨",
+    shuoye_dihuang_tao_info: "拥有【讨】的角色无法使用或打出非伤害牌，受到【万煌】拥有者的伤害+1；该角色脱离濒死状态后移除【讨】。",
+//#noname-kit-end translate:shuoye_dihuang_tao
 //#noname-kit-begin translate:shuoye_wudi
     shuoye_wudi: "无敌",
     shuoye_wudi_ab: "【无敌】",
