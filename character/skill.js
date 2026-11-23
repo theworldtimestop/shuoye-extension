@@ -25210,29 +25210,35 @@ shuoye_weiyan_enter: {
             return null;
         },
         filterCard(card, player, event) {
-            event = event || _status.event;
-            const filter = event._backup && event._backup.filterCard;
-            if (!filter) {
+            // 联机：本函数会被序列化到客机执行，任何异常都会让整个 game.check 挂掉（表现为所有牌变灰），所以整体兑底
+            try {
+                event = event || _status.event;
+                const filter = event._backup && event._backup.filterCard;
+                if (typeof filter !== "function") {
+                    return false;
+                }
+                const suit = get.suit(card, player);
+                if (suit === "heart") {
+                    return filter({ name: "tao", cards: [card] }, player, event);
+                }
+                if (suit === "club") {
+                    return filter({ name: "shan", cards: [card] }, player, event);
+                }
+                if (suit === "diamond") {
+                    return filter({ name: "sha", nature: "fire", cards: [card] }, player, event);
+                }
+                return false;
+            } catch (e) {
                 return false;
             }
-            const suit = get.suit(card, player);
-            if (suit === "heart") {
-                return filter({ name: "tao", cards: [card] }, player, event);
-            }
-            if (suit === "club") {
-                return filter({ name: "shan", cards: [card] }, player, event);
-            }
-            if (suit === "diamond") {
-                return filter({ name: "sha", nature: "fire", cards: [card] }, player, event);
-            }
-            return false;
         },
         filter(event, player) {
-            const filter = event.filterCard;
-            if (typeof filter !== "function" || !player.countCards("hes")) {
-                return false;
-            }
-            return player.getCards("hes").some((card) => {
+            // 联机：客机上也要跑。异常必须吞掉，否则会把 game.check 连带弄坏（所有牌变灰）
+            try {
+                if (typeof event.filterCard !== "function" || !player || !player.countCards("hes")) {
+                    return false;
+                }
+                return player.getCards("hes").some((card) => {
                 const suit = get.suit(card, player);
                 let name = null;
                 let nature = null;
@@ -25248,7 +25254,10 @@ shuoye_weiyan_enter: {
                     return false;
                 }
                 return filter({ name, nature, cards: [card] }, player, event);
-            });
+                });
+            } catch (e) {
+                return false;
+            }
         },
         check(card) {
             const player = get.player();
@@ -25344,17 +25353,19 @@ shuoye_weiyan_enter: {
                     selectCard: 1,
                     prompt: "龙魂：可弃置一张牌",
                     prompt2: "视为使用与其花色对应的牌（♥桃　♠无懈可击　♣闪　♦火杀）；若与你本次使用的牌花色相同，可弃置一名角色一张牌",
-                    filterCard(card, player2) {
-                        return lib.filter.cardDiscardable(card, player2, "shuoye_longhun_use");
-                    },
+                    filterCard: lib.filter.cardDiscardable,
                     ai(card) {
-                        const player2 = get.player();
-                        const evt = get.event();
-                        let value = 10 - get.value(card, player2);
-                        if (evt && evt.longhunSuit === get.suit(card, player2)) {
-                            value += 6;
+                        try {
+                            const player2 = get.player();
+                            const evt = get.event();
+                            let value = 10 - get.value(card, player2);
+                            if (evt && evt.longhunSuit === get.suit(card, player2)) {
+                                value += 6;
+                            }
+                            return value;
+                        } catch (e) {
+                            return 0;
                         }
-                        return value;
                     },
                 })
                 .set("longhunSuit", usedSuit)
@@ -25480,18 +25491,9 @@ shuoye_weiyan_enter: {
                         selectTarget: 1,
                         prompt: "赤胆：可交给一名角色一张手牌",
                         prompt2: "然后你摸一张牌",
-                        filterCard(card, player2) {
-                            return lib.filter.cardDiscardable(card, player2, "shuoye_chidan");
-                        },
-                        filterTarget(card, player2, target) {
-                            return target !== player2 && target.isIn();
-                        },
-                        ai1(card) {
-                            return 10 - get.value(card, get.player());
-                        },
-                        ai2(target) {
-                            return get.attitude(get.player(), target);
-                        },
+                        // 联机客机：只传“两边都有”的库函数引用，不传自定义闭包，避免客机上 filter 失效导致选牌框出不来
+                        filterCard: lib.filter.cardDiscardable,
+                        filterTarget: lib.filter.notMe,
                     })
                     .forResult();
                 if (!result.bool || !result.cards || !result.cards.length || !result.targets || !result.targets.length) {
