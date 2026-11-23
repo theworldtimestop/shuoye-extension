@@ -25769,7 +25769,8 @@ shuoye_shanxian: {
         popup: false,
         trigger: {
             source: "damageAfter",
-            target: "damageAfter",
+            // 受伤侧必须用 player 角色：damage 事件只有 player（受伤者）与 source，没有 target
+            player: "damageAfter",
         },
         // 判定要用“受伤之前”的数值，由这个子技能在 damageBegin1 快照
         group: ["shuoye_silie_snap"],
@@ -26162,7 +26163,8 @@ shuoye_shanxian: {
         popup: false,
         trigger: {
             source: ["damageBegin1"],
-            target: ["damageBegin1"],
+            // 同上：受伤侧用 player
+            player: ["damageBegin1"],
         },
         firstDo: true,
         filter(event, player) {
