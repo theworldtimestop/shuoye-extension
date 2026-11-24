@@ -1250,15 +1250,6 @@ if (!lib.shuoyeIf) {
                         : taoBase;
                 }
             } catch (e) {}
-            // 万煌：阳间模式取消阳形态的「伤害+1」，描述里只保留「出杀数+1」
-            try {
-                const wanhuangBase = lib.shuoyeWanhuangInfoBase;
-                if (typeof wanhuangBase === "string") {
-                    lib.translate["shuoye_wanhuang_info"] = qumoshi
-                        ? "转换技，初始阳，造成/受到你伤害的其他角色获得【讨】直到脱离濒死，拥有【讨】角色造成/受到你伤害后，你摸一张牌，阳：你出杀数+1，获得【破夜】【星火】。阴：你造成伤害改为弃置目标两倍牌，获得【幻羽】【列卿】。"
-                        : wanhuangBase;
-                }
-            } catch (e) {}
         },
         // ---------------- 无量空处：领域状态 ----------------
         domainOwner() {
@@ -11506,12 +11497,10 @@ shuoye_weituan: {
         },
         mod: {
             cardUsable(card, player) {
-                if (typeof card == "object") {
-                    if (card.storage.shuoye_zhongmu) return Infinity;
-                }
+                if (card && card.storage && card.storage.shuoye_zhongmu) return Infinity;
             },
             targetInRange(card, player, target) {
-                if (card.storage.shuoye_zhongmu) return true;
+                if (card && card.storage && card.storage.shuoye_zhongmu) return true;
             },
         },
         ai: {
@@ -26447,10 +26436,12 @@ shuoye_shanxian: {
 //#noname-kit-end skill:shuoye_silie_snap
 //#noname-kit-begin skill:shuoye_wanhuang
     //【帝皇之戎】万煌：转换技（初始阳）。
-    // 阳：你造成的伤害+1（阳间模式取消）、使用【杀】的次数上限+1，拥有【破夜】【星火】；
+    // 阳：使用【杀】的次数上限+1，拥有【破夜】【星火】；
     // 阴：你造成的伤害改为令目标弃置两倍伤害数的牌，拥有【幻羽】【列卿】。
     // 其他角色「对你造成伤害」或「受到你造成的伤害」后：其获得【讨】→ 你摸一张牌 → 阴阳互换。
     shuoye_wanhuang: {
+        // 持恒技：不会被其它技能无效（描述里不写，只作为技能标签）
+        persevereSkill: true,
         derivation: ["shuoye_poye", "shuoye_xinghuo", "shuoye_huanyu", "shuoye_lieqing"],
         mark: true,
         marktext: "☯",
@@ -26459,7 +26450,24 @@ shuoye_shanxian: {
         // 否则客机的 mod（出杀次数）与 filter 会读到旧形态。
         zhuanhuanji(player, skill) {
             const yin = !player.storage[skill];
+            const currentKey = player.storage[skill] ? "yin" : "yang";
+            const targetKey = yin ? "yin" : "yang";
+            // 双形态各记一份「体力值 + 体力上限」：切换时记录当前形态，再换成目标形态的数值
+            if (!player.storage.shuoye_wanhuang_hp || typeof player.storage.shuoye_wanhuang_hp !== "object") {
+                lib.skill.shuoye_wanhuang.resetHp(player);
+            }
+            const pool = player.storage.shuoye_wanhuang_hp;
+            pool[currentKey] = { hp: player.hp, maxHp: player.maxHp };
+            const targetHp = pool[targetKey];
+            lib.skill.shuoye_wanhuang.syncHp(player);
+            const okTarget = !!targetHp && typeof targetHp === "object" && typeof targetHp.hp === "number" && targetHp.hp > 0 && typeof targetHp.maxHp === "number" && targetHp.maxHp > 0;
+            if (!okTarget) {
+                // 目标形态已阵亡：留在当前形态
+                game.log(player, targetKey === "yin" ? "#y帝皇之御" : "#y帝皇之钺", "形态已阵亡，无法切换");
+                return;
+            }
             player.storage[skill] = yin;
+            player.storage.shuoye_wanhuang_switched = true;
             try {
                 game.broadcastAll(function (pid, name, value) {
                     const list = (game.players || []).concat(game.dead || []);
@@ -26487,22 +26495,82 @@ shuoye_shanxian: {
             try {
                 player.addAdditionalSkill(skill, yin ? ["shuoye_huanyu", "shuoye_lieqing"] : ["shuoye_poye", "shuoye_xinghuo"]);
             } catch (e) {}
+            // 体力上限与体力都换成目标形态记录的数值
+            try {
+                game.broadcastAll(function (p, hp, maxHp) {
+                    if (!p || typeof hp !== "number" || typeof maxHp !== "number") return;
+                    p.maxHp = maxHp;
+                    p.hp = Math.min(hp, maxHp);
+                    if (p.update) p.update();
+                }, player, targetHp.hp, targetHp.maxHp);
+            } catch (e) {}
             player.markSkill(skill);
             try {
                 player.update();
             } catch (e) {}
-            game.log(player, "切换为", yin ? "#y阴" : "#y阳", "形态");
+            game.log(player, "切换为", yin ? "#y阴" : "#y阳", "形态，体力调整为", "#y" + Math.min(targetHp.hp, targetHp.maxHp) + "/" + targetHp.maxHp);
         },
         intro: {
-            // 标记说明随形态与阳间模式变化
-            content(storage) {
-                const qumoshi = lib.shuoyeIf && typeof lib.shuoyeIf.qumoshi === "function" && lib.shuoyeIf.qumoshi();
-                if (storage) return "当前形态：阴——你造成的伤害改为令该角色弃置两倍伤害数的牌；你拥有【幻羽】【列卿】。";
-                if (qumoshi) return "当前形态：阳——使用【杀】的次数上限+1；你拥有【破夜】【星火】。";
-                return "当前形态：阳——你造成的伤害+1，使用【杀】的次数上限+1；你拥有【破夜】【星火】。";
+            // 标记说明：两形态各自记录的体力值/体力上限 + 当前形态
+            content(storage, player) {
+                const isYin = !!storage;
+                const pool = player && player.storage ? player.storage.shuoye_wanhuang_hp : null;
+                const live = {
+                    hp: player && typeof player.hp === "number" ? Math.max(0, player.hp) : 0,
+                    maxHp: player && typeof player.maxHp === "number" ? player.maxHp : 0,
+                };
+                const read = function (key) {
+                    if (!player) return live;
+                    // 当前形态用实时数值，另一形态用体力池里记录的数值
+                    if (isYin === (key === "yin")) return live;
+                    const rec = pool && pool[key];
+                    if (!rec || typeof rec !== "object") return { hp: 0, maxHp: 0 };
+                    return { hp: Math.max(0, Number(rec.hp) || 0), maxHp: Number(rec.maxHp) || 0 };
+                };
+                const yin = read("yin");
+                const yang = read("yang");
+                return "阴：" + yin.hp + "/" + yin.maxHp + "，阳：" + yang.hp + "/" + yang.maxHp + "。当前形态：" + (isYin ? "阴，帝皇之御" : "阳，帝皇之钺") + "。";
             },
         },
+        // 用当前（初始）体力值/体力上限重置双形态记录
+        resetHp(player) {
+            if (!player) return;
+            const hp0 = Math.max(1, Number(player.hp) || 3);
+            const maxHp0 = Math.max(1, Number(player.maxHp) || hp0);
+            player.storage.shuoye_wanhuang_hp = {
+                yang: { hp: hp0, maxHp: maxHp0 },
+                yin: { hp: hp0, maxHp: maxHp0 },
+            };
+            lib.skill.shuoye_wanhuang.syncHp(player);
+        },
+        // 体力池同步到三端：客机的 ☯ 标记说明要读另一形态的体力
+        syncHp(player) {
+            if (!player || !player.storage) return;
+            const pool = player.storage.shuoye_wanhuang_hp;
+            if (!pool || typeof pool !== "object") return;
+            const data = {
+                yang: {
+                    hp: Number(pool.yang && pool.yang.hp) || 0,
+                    maxHp: Number(pool.yang && pool.yang.maxHp) || 0,
+                },
+                yin: {
+                    hp: Number(pool.yin && pool.yin.hp) || 0,
+                    maxHp: Number(pool.yin && pool.yin.maxHp) || 0,
+                },
+            };
+            try {
+                game.broadcastAll(function (p, value) {
+                    if (!p) return;
+                    if (!p.storage) p.storage = {};
+                    p.storage.shuoye_wanhuang_hp = value;
+                }, player, data);
+            } catch (e) {}
+        },
         init(player, skill) {
+            // 双形态各记一份「体力值 + 体力上限」：初始取武将初始体力（主公等模式加成会在 gameStart 后同步一次）
+            if (!player.storage.shuoye_wanhuang_hp || typeof player.storage.shuoye_wanhuang_hp !== "object") {
+                lib.skill.shuoye_wanhuang.resetHp(player);
+            }
             player.storage[skill] = !!player.storage[skill];
             try {
                 player.addAdditionalSkill(skill, player.storage[skill] ? ["shuoye_huanyu", "shuoye_lieqing"] : ["shuoye_poye", "shuoye_xinghuo"]);
@@ -26517,7 +26585,14 @@ shuoye_shanxian: {
                 return num + 1;
             },
         },
-        group: ["shuoye_wanhuang_me", "shuoye_wanhuang_other", "shuoye_wanhuang_yang", "shuoye_wanhuang_yin"],
+        group: [
+            "shuoye_wanhuang_me",
+            "shuoye_wanhuang_other",
+            "shuoye_wanhuang_yin",
+            "shuoye_wanhuang_dyingSwitch",
+            "shuoye_wanhuang_lieqingReflect",
+            "shuoye_wanhuang_startSync",
+        ],
         // 万煌联动（阴形态的转换也走这里，保证顺序一致）：
         // ①其他角色获得【讨】 ②其拥有【讨】→ 你摸一张牌 ③阴阳互换
         async afterDamage(player, other) {
@@ -26536,11 +26611,21 @@ shuoye_shanxian: {
         // 避免把破夜后半段的【决斗】伤害也改成弃牌
         change(player) {
             if (!player || !player.isAlive() || player.isDead()) return;
+            if (!lib.skill.shuoye_wanhuang.canSwitch(player)) return;
             if (player.storage.shuoye_wanhuang_hold) {
                 player.storage.shuoye_wanhuang_pending = true;
                 return;
             }
             player.changeZhuanhuanji("shuoye_wanhuang");
+        },
+        // 目标形态是否还活着（体力 > 0）：形态阵亡后不能再切回去
+        canSwitch(player) {
+            const pool = player && player.storage ? player.storage.shuoye_wanhuang_hp : null;
+            if (!pool || typeof pool !== "object") return true;
+            const targetKey = player.storage.shuoye_wanhuang ? "yang" : "yin";
+            const target = pool[targetKey];
+            if (!target || typeof target !== "object") return false;
+            return typeof target.hp === "number" && target.hp > 0 && typeof target.maxHp === "number" && target.maxHp > 0;
         },
         subSkill: {
             // 其他角色对你造成伤害后
@@ -26573,22 +26658,78 @@ shuoye_shanxian: {
                     await lib.skill.shuoye_wanhuang.afterDamage(player, trigger.player);
                 },
             },
-            // 阳：你造成的伤害+1
-            yang: {
+            // 【列卿】的反伤：写在万煌上结算，这样阴形态失救切回阳后这次伤害仍然会反伤
+            lieqingReflect: {
                 forced: true,
                 silent: true,
                 popup: false,
+                charlotte: true,
+                _priority: 100,
                 trigger: {
-                    source: "damageBegin1",
+                    player: "damageEnd",
                 },
                 filter(event, player) {
-                    if (player.storage.shuoye_wanhuang) return false;
-                    // 阳间模式：去除万煌的「造成伤害+1」
-                    if (lib.shuoyeIf && typeof lib.shuoyeIf.qumoshi === "function" && lib.shuoyeIf.qumoshi()) return false;
+                    // 只反「这段伤害开始结算时你已经在阴形态」的伤害（标记由【列卿】的子技能打）
+                    if (!event.shuoye_lieqing_mark) return false;
+                    if (!event.source || event.source === player) return false;
+                    if (!event.source.isAlive() || event.source.isDead()) return false;
                     return typeof event.num === "number" && event.num > 0;
                 },
+                async content(event, trigger, player) {
+                    const num = Math.max(1, trigger.num || 1);
+                    game.log(player, "发动了", "#g【列卿】", "：", trigger.source, "受到等量无来源【绝毁伤害】");
+                    await lib.shuoyeDihuang.juehui(trigger.source, num, null);
+                },
+            },
+            // 失救（濒死没被救回、真的死亡）时：另一形态还活着 → 取消这次死亡并切过去
+            // 判定写法与胃炎使命技的「失救」一致（dieBefore + 父事件是 dying）
+            dyingSwitch: {
+                forced: true,
+                forceDie: true,
+                silent: true,
+                popup: false,
+                charlotte: true,
+                trigger: {
+                    player: "dieBefore",
+                },
+                filter(event, player) {
+                    if (event.reserveOut) return false;
+                    const dying = event.getParent("dying");
+                    if (!dying || dying.name != "dying") return false;
+                    if (player.hp > 0) return false;
+                    // 体力上限为 0 时不能救：否则切完形态体力仍是 0，会反复触发濒死
+                    if (player.maxHp <= 0) return false;
+                    return lib.skill.shuoye_wanhuang.canSwitch(player);
+                },
                 content(event, trigger, player) {
-                    trigger.num += 1;
+                    // 取消这次死亡，换成另一形态继续
+                    trigger.cancel();
+                    delete player.storage.shuoye_wanhuang_hold;
+                    delete player.storage.shuoye_wanhuang_pending;
+                    game.log(player, "濒死失救：切换形态继续战斗");
+                    player.changeZhuanhuanji("shuoye_wanhuang");
+                },
+            },
+            // 开局对齐「初始体力值/体力上限」：主公等模式加成可能在技能 init 之后才生效，
+            // 所以在 gameStart 之后（以及首个满体力的回合开始）再同步一次；只同步一次且未切过形态
+            startSync: {
+                forced: true,
+                silent: true,
+                popup: false,
+                charlotte: true,
+                trigger: {
+                    global: ["gameStartAfter", "phaseBegin"],
+                },
+                filter(event, player) {
+                    if (player.storage.shuoye_wanhuang_switched) return false;
+                    if (player.storage.shuoye_wanhuang_synced) return false;
+                    return true;
+                },
+                content(event, trigger, player) {
+                    // 只在满体力时把当前数值当作初始值（避免把已经受伤的数值记进去）
+                    if (player.hp >= player.maxHp) lib.skill.shuoye_wanhuang.resetHp(player);
+                    // 首个回合开始后就不再同步，防止后续的体力上限加成被带到另一形态
+                    if (event.triggername === "phaseBegin") player.storage.shuoye_wanhuang_synced = true;
                 },
             },
             // 阴：你造成伤害改为令该角色弃置两倍伤害数的牌（该次伤害不再结算）
@@ -26782,7 +26923,7 @@ shuoye_shanxian: {
                 if (player.storage.shuoye_wanhuang_pending) {
                     delete player.storage.shuoye_wanhuang_pending;
                     try {
-                        player.changeZhuanhuanji("shuoye_wanhuang");
+                        lib.skill.shuoye_wanhuang.change(player);
                     } catch (e) {}
                 }
             }
@@ -26889,24 +27030,29 @@ shuoye_shanxian: {
 //#noname-kit-begin skill:shuoye_lieqing
     //【帝皇之戎】列卿（阴形态）：锁定技。
     // 对你造成伤害的角色受到等量、无来源的【绝毁伤害】。
+    // 实际的反伤结算写在【万煌】的 lieqingReflect 子技里：阴形态失救切回阳时
+    // 【列卿】已经被移除，若反伤还挂在【列卿】上，这次伤害就不会反伤了。
+    // 这里只负责在「伤害开始时」给伤害事件打标记（只有阴形态才有【列卿】）。
     shuoye_lieqing: {
         forced: true,
         locked: true,
-        trigger: {
-            player: "damageEnd",
+        group: ["shuoye_lieqing_mark"],
+        subSkill: {
+            // 伤害开始时就打标记：用来判断「受伤时是否已经在阴形态」
+            mark: {
+                forced: true,
+                silent: true,
+                popup: false,
+                charlotte: true,
+                trigger: {
+                    player: "damageBegin1",
+                },
+                content(event, trigger, player) {
+                    trigger.shuoye_lieqing_mark = true;
+                },
+            },
         },
-        filter(event, player) {
-            if (!event.source || event.source === player) return false;
-            if (!event.source.isAlive() || event.source.isDead()) return false;
-            return typeof event.num === "number" && event.num > 0;
-        },
-        async content(event, trigger, player) {
-            const num = Math.max(1, trigger.num || 1);
-            game.log(player, "发动了", "#g【列卿】", "：", trigger.source, "受到等量无来源【绝毁伤害】");
-            await lib.shuoyeDihuang.juehui(trigger.source, num, null);
-        },
-        // 排在【万煌】的形态切换之前：切到阳形态后【列卿】会被移除，否则这次反伤可能被跳过
-        _priority: 100,
+        _priority: 0,
     },
 //#noname-kit-end skill:shuoye_lieqing
 };

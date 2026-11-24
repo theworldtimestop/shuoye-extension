@@ -1436,7 +1436,7 @@ shuoye_kuanggu: "狂骨",
 //#noname-kit-end translate:shuoye_dihuangzhirong
 //#noname-kit-begin translate:shuoye_wanhuang
     shuoye_wanhuang: "万煌",
-    shuoye_wanhuang_info: "转换技，初始阳，造成/受到你伤害的其他角色获得【讨】直到脱离濒死，拥有【讨】角色造成/受到你伤害后，你摸一张牌，阳：你造成伤害，出杀数+1，获得【破夜】【星火】。阴：你造成伤害改为弃置目标两倍牌，获得【幻羽】【列卿】。",
+    shuoye_wanhuang_info: "转换技，初始阳，造成或受到你伤害的其他角色获得【讨】直到脱离濒死，拥有【讨】角色造成或受到你伤害后，你摸一张牌，切换武将牌为阳：帝皇之钺；阴：帝皇之御。",
 //#noname-kit-end translate:shuoye_wanhuang
 //#noname-kit-begin translate:shuoye_poye
     shuoye_poye: "破夜",

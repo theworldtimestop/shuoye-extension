@@ -416,6 +416,17 @@ export async function content(config, pack) {
                 id: "shuoye_juehui",
                 name: "绝毁伤害",
                 info: "无法被免疫、转移或减少，且会给予你真正的死亡。",
+                // 在技能详情里点开时，把解释窗抬到最顶层并移到最后，避免被详情框压住
+                dialog(dialog) {
+                    try {
+                        // 用 !important 内联覆盖引擎写死的 z-index:21（以及其它 UI 的弹窗层级）
+                        if (dialog.style && dialog.style.setProperty) dialog.style.setProperty("z-index", "2147483647", "important");
+                        dialog.style.zIndex = "2147483647";
+                        if (dialog.parentNode && dialog.parentNode.appendChild) dialog.parentNode.appendChild(dialog);
+                        dialog.add('<div class = "text">无法被免疫、转移或减少，且会给予你真正的死亡。</div>');
+                    } catch (e) {}
+                    return dialog;
+                },
             });
         }
     } catch (e) {}
