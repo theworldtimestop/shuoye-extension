@@ -411,22 +411,56 @@ export async function content(config, pack) {
                 name: "俱利伽罗",
                 info: "雷电芽衣的副将。体力1，优先承担雷电芽衣受到的伤害与体力流失且不会溢出；一张黑色牌非因使用进入弃牌堆时，获得之置于武将牌上称为【鸣】；雷电芽衣受到或造成伤害后，将一张【鸣】当做【闪】对来源或目标使用。",
             });
-            // 【帝皇之戎】绝毁伤害：描述里的超链接词条（get.poptip("shuoye_juehui")）
-            lib.poptip.add({
-                id: "shuoye_juehui",
-                name: "绝毁伤害",
-                info: "无法被免疫、转移或减少，且会给予你真正的死亡。",
-                // 在技能详情里点开时，把解释窗抬到最顶层并移到最后，避免被详情框压住
-                dialog(dialog) {
+            // 词条弹窗：解释窗一律抬到最顶层（技能详情、上一层词条都压不住）
+            // info 可以是字符串，也可以是函数（函数在点开时才取值，方便引用后加载的技能描述）
+            const shuoyePoptipDialog = function (info) {
+                return function (dialog) {
                     try {
+                        const text = typeof info === "function" ? info() : info;
                         // 用 !important 内联覆盖引擎写死的 z-index:21（以及其它 UI 的弹窗层级）
                         if (dialog.style && dialog.style.setProperty) dialog.style.setProperty("z-index", "2147483647", "important");
                         dialog.style.zIndex = "2147483647";
                         if (dialog.parentNode && dialog.parentNode.appendChild) dialog.parentNode.appendChild(dialog);
-                        dialog.add('<div class = "text">无法被免疫、转移或减少，且会给予你真正的死亡。</div>');
+                        dialog.add('<div class = "text">' + text + "</div>");
                     } catch (e) {}
                     return dialog;
-                },
+                };
+            };
+            // 技能名链接：注册成「规则型」词条（名字不带〖〗），外层再包【】保持原样式；
+            // 内容在点开时才取该技能的描述
+            const shuoyeSkillLink = function (skill, name) {
+                const id = "shuoye_link_" + skill;
+                lib.poptip.add({
+                    id,
+                    name,
+                    dialog: shuoyePoptipDialog(function () {
+                        return lib.translate[skill + "_info"] || "";
+                    }),
+                });
+                return "【" + lib.poptip.getElement(id) + "】";
+            };
+            // 【帝皇之戎】描述里的超链接词条（get.poptip(...)）
+            lib.poptip.add({
+                id: "shuoye_juehui",
+                name: "绝毁伤害",
+                info: "无法被免疫、转移或减少，且会给予你真正的死亡。",
+                dialog: shuoyePoptipDialog("无法被免疫、转移或减少，且会给予你真正的死亡。"),
+            });
+            lib.poptip.add({
+                id: "shuoye_dihuang_zhiyue",
+                name: "帝皇之钺",
+                info: "拥有【破夜】【星火】，出杀次数+1。",
+                dialog: shuoyePoptipDialog(
+                    "拥有" + shuoyeSkillLink("shuoye_poye", "破夜") + shuoyeSkillLink("shuoye_xinghuo", "星火") + "，出杀次数+1。",
+                ),
+            });
+            lib.poptip.add({
+                id: "shuoye_dihuang_zhiyu",
+                name: "帝皇之御",
+                info: "拥有【幻羽】【列卿】，造成伤害改为弃置目标两倍牌。",
+                dialog: shuoyePoptipDialog(
+                    "拥有" + shuoyeSkillLink("shuoye_huanyu", "幻羽") + shuoyeSkillLink("shuoye_lieqing", "列卿") + "，造成伤害改为弃置目标两倍牌。",
+                ),
             });
         }
     } catch (e) {}
