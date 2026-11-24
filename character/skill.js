@@ -1116,6 +1116,10 @@ if (!lib.shuoyeLei) {
 // 改成 false 后，记得把 translate.js 里 shuoye_fazhou_info 的「体力上限」改回「体力值」。
 const DILU_FAZHOU_USE_MAXHP = true;
 
+// 【幻羽】的两种描述：普通模式 / 阳间模式（阳间模式取消「若无同花色牌则造成绝毁伤害」）
+const SHUOYE_HUANYU_INFO = `你对一名角色使用牌时随机弃置其一张与此牌花色相同的牌，若无则对其造成一点【${get.poptip("shuoye_juehui")}】。`;
+const SHUOYE_HUANYU_INFO_QUMOSHI = "你对一名角色使用牌时随机弃置其一张与此牌花色相同的牌。";
+
 // ===== 【iF五条悟】公共入口：领域 / 演出 / 背景 / BGM =====
 // 这些函数会被 game.broadcastAll 送上客机执行，回调里只允许依赖全局的 lib/game/ui/get/_status。
 if (!lib.shuoyeIf) {
@@ -1240,15 +1244,21 @@ if (!lib.shuoyeIf) {
             const qumoshi = lib.shuoyeIf.qumoshi();
             try {
                 if (typeof base === "string") {
-                    lib.translate["shuoye_xinghuo_info"] = qumoshi ? "锁定技，拥有【讨】角色无法使用或打出非伤害牌。" : base;
+                    lib.translate["shuoye_xinghuo_info"] = qumoshi ? "锁定技，拥有【讨】角色无法使用或打出闪。" : base;
                 }
             } catch (e) {}
             try {
                 if (typeof taoBase === "string") {
                     lib.translate["shuoye_dihuang_tao_info"] = qumoshi
-                        ? "拥有【讨】的角色无法使用或打出非伤害牌；该角色脱离濒死状态后移除【讨】。"
+                        ? "拥有【讨】的角色无法使用或打出闪；该角色脱离濒死状态后移除【讨】。"
                         : taoBase;
                 }
+            } catch (e) {}
+            // 幻羽：阳间模式去除「若无同花色牌则造成【绝毁伤害】」
+            // （两个版本都写在模块常量里，不依赖 lib.shuoyeHuanyuInfoBase 是否已捕获）
+            try {
+                const huanyuBase = typeof lib.shuoyeHuanyuInfoBase === "string" ? lib.shuoyeHuanyuInfoBase : SHUOYE_HUANYU_INFO;
+                lib.translate["shuoye_huanyu_info"] = qumoshi ? SHUOYE_HUANYU_INFO_QUMOSHI : huanyuBase;
             } catch (e) {}
         },
         // ---------------- 无量空处：领域状态 ----------------
@@ -26778,10 +26788,10 @@ shuoye_shanxian: {
         mark: true,
         marktext: "讨",
         intro: {
-            // 悬停说明随阳间模式变化（该模式下不加伤，只留禁牌那半句）
+            // 悬停说明随阳间模式变化（该模式下不加伤，且禁牌范围改为「闪」）
             content() {
                 if (lib.shuoyeIf && typeof lib.shuoyeIf.qumoshi === "function" && lib.shuoyeIf.qumoshi()) {
-                    return "无法使用或打出非伤害牌";
+                    return "无法使用或打出闪";
                 }
                 return "无法使用或打出非伤害牌，受到【万煌】拥有者的伤害+1。";
             },
@@ -26808,29 +26818,30 @@ shuoye_shanxian: {
             game.log(target, "脱离了濒死状态，移除了", "#g【讨】");
         },
         group: ["shuoye_dihuang_tao_dying", "shuoye_dihuang_tao_out"],
+        // 该牌是否被【讨】禁掉：普通模式禁非伤害牌；阳间模式只禁【闪】
+        blocked(card, player) {
+            if (!lib.skill.shuoye_dihuang_tao.lockOn()) return false;
+            if (lib.shuoyeIf && typeof lib.shuoyeIf.qumoshi === "function" && lib.shuoyeIf.qumoshi()) {
+                return get.name(card, player || null) === "shan";
+            }
+            return !(get.tag(card, "damage") > 0);
+        },
+        
         mod: {
-            // 不能使用非伤害牌（实体牌走 cardEnabled2，转化牌走 cardEnabled）
+            // 不能使用（实体牌走 cardEnabled2，转化牌走 cardEnabled）
             cardEnabled2(card, player) {
-                if (!lib.skill.shuoye_dihuang_tao.lockOn()) return;
-                if (get.tag(card, "damage") > 0) return;
-                return false;
+                if (lib.skill.shuoye_dihuang_tao.blocked(card, player)) return false;
             },
             cardEnabled(card, player) {
-                if (!lib.skill.shuoye_dihuang_tao.lockOn()) return;
-                if (get.tag(card, "damage") > 0) return;
-                return false;
+                if (lib.skill.shuoye_dihuang_tao.blocked(card, player)) return false;
             },
             // 不能打出 / 响应（闪、杀、无懈等作为响应时走 cardRespondable）
             cardRespondable(card, player) {
-                if (!lib.skill.shuoye_dihuang_tao.lockOn()) return;
-                if (get.tag(card, "damage") > 0) return;
-                return false;
+                if (lib.skill.shuoye_dihuang_tao.blocked(card, player)) return false;
             },
             // 濒死求桃走的是 cardSavable 而不是 cardEnabled
             cardSavable(card, player) {
-                if (!lib.skill.shuoye_dihuang_tao.lockOn()) return;
-                if (get.tag(card, "damage") > 0) return;
-                return false;
+                if (lib.skill.shuoye_dihuang_tao.blocked(card, player)) return false;
             },
         },
         onremove(player, skill) {
@@ -27020,6 +27031,8 @@ shuoye_shanxian: {
                 game.log(player, "对", target, "发动了", "#g【幻羽】", "：随机弃置", picked);
                 await target.discard(picked).set("discarder", player);
             } else {
+                // 阳间模式：去除「若无同花色牌则造成【绝毁伤害】」
+                if (lib.shuoyeIf && typeof lib.shuoyeIf.qumoshi === "function" && lib.shuoyeIf.qumoshi()) return;
                 game.log(player, "对", target, "发动了", "#g【幻羽】", "：没有同花色的牌，造成1点【绝毁伤害】");
                 await lib.shuoyeDihuang.juehui(target, 1, player);
             }
