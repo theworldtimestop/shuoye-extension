@@ -27379,7 +27379,7 @@ shuoye_shanxian: {
     },
 //#noname-kit-end skill:shuoye_huizuo
 //#noname-kit-begin skill:shuoye_jimou
-    //【神郭嘉】极谋：锁定技。每轮开始记录牌名；已记录牌名的牌每回合首次进弃牌堆时判定（每回合至多X次，X=游戏轮数）
+    //【神郭嘉】极谋：锁定技。每轮开始记录牌名；已记录牌名的牌每回合首次进弃牌堆时判定（每回合至多X+1次，X=游戏轮数）
     shuoye_jimou: {
         audio: "ext:朔夜/audio/skill:3",
         logAudio(...args) {
@@ -27400,7 +27400,7 @@ shuoye_shanxian: {
             const recorded = player.getStorage("shuoye_jimou", []);
             if (!recorded.length) return false;
             const used = lib.skill.shuoye_jimou.turnUsed(player);
-            // 每回合至多判定 X 次（X=游戏轮数）。每个牌名每回合本来就只触发一次，
+            // 每回合至多判定 X+1 次（X=游戏轮数）。每个牌名每回合本来就只触发一次，
             // 所以本回合已判次数 = used.length（跨多次触发事件累计）。
             if (used.length >= lib.skill.shuoye_jimou.turnCap()) return false;
             const names = lib.skill.shuoye_jimou.discardNames(event);
@@ -27484,7 +27484,7 @@ shuoye_shanxian: {
             const used = lib.skill.shuoye_jimou.turnUsed(player);
             const names = lib.skill.shuoye_jimou.discardNames(trigger);
             const todo = [];
-            // 每回合至多判定 X 次（X=游戏轮数）：本回合已判 used.length 次，额度用完就停
+            // 每回合至多判定 X+1 次（X=游戏轮数）：本回合已判 used.length 次，额度用完就停
             const remain = Math.max(0, lib.skill.shuoye_jimou.turnCap() - used.length);
             for (const cardname of names) {
                 if (todo.length >= remain) break;
@@ -27518,10 +27518,10 @@ shuoye_shanxian: {
             if (!record || record.turn !== turn || !Array.isArray(record.names)) return [];
             return record.names.slice(0);
         },
-        // 每回合至多判定的次数：X = 游戏轮数
-        // （记录数是 1+2+3+… 累加，这个上限只随轮数线性涨，所以从第2轮起就真的在削弱）
+        // 每回合至多判定的次数：X + 1（X = 游戏轮数）
+        // 记录数是 1+2+3+… 累加，这个上限只随轮数线性涨，所以后期仍然有上限约束
         turnCap() {
-            return Math.max(1, Number(game.roundNumber) || 1);
+            return Math.max(0, Number(game.roundNumber) || 0) + 1;
         },
         markTurnUsed(player, names) {
             const turn = Number(game.phaseNumber) || 0;
