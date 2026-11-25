@@ -27104,7 +27104,7 @@ shuoye_shanxian: {
     },
 //#noname-kit-end skill:shuoye_lieqing
 //#noname-kit-begin skill:shuoye_shenmu
-    //【神郭嘉】神牧：回合开始时，令一名角色获得你一点体力上限与一点护甲，并获得【慧佐】
+    //【神郭嘉】神牧：每轮首个回合开始时，令一名角色获得你一点体力上限与一点护甲，并获得【慧佐】
     shuoye_shenmu: {
         audio: "ext:朔夜/audio/skill:2",
         logAudio(...args) {
@@ -27114,7 +27114,6 @@ shuoye_shanxian: {
             }
             return "ext:朔夜/audio/skill/shuoye_shenmu1.mp3";
         },
-        // 衍生技展示用（见 shuoye_huizuo_show）：让慧佐在技能界面里作为衍生技出现
         // 衍生技「慧佐」：shuoye_huizuo_show 刻意不带 nopop，引擎才会把它做成角色卡
         // 技能栏里的独立条目（ui.click.charactercard 的 deri 循环；名字取势力色，神=金色），
         // 点开是慧佐自己的介绍页。同一条 derivation 里只挂一条慧佐：挂两条会让
@@ -27122,21 +27121,30 @@ shuoye_shanxian: {
         derivation: ["shuoye_huizuo_show"],
         forced: true,
         popup: false,
-        // 回合开始时给上限/护甲/慧佐；击杀台词共用同一个技能的 die 触发（不再挂 group）
-        trigger: { player: "phaseBegin", global: "die" },
+        // 每轮首个回合开始时发动；击杀台词共用同一个技能的 die 触发（不再挂 group）
+        trigger: { global: ["phaseBegin", "die"] },
         filter(event, player, name) {
             if (name === "die") {
                 if (!event.player || event.player === player) return false;
                 if (event.source !== player) return false;
                 return player.isAlive();
             }
-            return player.maxHp > 1;
+            // 「每轮首个回合开始时」不能按座位判断：像阴阳师的星于吉这类角色开局就离场，
+            // 本轮的首个回合不一定是1号位。这里用「任意角色的回合开始 + 每轮限一次」：
+            // 引擎在首个回合的 phaseBegin 之前就已经 game.roundNumber++（content.js 的 phase 第2步），
+            // 所以本轮第一个被触发的 phaseBegin 就是「本轮首个回合开始时」。
+            if (!player.isAlive() || player.isOut() || player.removed) return false;
+            if (!(player.maxHp > 1)) return false;
+            return (Number(player.getStorage("shuoye_shenmu_round", 0)) || 0) !== (Number(game.roundNumber) || 0);
         },
         async content(event, trigger, player) {
             if (event.triggername === "die") {
                 game.trySkillAudio("shuoye_shenguojia_kill", player, true, null, { audio: "ext:朔夜/audio/skill:1" });
                 return;
             }
+            // 本轮已经发动过就不再弹（forced 技：filter 过了 content 就一定会跑）
+            player.setStorage("shuoye_shenmu_round", Number(game.roundNumber) || 0);
+            playerStorageSync(player, "shuoye_shenmu_round");
             const result = await player
                 .chooseTarget(get.prompt2("shuoye_shenmu"), true)
                 .set("ai", function (target) {
@@ -27562,8 +27570,6 @@ shuoye_shanxian: {
             const prompt = isDamage
                 ? `揽天：交给${get.translation(target)}任意张牌堆顶的牌，令其此次伤害不消耗护甲`
                 : `揽天：交给${get.translation(target)}任意张牌堆顶的牌，取消其此次获得的牌`;
-            // 临时诊断：走到这里就说明触发与 filter 都过了，便于区分「没触发」还是「弹窗被挡」
-            game.log("【揽天】：", get.translation(target), isDamage ? "受到可介入的伤害" : "获得了可介入的牌", "，牌堆顶可见", cards.length, "张");
             const result = await player
                 .chooseButton({ createDialog: [prompt, [cards, "card"]], selectButton: [1, cards.length] })
                 .set("lantianTarget", target)
@@ -27584,7 +27590,9 @@ shuoye_shanxian: {
                 })
                 .forResult();
             if (result && result.bool && result.links && result.links.length) {
-                event.result = { bool: true, cost_data: result.links.slice(0, 1), targets: [target] };
+                // 描述是「任意张」：得把玩家选中的全部牌传下去。
+                // 之前写的是 slice(0, 1)，只传第一张（看起来就像「只给了其中一张」）。
+                event.result = { bool: true, cost_data: result.links.slice(0), targets: [target] };
             }
         },
         async content(event, trigger, player) {
