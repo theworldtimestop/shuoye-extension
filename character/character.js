@@ -619,6 +619,25 @@ shuoye_weiyan: {
         trashBin: [],
     },
 //#noname-kit-end character:shuoye_dihuangzhirong
+//#noname-kit-begin character:shuoye_shenguojia
+    // 【神郭嘉】星月奇佐
+    // 立绘：用 image/shuoye_shenguojia.webp（动图，浏览器自己循环画帧，不会抽动），
+    // 静态图 image/shuoye_shenguojia.jpg 留作保底（不在局内使用）
+    shuoye_shenguojia: {
+        sex: "female",
+        group: "shen",
+        hp: 1,
+        maxHp: 10,
+        hujia: 0,
+        // 内部技能（击杀台词）走神牧的 group，不进这里，否则技能栏会显示无翻译的 id
+        skills: ["shuoye_shenmu", "shuoye_jimou", "shuoye_lantian"],
+        // 立绘用动图：动图是背景图，浏览器自己循环画帧，不存在视频暂停/重挂的抽动，
+        // 而且选将框、图鉴、设置→武将列表都自动是动的（这些界面都只设背景图）。
+        img: "extension/朔夜/image/shuoye_shenguojia.webp",
+        dieAudios: ["ext:朔夜/audio/die/shuoye_shenguojia1.mp3"],
+        trashBin: [],
+    },
+//#noname-kit-end character:shuoye_shenguojia
 };
 for (let i in characters) {
     characters[i].img = characters[i].img || `extension/朔夜/image/character/${i}.jpg`;

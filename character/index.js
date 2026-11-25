@@ -100,6 +100,16 @@ game.import("character", function () {
     if (lib.shuoyeIf && lib.shuoyeIf.qumoshi()) {
         shuoye.translate["shuoye_dihuang_tao_info"] = "拥有【讨】的角色无法使用或打出闪；该角色脱离濒死状态后移除【讨】。";
     }
+    // 【阳间模式】黄金之杯：该模式下初始【影】由 666 张削为 66 张
+    // （取值在 skill.js 的 lib.shuoyeNilu.cupSize，判定见 shuoye_huangjinzhibei）。
+    // 与其他技能一致：这里只存原描述并落一次初始值，真正生效的值由房主广播的
+    // _status.shuoyeQumoshi 决定（见 lib.shuoyeIf.setQumoshi → refreshHuangjinzhibeiInfo）。
+    if (!lib.shuoyeHuangjinzhibeiInfoBase) {
+        lib.shuoyeHuangjinzhibeiInfoBase = shuoye.translate["shuoye_huangjinzhibei_info"];
+    }
+    if (lib.shuoyeIf && typeof lib.shuoyeIf.refreshHuangjinzhibeiInfo === "function") {
+        lib.shuoyeIf.refreshHuangjinzhibeiInfo(shuoye.translate);
+    }
     lib.translate["shuoye_character_config"] = "朔夜";
     if (!lib.config[`extension_朔夜_characterPack_shuoye_enable`]) {
 		game.saveExtensionConfig("朔夜", "characterPack_shuoye_enable", true);

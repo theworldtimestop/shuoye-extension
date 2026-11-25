@@ -154,6 +154,18 @@ const voices = {
 	"#ext:朔夜/audio/skill/shuoye_qinggang2": "勇略已超天下将，再炽心气问天高！",
 	"#ext:朔夜/audio/skill/shuoye_zhaoyun_kill1": "古今名将万千，冲阵扶主者，几人？",
 	"#shuoye_zhaoyun:die": "吾平生未有败事，岂料今日，呃啊……",
-	"#ext:朔夜/audio/die/shuoye_zhaoyun1:die": "吾平生未有败事，岂料今日，呃啊……",
+	"#ext:朔夜/audio/die/shuoye_zhaoyun1:die": "吾平生未有败事，岂料今日，呃啊……",	// 【神郭嘉】星月奇佐（原版技能页与千幻聆音技能页均读此表；键名 = 音频文件名）
+	"#ext:朔夜/audio/skill/shuoye_shenmu1": "寿数长短，不足与明公大事相较。",
+	"#ext:朔夜/audio/skill/shuoye_shenmu2": "明主既现，吾定极尽所能。",
+	"#ext:朔夜/audio/skill/shuoye_jimou1": "目下万物，皆为成吾等之愿。",
+	"#ext:朔夜/audio/skill/shuoye_jimou2": "人心所向，未来之势，皆一睹而尽知。",
+	"#ext:朔夜/audio/skill/shuoye_jimou3": "人亦如星，或居空而渺然，或为彗而明夜。",
+	"#ext:朔夜/audio/skill/shuoye_lantian1": "笑览世间众生，坐观天行定数。",
+	"#ext:朔夜/audio/skill/shuoye_lantian2": "天命所属，自当多得。",
+	"#ext:朔夜/audio/skill/shuoye_lantian3": "观滴水而知沧海，窥一举而察人心",
+	"#ext:朔夜/audio/skill/shuoye_huizuo1": "今九州纷乱，当祈天朗佑。",
+	"#ext:朔夜/audio/skill/shuoye_huizuo2": "借天秘力，佐公之事，感有荣焉。",
+	"#ext:朔夜/audio/skill/shuoye_shenguojia_kill1": "动天而为，安有大事不成之理？",
+	"#ext:朔夜/audio/die/shuoye_shenguojia1:die": "未及引动天能，竟已要坠入轮回……",
 };
 export default voices;

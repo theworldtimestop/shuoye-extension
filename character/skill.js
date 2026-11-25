@@ -1205,6 +1205,9 @@ if (!lib.shuoyeIf) {
                     if (lib.shuoyeIf && typeof lib.shuoyeIf.refreshXinghuoInfo === "function") {
                         lib.shuoyeIf.refreshXinghuoInfo();
                     }
+                    if (lib.shuoyeIf && typeof lib.shuoyeIf.refreshHuangjinzhibeiInfo === "function") {
+                        lib.shuoyeIf.refreshHuangjinzhibeiInfo();
+                    }
                 } catch (e) {}
             }, value);
         },
@@ -1259,6 +1262,18 @@ if (!lib.shuoyeIf) {
             try {
                 const huanyuBase = typeof lib.shuoyeHuanyuInfoBase === "string" ? lib.shuoyeHuanyuInfoBase : SHUOYE_HUANYU_INFO;
                 lib.translate["shuoye_huanyu_info"] = qumoshi ? SHUOYE_HUANYU_INFO_QUMOSHI : huanyuBase;
+            } catch (e) {}
+        },
+        // 按阳间模式刷新【黄金之杯】的描述（原描述存在 lib.shuoyeHuangjinzhibeiInfoBase）
+        // 阳间模式只把初始张数 666 换成 66，其余文案沿用 translate.js 原文。
+        // target 传对象时写进该对象（character/index.js 注册前要改 pack 里的 translate），
+        // 不传时写 lib.translate（局内模式开关广播后三端刷新）。
+        refreshHuangjinzhibeiInfo(target) {
+            const base = lib.shuoyeHuangjinzhibeiInfoBase;
+            if (typeof base !== "string") return;
+            try {
+                const size = lib.shuoyeNilu && typeof lib.shuoyeNilu.cupSize === "function" ? lib.shuoyeNilu.cupSize() : 666;
+                (target || lib.translate)["shuoye_huangjinzhibei_info"] = base.replace("666", String(size));
             } catch (e) {}
         },
         // ---------------- 无量空处：领域状态 ----------------
@@ -1856,6 +1871,14 @@ if (!lib.shuoyeIf) {
 // 不能依赖模块闭包，否则联机客机重建函数时找不到。
 if (!lib.shuoyeNilu) {
     lib.shuoyeNilu = {
+        // 黄金之杯初始【影】张数：普通模式 666 张，阳间模式削为 66 张。
+        // 这里写数字字面量而不是模块常量：联机客机可能重建这些函数，不能依赖模块闭包。
+        cupSize() {
+            try {
+                if (lib.shuoyeIf && typeof lib.shuoyeIf.qumoshi === "function" && lib.shuoyeIf.qumoshi()) return 66;
+            } catch (e) {}
+            return 666;
+        },
         voiceLast: 0,
         // 【兽之七冠】调试日志：写 extension/朔夜/backup/shouguan.log，验证完可整段删掉
         shouguanLog(text) {
@@ -2255,7 +2278,7 @@ if (!lib.shuoyeNilu) {
                             this.storage[key] = left;
                             if (typeof this.syncStorage === "function") this.syncStorage(key);
                             // updateMarks 传入技能名时，联机主机会把新的 storage 广播给客机并刷新标记；
-                            // 不传参只刷新本地，客机会一直显示游戏开始时的 666。
+                            // 不传参只刷新本地，客机会一直显示游戏开始时的初始张数。
                             if (typeof this.updateMarks === "function") this.updateMarks(key);
                         }
                         return cards;
@@ -18815,7 +18838,14 @@ shuoye_weituan: {
             try {
                 if (lib.shuoyeNilu && lib.shuoyeNilu.shouguanLog) lib.shuoyeNilu.shouguanLog("[开局] 黄金之杯 gameStart content 开始 player=" + get.translation(player) + " online=" + game.online + " connect=" + _status.connectMode);
             } catch (e) {}
-            player.storage.shuoye_huangjinzhibei = 666;
+            // 初始【影】张数：普通模式 666 张，阳间模式削为 66 张（见 lib.shuoyeNilu.cupSize）。
+            // 热重载后旧的 lib.shuoyeNilu 可能还没有 cupSize，这里给个同规则的兜底，避免抛异常。
+            player.storage.shuoye_huangjinzhibei =
+                typeof lib.shuoyeNilu.cupSize == "function"
+                    ? lib.shuoyeNilu.cupSize()
+                    : lib.shuoyeIf && typeof lib.shuoyeIf.qumoshi == "function" && lib.shuoyeIf.qumoshi()
+                      ? 66
+                      : 666;
             if (typeof player.syncStorage === "function") player.syncStorage("shuoye_huangjinzhibei");
             player.markSkill("shuoye_huangjinzhibei");
             try {
@@ -27073,6 +27103,791 @@ shuoye_shanxian: {
         _priority: 0,
     },
 //#noname-kit-end skill:shuoye_lieqing
+//#noname-kit-begin skill:shuoye_shenmu
+    //【神郭嘉】神牧：回合开始时，令一名角色获得你一点体力上限与一点护甲，并获得【慧佐】
+    shuoye_shenmu: {
+        audio: "ext:朔夜/audio/skill:2",
+        logAudio(...args) {
+            const first = args[0];
+            if (typeof first === "number") {
+                return "ext:朔夜/audio/skill/shuoye_shenmu" + first + ".mp3";
+            }
+            return "ext:朔夜/audio/skill/shuoye_shenmu1.mp3";
+        },
+        // 衍生技展示用（见 shuoye_huizuo_show）：让慧佐在技能界面里作为衍生技出现
+        // 衍生技「慧佐」：shuoye_huizuo_show 刻意不带 nopop，引擎才会把它做成角色卡
+        // 技能栏里的独立条目（ui.click.charactercard 的 deri 循环；名字取势力色，神=金色），
+        // 点开是慧佐自己的介绍页。同一条 derivation 里只挂一条慧佐：挂两条会让
+        //「—— 衍生技能 ——」（ui.create 的 skill 预设）与十周年UI 的衍生技列表各重复一次。
+        derivation: ["shuoye_huizuo_show"],
+        forced: true,
+        popup: false,
+        // 回合开始时给上限/护甲/慧佐；击杀台词共用同一个技能的 die 触发（不再挂 group）
+        trigger: { player: "phaseBegin", global: "die" },
+        filter(event, player, name) {
+            if (name === "die") {
+                if (!event.player || event.player === player) return false;
+                if (event.source !== player) return false;
+                return player.isAlive();
+            }
+            return player.maxHp > 1;
+        },
+        async content(event, trigger, player) {
+            if (event.triggername === "die") {
+                game.trySkillAudio("shuoye_shenguojia_kill", player, true, null, { audio: "ext:朔夜/audio/skill:1" });
+                return;
+            }
+            const result = await player
+                .chooseTarget(get.prompt2("shuoye_shenmu"), true)
+                .set("ai", function (target) {
+                    const me = get.player();
+                    if (!target) return 0;
+                    if (target === me) {
+                        return 6 + (me.hujia < 2 ? 4 : 0) + (me.hasSkill("shuoye_huizuo") ? 0 : 2);
+                    }
+                    const att = get.attitude(me, target);
+                    if (att <= 0) return 0;
+                    return att * (target.hasSkill("shuoye_huizuo") ? 1 : 2) * (target.isDamaged() ? 1.5 : 1);
+                })
+                .forResult();
+            const target = result && result.bool && result.targets && result.targets[0] ? result.targets[0] : player;
+            const self = target === player;
+            // 第5个参数必须是数组：引擎会用 logAudio(...args) 展开它
+            player.logSkill("shuoye_shenmu", self ? false : target, null, null, [self ? 1 : 2]);
+            await player.loseMaxHp();
+            if (!self && target.isIn()) {
+                await target.gainMaxHp();
+            }
+            if (target.isIn()) {
+                await target.changeHujia(1);
+            }
+            if (target.isIn()) {
+                lib.skill.shuoye_shenmu.giveHuizuo(target);
+            }
+        },
+        // 授予【慧佐】：持续到其下一次回合结束（若正处于该角色自己的回合内，则顺延一个回合）
+        giveHuizuo(target) {
+            if (!target || typeof target.isIn !== "function" || !target.isIn()) return;
+            const turns = _status.currentPhase === target ? 2 : 1;
+            const prev = Number(target.getStorage("shuoye_huizuo_turns", 0)) || 0;
+            target.setStorage("shuoye_huizuo_turns", Math.max(prev, turns));
+            playerStorageSync(target, "shuoye_huizuo_turns");
+            if (!target.hasSkill("shuoye_huizuo")) target.addSkill("shuoye_huizuo");
+            game.log(target, "获得了技能", "#g【慧佐】", "，直到其下个回合结束");
+        },
+        ai: {
+            order: 1,
+            threaten: 2,
+            result: { player: 1 },
+        },
+    },
+//#noname-kit-end skill:shuoye_shenmu
+//#noname-kit-begin skill:shuoye_huizuo
+    //【神郭嘉】慧佐（衍生技）：使用伤害牌时强制二选一；自己计时，不另挂技能
+    shuoye_huizuo: {
+        audio: "ext:朔夜/audio/skill:2",
+        logAudio(...args) {
+            const first = args[0];
+            if (typeof first === "number") {
+                return "ext:朔夜/audio/skill/shuoye_huizuo" + first + ".mp3";
+            }
+            return "ext:朔夜/audio/skill/shuoye_huizuo1.mp3";
+        },
+        // 衍生技蓝色显示：慧佐是【神牧】授予的派生技能，引擎的技能面板
+        // （get.nodeintro 里 `temp || !node.skills.includes(技能) || thundertext` 那条分支）
+        // 会把带 thundertext 的技能名与描述渲染成蓝字，和帝皇之戎的【破夜】【星火】同一种蓝色。
+        thundertext: true,
+        forced: true,
+        popup: false,
+        trigger: { player: ["useCard", "useCardAfter", "phaseAfter"] },
+        filter(event, player, name) {
+            if (name === "phaseAfter") {
+                return (Number(player.getStorage("shuoye_huizuo_turns", 0)) || 0) > 0;
+            }
+            if (name === "useCardAfter") {
+                return !!event.shuoye_huizuo_pending;
+            }
+            if (event.shuoye_huizuo_extra) return false;
+            if (!event.card) return false;
+            if (!event.targets || !event.targets.length) return false;
+            return Boolean(get.tag(event.card, "damage"));
+        },
+        async content(event, trigger, player) {
+            // 回合结束：倒计数，到期移除
+            if (event.triggername === "phaseAfter") {
+                const turns = (Number(player.getStorage("shuoye_huizuo_turns", 0)) || 0) - 1;
+                if (turns > 0) {
+                    player.setStorage("shuoye_huizuo_turns", turns);
+                    playerStorageSync(player, "shuoye_huizuo_turns");
+                    return;
+                }
+                player.setStorage("shuoye_huizuo_turns", 0);
+                playerStorageSync(player, "shuoye_huizuo_turns");
+                game.log(player, "失去了技能", "#g【慧佐】");
+                player.removeSkill("shuoye_huizuo");
+                return;
+            }
+            // 结算后：视为对其中一个目标使用一张基本牌或普通锦囊牌
+            if (event.triggername === "useCardAfter") {
+                delete trigger.shuoye_huizuo_pending;
+                await lib.skill.shuoye_huizuo.afterEffect(trigger, player);
+                return;
+            }
+            const canLose = player.maxHp > 1;
+            // 选项写短一点，免得按钮被文字撜满；完整效果看技能描述
+            const choices = ["受到伤害不可响应"];
+            if (canLose) choices.push("失去上限额外使用");
+            const result = await player
+                .chooseControl(choices)
+                .set("prompt", "慧佐：请选择一项")
+                .set("ai", function () {
+                    const me = get.player();
+                    return me.maxHp > 1 ? 1 : 0;
+                })
+                .forResult();
+            const index = result && typeof result.index === "number" ? result.index : 0;
+            if (index === 1 && canLose) {
+                player.logSkill("shuoye_huizuo", null, null, null, [2]);
+                await player.loseMaxHp();
+                // 只在这张牌的事件上做标记：结算后由同一个技能的 useCardAfter 接着处理
+                trigger.shuoye_huizuo_pending = true;
+            } else {
+                player.logSkill("shuoye_huizuo", null, null, null, [1]);
+                await player.damage("nosource");
+                if (trigger.targets && trigger.targets.length) {
+                    trigger.directHit.addArray(trigger.targets);
+                }
+                game.log(trigger.card, "不可被响应");
+            }
+        },
+        async afterEffect(trigger, player) {
+            const targets = (trigger.targets || []).filter(t => t && typeof t.isIn === "function" && t.isIn());
+            if (!targets.length) return;
+            let target;
+            if (targets.length === 1) {
+                target = targets[0];
+            } else {
+                const res = await player
+                    .chooseTarget("慧佐：选择其中一个目标", true, function (card, p, t) {
+                        const evt = get.event();
+                        const list = evt && evt.huizuoTargets;
+                        return Boolean(list && list.includes(t));
+                    })
+                    .set("huizuoTargets", targets)
+                    .set("ai", function (t) {
+                        return -get.attitude(get.player(), t);
+                    })
+                    .forResult();
+                if (!res || !res.bool || !res.targets || !res.targets.length) return;
+                target = res.targets[0];
+            }
+            if (!target) return;
+            const list = [];
+            for (const cardname of lib.inpile) {
+                if (!lib.card[cardname]) continue;
+                const type = get.type(cardname);
+                if (type !== "basic" && type !== "trick") continue;
+                if (list.some(item => item[2] === cardname)) continue;
+                list.push([type, "", cardname]);
+            }
+            if (!list.length) return;
+            const res2 = await player
+                .chooseButton([`慧佐：选择视为对${get.translation(target)}使用的一张基本牌或普通锦囊牌`, [list, "vcard"]], true)
+                .set("huizuoTarget", target)
+                .set("ai", function (button) {
+                    const evt = get.event();
+                    const me = get.player();
+                    const t = evt && evt.huizuoTarget;
+                    if (!t) return 1;
+                    return get.effect(t, { name: button.link[2] }, me, me);
+                })
+                .forResult();
+            if (!res2 || !res2.bool || !res2.links || !res2.links.length) return;
+            const cardname = res2.links[0][2];
+            if (!cardname) return;
+            const use = player.useCard({ name: cardname }, target);
+            if (use && typeof use.set === "function") use.set("shuoye_huizuo_extra", true);
+            game.log(player, "视为对", target, "使用了一张", "#y" + get.translation(cardname));
+        },
+    },
+    //【神郭嘉】慧佐（仅用于展示）：慧佐初始不在任何人的技能栏里（含神郭嘉本人）。
+    // 这条展示技刻意【不带】nopop：引擎只把「derivation 里不带 nopop」的技能做成
+    // 角色卡技能栏里的独立条目（ui.click.charactercard 的 deri 循环；名字取势力色，神=金色），
+    // 点开就是慧佐自己的介绍页；带 nopop 只会被内联进神牧页、不单开条目。
+    shuoye_huizuo_show: {
+        // 音频用「引用另一技能」的写法（官方 character/diy.js 的 audio: ["huashen", 2] 同款）：
+        // 引擎拼音频文件名用的是技能 ID（get/audio.js → textMapWithIndex → this.name + 序号），
+        // 写自己的 ID 就会去找 shuoye_huizuo_show1.mp3（不存在），于是原版技能页和千幻台词页
+        // 都拿不到 textList、台词不显示；引用 shuoye_huizuo 就会用
+        // ext:朔夜/audio/skill/shuoye_huizuo1.mp3 与 translate 里的 #ext:...huizuo1/2 两条台词。
+        audio: ["shuoye_huizuo", 2],
+        logAudio(...args) {
+            const first = args[0];
+            if (typeof first === "number") {
+                return "ext:朔夜/audio/skill/shuoye_huizuo" + first + ".mp3";
+            }
+            return "ext:朔夜/audio/skill/shuoye_huizuo1.mp3";
+        },
+    },
+    //【神郭嘉】慧佐（展示用·备用）：和 shuoye_huizuo_show 同名同描述，不授予给任何人、没有任何触发。
+    // 「单开条目」现在由 shuoye_huizuo_show 负责（它已去掉 nopop），这里留一份备用展示技：
+    // 日后若要改回「神牧页内联 + 独立条目」两套并存，把它挂回 derivation 即可
+    // （代价：「—— 衍生技能 ——」与十周年UI 衍生技列表里慧佐会列两遍，先确认再改）。
+    shuoye_huizuo_view: {
+        // 同 shuoye_huizuo_show：拼音频名用的是技能 ID，必须引用慧佐本体的音频，
+        // 否则这个技能被挂回 derivation 时也拿不到台词。
+        audio: ["shuoye_huizuo", 2],
+        logAudio(...args) {
+            const first = args[0];
+            if (typeof first === "number") {
+                return "ext:朔夜/audio/skill/shuoye_huizuo" + first + ".mp3";
+            }
+            return "ext:朔夜/audio/skill/shuoye_huizuo1.mp3";
+        },
+    },
+//#noname-kit-end skill:shuoye_huizuo
+//#noname-kit-begin skill:shuoye_jimou
+    //【神郭嘉】极谋：锁定技。每轮开始记录牌名；已记录牌名的牌每回合首次进弃牌堆时判定
+    shuoye_jimou: {
+        audio: "ext:朔夜/audio/skill:3",
+        logAudio(...args) {
+            const first = args[0];
+            if (typeof first === "number") {
+                return "ext:朔夜/audio/skill/shuoye_jimou" + first + ".mp3";
+            }
+            return "ext:朔夜/audio/skill/shuoye_jimou1.mp3";
+        },
+        forced: true,
+        popup: false,
+        trigger: { global: ["roundStart", "loseAfter", "loseAsyncAfter", "cardsDiscardAfter"] },
+        filter(event, player, name) {
+            if (!player.isAlive() || !player.hasSkill("shuoye_jimou")) return false;
+            if (name === "roundStart") {
+                return lib.skill.shuoye_jimou.pool(player).length > 0;
+            }
+            const recorded = player.getStorage("shuoye_jimou", []);
+            if (!recorded.length) return false;
+            const used = lib.skill.shuoye_jimou.turnUsed(player);
+            const names = lib.skill.shuoye_jimou.discardNames(event);
+            return names.some(cardname => recorded.includes(cardname) && !used.includes(cardname));
+        },
+        async content(event, trigger, player) {
+            if (event.triggername === "roundStart") {
+                await lib.skill.shuoye_jimou.record(player);
+                return;
+            }
+            await lib.skill.shuoye_jimou.judge(trigger, player);
+        },
+        mark: true,
+        marktext: "谋",
+        intro: {
+            markcount(storage) {
+                return Array.isArray(storage) ? storage.length : 0;
+            },
+            content(storage) {
+                const list = Array.isArray(storage) ? storage : [];
+                if (!list.length) return "尚未记录牌名";
+                return "已记录牌名：" + list.map(cardname => get.translation(cardname)).join("、");
+            },
+        },
+        init(player, skill) {
+            if (!Array.isArray(player.storage[skill])) player.storage[skill] = [];
+        },
+        // 可选牌名：全部尚未记录的牌名（基本/锦囊/延时锦囊/装备）
+        pool(player) {
+            const recorded = player.getStorage("shuoye_jimou", []);
+            const list = [];
+            for (const cardname of lib.inpile) {
+                if (!lib.card[cardname]) continue;
+                if (recorded.includes(cardname)) continue;
+                const type2 = get.type2(cardname);
+                if (type2 !== "basic" && type2 !== "trick" && type2 !== "equip") continue;
+                if (list.some(item => item[2] === cardname)) continue;
+                list.push([get.type(cardname) || type2, "", cardname]);
+            }
+            return list;
+        },
+        // 每轮开始：记录 X（游戏轮数）个未记录的牌名
+        async record(player) {
+            const pool = lib.skill.shuoye_jimou.pool(player);
+            if (!pool.length) return;
+            player.logSkill("shuoye_jimou", null, null, null, [1]);
+            const need = Math.min(Math.max(1, Number(game.roundNumber) || 1), pool.length);
+            let links;
+            if (pool.length <= 1) {
+                // 只剩一个未记录的牌名，直接记录，不用再问
+                links = pool.slice(0, need);
+            } else {
+                const result = await player
+                    .chooseButton([`极谋：选择${get.cnNumber(need)}个未记录的牌名`, [pool, "vcard"]], true, [need, need])
+                    .set("ai", function (button) {
+                        const cardname = button && button.link && button.link[2];
+                        const prefer = ["sha", "shan", "tao", "wuxie", "wuzhong", "guohe", "shunshou", "juedou", "nanman", "wanjian", "tiesuo", "huogong"];
+                        const index = prefer.indexOf(cardname);
+                        return index < 0 ? 1 : 20 - index;
+                    })
+                    .forResult();
+                if (!result || !result.bool || !result.links || !result.links.length) return;
+                links = result.links;
+            }
+            const recorded = player.getStorage("shuoye_jimou", []).slice();
+            const names = [];
+            for (const link of links) {
+                const cardname = Array.isArray(link) ? link[2] : link;
+                if (!cardname || recorded.includes(cardname) || names.includes(cardname)) continue;
+                names.push(cardname);
+            }
+            if (!names.length) return;
+            player.setStorage("shuoye_jimou", recorded.concat(names));
+            player.markSkill("shuoye_jimou");
+            playerStorageSync(player, "shuoye_jimou");
+            game.log(player, "记录了牌名", names.map(cardname => "#y" + get.translation(cardname)));
+        },
+        // 已记录牌名的牌每回合首次进弃牌堆：判定
+        async judge(trigger, player) {
+            const recorded = player.getStorage("shuoye_jimou", []).slice();
+            const used = lib.skill.shuoye_jimou.turnUsed(player);
+            const names = lib.skill.shuoye_jimou.discardNames(trigger);
+            const todo = [];
+            for (const cardname of names) {
+                if (!recorded.includes(cardname)) continue;
+                if (used.includes(cardname)) continue;
+                if (todo.includes(cardname)) continue;
+                todo.push(cardname);
+                used.push(cardname);
+            }
+            if (!todo.length) return;
+            lib.skill.shuoye_jimou.markTurnUsed(player, used);
+            for (const cardname of todo) {
+                game.log("【极谋】：", "#y" + get.translation(cardname), "进入弃牌堆，你进行判定");
+                const result = await player.judge().forResult();
+                const card = result && result.card;
+                const judged = card && card.name ? card.name : null;
+                const success = Boolean(judged && recorded.includes(judged));
+                player.logSkill("shuoye_jimou", null, null, null, [success ? 2 : 3]);
+                if (success) {
+                    if (player.maxHp < 10) await player.gainMaxHp();
+                    await player.draw();
+                    game.log(player, "的【极谋】判定成功");
+                } else {
+                    game.log(player, "的【极谋】判定失败");
+                }
+            }
+        },
+        turnUsed(player) {
+            const turn = Number(game.phaseNumber) || 0;
+            const record = player.storage.shuoye_jimou_turn;
+            if (!record || record.turn !== turn || !Array.isArray(record.names)) return [];
+            return record.names.slice(0);
+        },
+        markTurnUsed(player, names) {
+            const turn = Number(game.phaseNumber) || 0;
+            player.storage.shuoye_jimou_turn = { turn: turn, names: names.slice(0) };
+            playerStorageSync(player, "shuoye_jimou_turn");
+        },
+        discardNames(event) {
+            const names = [];
+            const cards = event && event.cards ? event.cards : [];
+            for (const card of cards) {
+                if (!card || !card.name) continue;
+                if (names.includes(card.name)) continue;
+                // 处理区的牌 get.position 也返回 "d"，要用第二参区分
+                if (get.position(card) !== "d") continue;
+                if (get.position(card, true) === "o") continue;
+                names.push(card.name);
+            }
+            return names;
+        },
+    },
+//#noname-kit-end skill:shuoye_jimou
+//#noname-kit-begin skill:shuoye_lantian
+    //【神郭嘉】揽天：牌堆顶X张牌对你可见（X=游戏轮数）；护甲承伤 / 获得牌都可介入
+    shuoye_lantian: {
+        audio: "ext:朔夜/audio/skill:3",
+        logAudio(...args) {
+            const first = args[0];
+            if (typeof first === "number") {
+                return "ext:朔夜/audio/skill/shuoye_lantian" + first + ".mp3";
+            }
+            return "ext:朔夜/audio/skill/shuoye_lantian1.mp3";
+        },
+        // popup: false + 自己 logSkill：否则引擎的自动日志和我们分支选句会双重点赞/双语音
+        popup: false,
+        trigger: { global: ["damageBegin3", "gainBegin"] },
+        // 牌堆顶可见的是一排只做展示的副本牌（渲染见文件末尾的 shuoyeLantian* 函数）：
+        // 它们带 shuoye_lantian 角标，只可见、不可用
+        mod: {
+            cardEnabled2(card, player) {
+                if (!card || typeof card.hasGaintag !== "function") return;
+                if (card.hasGaintag("shuoye_lantian")) return false;
+            },
+            cardDiscardable(card, player) {
+                if (!card || typeof card.hasGaintag !== "function") return;
+                if (card.hasGaintag("shuoye_lantian")) return false;
+            },
+        },
+        topNum() {
+            return Math.max(0, Number(game.roundNumber) || 0);
+        },
+        // 真实牌堆顶（主机/单机直接读；客机用主机推送过来的牌面数据，见 shuoyeLantianRemoteData）
+        getTopCards() {
+            const num = lib.skill.shuoye_lantian.topNum();
+            if (num <= 0) return [];
+            if (!ui.cardPile || ui.cardPile.hasChildNodes() === false) return [];
+            return Array.from(ui.cardPile.childNodes).slice(0, num);
+        },
+        filter(event, player, name) {
+            if (!player.isAlive() || !player.hasSkill("shuoye_lantian")) return false;
+            if (name === "damageBegin3") {
+                const target = event.player;
+                if (!target || target.isDead()) return false;
+                if (!(target.hujia > 0)) return false;
+                if (event.nohujia || target.hasSkillTag("nohujia")) return false;
+                if (!(event.num > 0)) return false;
+            } else if (name === "gainBegin") {
+                if (event.shuoye_lantian) return false;
+                const target = event.player;
+                if (!target || target.isDead()) return false;
+                if (!(event.cards && event.cards.length > 2)) return false;
+            } else {
+                return false;
+            }
+            return lib.skill.shuoye_lantian.getTopCards().length > 0;
+        },
+        async cost(event, trigger, player) {
+            const target = trigger.player;
+            const cards = lib.skill.shuoye_lantian.getTopCards();
+            if (!cards.length || !target) return;
+            const isDamage = event.triggername === "damageBegin3";
+            const prompt = isDamage
+                ? `揽天：交给${get.translation(target)}任意张牌堆顶的牌，令其此次伤害不消耗护甲`
+                : `揽天：交给${get.translation(target)}任意张牌堆顶的牌，取消其此次获得的牌`;
+            // 临时诊断：走到这里就说明触发与 filter 都过了，便于区分「没触发」还是「弹窗被挡」
+            game.log("【揽天】：", get.translation(target), isDamage ? "受到可介入的伤害" : "获得了可介入的牌", "，牌堆顶可见", cards.length, "张");
+            const result = await player
+                .chooseButton({ createDialog: [prompt, [cards, "card"]], selectButton: [1, cards.length] })
+                .set("lantianTarget", target)
+                .set("ai", function (button, buttons) {
+                    const evt = get.event();
+                    const me = get.player();
+                    const t = evt && evt.lantianTarget;
+                    if (!t || !button) return 0;
+                    if (get.attitude(me, t) >= 0) return 0;
+                    // 只给价值最低的一张，其余一律 0 分
+                    const list = buttons && buttons.length ? buttons : [button];
+                    let best = null;
+                    for (const item of list) {
+                        if (!item || !item.link) continue;
+                        if (!best || get.value(item.link) < get.value(best.link)) best = item;
+                    }
+                    return best === button ? 1 : 0;
+                })
+                .forResult();
+            if (result && result.bool && result.links && result.links.length) {
+                event.result = { bool: true, cost_data: result.links.slice(0, 1), targets: [target] };
+            }
+        },
+        async content(event, trigger, player) {
+            const target = trigger.player;
+            const cards = (event.cost_data || []).filter(card => card && get.position(card) === "c");
+            if (!cards.length || !target || target.isDead()) return;
+            if (event.triggername === "damageBegin3") {
+                player.logSkill("shuoye_lantian", target, null, null, [2]);
+                trigger.nohujia = true;
+                game.log("【揽天】：", get.translation(target), "此次伤害不消耗护甲");
+                await target.gain(cards, "gain2").set("shuoye_lantian", true);
+                return;
+            }
+            const stranded = (trigger.cards || []).slice(0);
+            player.logSkill("shuoye_lantian", target, null, null, [3]);
+            // 取消本次获得：gain 内容遇到空牌直接 finish，牌不会进入目标区域
+            trigger.cards = [];
+            // 已经离手（从牌堆抽出 / loseAsync 已先失去）的牌进弃牌堆，避免凭空消失；
+            // 还在原主手牌、装备或判定区的牌保持不动
+            const flying = stranded.filter(card => card && !get.owner(card));
+            game.log("【揽天】：", get.translation(target), `此次获得的${stranded.length}张牌被取消`);
+            if (flying.length) await game.cardsDiscard(flying);
+            await target.gain(cards, "gain2").set("shuoye_lantian", true);
+        },
+    },
+//#noname-kit-end skill:shuoye_lantian
 };
+
+// ===== 【神郭嘉】公共小工具 / 局内表现（蓝色前缀 / 动态立绘） =====
+// 说明：
+//   1. storage 变更后只是给录像留一条记录（player.syncStorage 本身不广播）；
+//      联机时 content 在三端同样执行，storage 自然一致，不需要额外广播；
+//   2. 前缀与立绘只改神郭嘉自己的显示，不碰其它武将；调色板沿用扩展的 shj 前缀命名空间。
+function playerStorageSync(player, key) {
+    try {
+        if (player && typeof player.syncStorage === "function") player.syncStorage(key);
+    } catch (e) {}
+}
+
+const SHUOYE_SGJ_CHAR = "shuoye_shenguojia";
+const SHUOYE_SGJ_STYLE_ID = "shuoye-shenguojia-style";
+
+function shuoyeSgjEnsureStyle() {
+    try {
+        if (typeof document === "undefined" || !document.head) return;
+        if (document.getElementById(SHUOYE_SGJ_STYLE_ID)) return;
+        const style = document.createElement("style");
+        style.id = SHUOYE_SGJ_STYLE_ID;
+        style.innerHTML =
+            ".shj-name-blue{display:inline-block;background-image:linear-gradient(90deg,#1e6dff,#63b4ff,#d8edff,#4aa4ff,#1e6dff);background-size:200% 100%;background-position:0% 50%;-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent;text-shadow:none !important;animation:shjNameBlueFlow 3.2s linear infinite;}" +
+            "@keyframes shjNameBlueFlow{0%{background-position:0% 50%;}100%{background-position:200% 50%;}}";
+        document.head.appendChild(style);
+    } catch (e) {}
+}
+
+// 武将前缀：把「神」的 getSpan 换成蓝色流光，但只对神郭嘉生效（其它神势力武将保持引擎原色）
+function shuoyeSgjInstallPrefix() {
+    try {
+        shuoyeSgjEnsureStyle();
+        const map = lib.namePrefix;
+        if (!map || typeof map.set !== "function") return;
+        const old = typeof map.get === "function" ? map.get("神") : null;
+        if (old && old._shuoyeSgj) return;
+        map.set("神", {
+            _shuoyeSgj: true,
+            getSpan(text, name) {
+                const simple = lib.config.buttoncharacter_prefix == "simple";
+                if (name === SHUOYE_SGJ_CHAR && !simple) {
+                    try {
+                        const span = document.createElement("span");
+                        span.className = "shj-name-blue";
+                        span.innerHTML = text;
+                        return span.outerHTML;
+                    } catch (e) {}
+                }
+                if (old && typeof old.getSpan === "function") return old.getSpan(text, name);
+                const span = document.createElement("span");
+                if (!simple) {
+                    span.style.color = (old && old.color) || "#faecd1";
+                    span.dataset.nature = (old && old.nature) || "orangemm";
+                }
+                span.innerHTML = text;
+                return span.outerHTML;
+            },
+        });
+    } catch (e) {}
+}
+
+// ===== 【揽天】牌堆顶可见牌：在本地玩家手牌区常驻一排（仿鸽府「购物Mimi·透支」，区别是只可见、不可用） =====
+// 数据来源：
+//   1. 单机 / 联机主机：直接读 ui.cardPile（牌堆顶 = firstChild），这是权威数据；
+//   2. 联机客机：客机本地没有真实牌堆（引擎的记牌器都要向主机请求牌堆），所以由主机用
+//      player.ws.send("shuoyeLantianView", data) 只推给「拥有揽天的那个玩家的客户端」，其它玩家收不到；
+//      客机在 lib.message.client.shuoyeLantianView 里用推送数据在本地画。
+// 渲染：副本牌用 directgains 放进手牌区的特殊牌（带 glows → get.position 算 "s"），带「揽天」角标、
+//      可悬停看牌面，不写进真实牌堆、不算手牌；lib.skill.shuoye_lantian.mod 禁止这些副本牌被使用/打出/弃置。
+// 计时器常驻本页、不挂 lib.onfree：引擎在换将/退出时会执行并删除 lib.onfree，挂在上面的清理会让效果
+//      只生效一局（本文件另一处 onfree 钩子同样拿不到第二局），这也是之前「牌堆顶可见」没显示的原因。
+const SHUOYE_LANTIAN_TAG = "shuoye_lantian";
+let shuoyeLantianViewTimer = null;
+let shuoyeLantianViewKey = "";
+// 客机收到的牌面数据（只推给拥有揽天的那台客机），标记弹窗也用它
+let shuoyeLantianRemoteData = [];
+
+function shuoyeLantianViewList(player) {
+    const target = player || game.me;
+    if (!target || !target.getCards) return [];
+    try {
+        return target.getCards("s", card => !!(card && card.hasGaintag && card.hasGaintag(SHUOYE_LANTIAN_TAG)));
+    } catch (e) {
+        return [];
+    }
+}
+
+function shuoyeLantianViewRemove(player) {
+    for (const card of shuoyeLantianViewList(player)) {
+        try {
+            card.removeGaintag(SHUOYE_LANTIAN_TAG);
+        } catch (e) {}
+        try {
+            if (card.parentNode) card.parentNode.removeChild(card);
+        } catch (e) {}
+    }
+}
+
+function shuoyeLantianViewApply(player, data) {
+    if (!player || !player.node || !player.node.handcards1) return;
+    shuoyeLantianViewRemove(player);
+    if (!data || !data.length) return;
+    const clones = [];
+    for (const item of data) {
+        if (!item || !item.name) continue;
+        let clone = null;
+        try {
+            clone = game.createCard(item.name, item.suit, item.number, item.nature);
+        } catch (e) {
+            clone = null;
+        }
+        if (!clone) continue;
+        // 牌左下角的「揽天」标签由引擎的 gaintag 渲染（translate: shuoye_lantian = 揽天）
+        try {
+            clone.addGaintag(SHUOYE_LANTIAN_TAG);
+        } catch (e) {}
+        clones.push(clone);
+    }
+    if (!clones.length) return;
+    try {
+        // false = 不广播：牌堆顶对谁可见是私有信息，不往其它客机发
+        player.directgains(clones, false, SHUOYE_LANTIAN_TAG);
+    } catch (e) {}
+    // directgains 会给本机玩家的牌加 drawinghidden（opacity:0 + scale(0.2)），不去掉就像「牌根本没出现」
+    for (const card of clones) {
+        try {
+            card.classList.remove("drawinghidden");
+        } catch (e) {}
+    }
+    // 防御：万一 directgains 中途抛错，副本牌会留在 ui.special 里变成看不见的垃圾节点，自己清掉
+    for (const card of clones) {
+        const parent = card.parentNode;
+        if (parent !== player.node.handcards1 && parent !== player.node.handcards2) {
+            try {
+                if (parent) parent.removeChild(card);
+            } catch (e) {}
+        }
+    }
+    try {
+        ui.updatehl();
+    } catch (e) {}
+}
+
+// 牌堆顶 X 张的纯数据（主机/单机读牌堆，顺序 = 牌堆从上到下）
+function shuoyeLantianViewData() {
+    if (!ui.cardPile || !ui.cardPile.childNodes) return [];
+    const num = lib.skill.shuoye_lantian.topNum();
+    if (num <= 0) return [];
+    const data = [];
+    for (const card of Array.from(ui.cardPile.childNodes).slice(0, num)) {
+        if (!card || !card.name) continue;
+        data.push({ name: card.name, suit: get.suit(card), number: get.number(card), nature: get.nature(card) });
+    }
+    return data;
+}
+
+function shuoyeLantianViewDataKey(data) {
+    const list = [];
+    for (const item of data || []) {
+        if (!item) continue;
+        list.push([item.name, item.suit, item.number, item.nature || ""].join("/"));
+    }
+    return list.join("|");
+}
+
+// 本机玩家有揽天就在本机画；没有技能/阵亡/牌堆空就收掉
+function shuoyeLantianLocalSync(data, key) {
+    const player = game.me;
+    if (!player || !player.node) return;
+    const active = !!(player.hasSkill && player.hasSkill("shuoye_lantian") && player.isAlive() && data.length);
+    if (!active) {
+        shuoyeLantianViewRemove(player);
+        shuoyeLantianViewKey = "";
+        return;
+    }
+    if (key === shuoyeLantianViewKey && shuoyeLantianViewList(player).length === data.length) return;
+    shuoyeLantianViewKey = key;
+    shuoyeLantianViewApply(player, data);
+}
+
+// 联机主机：只把数据推给「客机上拥有揽天的玩家」，不广播；断线重连靠 5 秒心跳补发
+function shuoyeLantianPushClients(data) {
+    if (!game.players || !game.players.length) return;
+    for (const player of game.players.slice(0).concat(game.dead || [])) {
+        if (!player || player === game.me) continue;
+        const ws = player.ws;
+        if (!ws || typeof ws.send !== "function" || ws.closed) continue;
+        const active = !!(player.hasSkill && player.hasSkill("shuoye_lantian") && player.isAlive());
+        if (!active && player._shuoyeLantianViewKey === undefined) continue;
+        const payload = active ? data : [];
+        const key = shuoyeLantianViewDataKey(payload);
+        const now = Date.now();
+        if (key === player._shuoyeLantianViewKey && now - (player._shuoyeLantianViewTime || 0) < 5000) continue;
+        player._shuoyeLantianViewKey = key;
+        player._shuoyeLantianViewTime = now;
+        try {
+            ws.send("shuoyeLantianView", payload);
+        } catch (e) {}
+    }
+}
+
+function shuoyeLantianTick() {
+    try {
+        if (typeof document === "undefined") return;
+        if (_status.video) return;
+        const player = game.me;
+        if (!game.players || !game.players.length || !ui.cardPile) {
+            // 不在局内：收掉上一局残留的副本牌；客机缓存也一起清（否则重开一局会先画出上一局的牌）
+            shuoyeLantianViewRemove(player);
+            shuoyeLantianViewKey = "";
+            shuoyeLantianRemoteData = [];
+            return;
+        }
+        // 客机没有真实牌堆，只等主机推送；这里只做「副本牌被重新连接/重绘冲掉后补上」的看护
+        if (game.online) {
+            if (!player || !player.node) return;
+            // 防御：重连时引擎会把主机 state 里的 handcards/specials 发给本机，别的玩家身上
+            // 会凭空多出「揽天」副本牌；那不是他们该有的牌，直接清掉，避免把牌堆顶露给别人。
+            for (const other of (game.players || []).concat(game.dead || [])) {
+                if (other && other !== player) shuoyeLantianViewRemove(other);
+            }
+            const hasSkill = !!(player.hasSkill && player.hasSkill("shuoye_lantian"));
+            const cache = Array.isArray(shuoyeLantianRemoteData) ? shuoyeLantianRemoteData : [];
+            if (!hasSkill || !cache.length) {
+                shuoyeLantianViewRemove(player);
+                return;
+            }
+            const cacheKey = shuoyeLantianViewDataKey(cache);
+            if (cacheKey !== shuoyeLantianViewKey || shuoyeLantianViewList(player).length !== cache.length) {
+                shuoyeLantianViewKey = cacheKey;
+                shuoyeLantianViewApply(player, cache);
+            }
+            return;
+        }
+        const data = shuoyeLantianViewData();
+        const key = shuoyeLantianViewDataKey(data);
+        if (player && player.node) shuoyeLantianLocalSync(data, key);
+        shuoyeLantianPushClients(data);
+    } catch (e) {}
+}
+
+// 客机渲染入口：主机 player.ws.send("shuoyeLantianView", data) 推过来
+// 注意：这里用「覆盖式注册」而不是「已存在就跳过」——热重载后旧闭包指向旧模块，
+// 跳过就会拿到旧闭包、新模块的 shuoyeLantianRemoteData 永远收不到数据。频道名只有本扩展用。
+function shuoyeLantianInstallClientHandler() {
+    try {
+        if (!lib.message || !lib.message.client) return;
+        lib.message.client.shuoyeLantianView = function (data) {
+            const list = Array.isArray(data) ? data.slice(0) : [];
+            shuoyeLantianRemoteData = list;
+            const player = game.me;
+            if (!player || !player.node) return;
+            if (!player.hasSkill || !player.hasSkill("shuoye_lantian")) {
+                shuoyeLantianViewRemove(player);
+                return;
+            }
+            const key = shuoyeLantianViewDataKey(list);
+            // 内容没变就不重画，避免心跳包造成闪烁
+            if (key === shuoyeLantianViewKey && shuoyeLantianViewList(player).length === list.length) return;
+            shuoyeLantianViewKey = key;
+            shuoyeLantianViewApply(player, list);
+        };
+    } catch (e) {}
+}
+
+function shuoyeLantianInstallView() {
+    try {
+        shuoyeSgjEnsureStyle();
+        shuoyeLantianInstallClientHandler();
+        if (!shuoyeLantianViewTimer && typeof setInterval === "function") {
+            shuoyeLantianViewTimer = setInterval(shuoyeLantianTick, 500);
+        }
+    } catch (e) {}
+}
+
+shuoyeSgjInstallPrefix();
+shuoyeLantianInstallView();
 
 export default skills;

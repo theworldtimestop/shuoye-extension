@@ -1458,6 +1458,38 @@ shuoye_kuanggu: "狂骨",
     shuoye_dihuang_tao: "讨",
     shuoye_dihuang_tao_info: "拥有【讨】的角色无法使用或打出非伤害牌，受到【万煌】拥有者的伤害+1；该角色脱离濒死状态后移除【讨】。",
 //#noname-kit-end translate:shuoye_dihuang_tao
+//#noname-kit-begin translate:shuoye_shenguojia
+    shuoye_shenguojia: "神郭嘉",
+//#noname-kit-end translate:shuoye_shenguojia
+//#noname-kit-begin translate:shuoye_shenguojia_prefix
+    // 武将前缀：引擎会把「神」从名字里拆出来走 lib.namePrefix，
+    // 在 skill.js 里改写 getSpan 后只有神郭嘉显示蓝色流光
+    shuoye_shenguojia_prefix: "神",
+//#noname-kit-end translate:shuoye_shenguojia_prefix
+//#noname-kit-begin translate:shuoye_shenmu
+    shuoye_shenmu: "神牧",
+    shuoye_shenmu_info: "你的回合开始时令1名角色获得你一点体力上限（若为你则仅失去体力上限），并获得一点护甲。其直到其下个回合结束时获得技能：慧佐。",
+//#noname-kit-end translate:shuoye_shenmu
+//#noname-kit-begin translate:shuoye_jimou
+    shuoye_jimou: "极谋",
+    shuoye_jimou_info: "锁定技，每轮开始后你记录X（游戏轮数）个未记录牌名，这些牌每回合首次进入弃牌堆时你进行判定，若判定牌与已记录牌名之一相同，你增加一点体力上限摸一张牌（最多10）。",
+//#noname-kit-end translate:shuoye_jimou
+//#noname-kit-begin translate:shuoye_lantian
+    shuoye_lantian: "揽天",
+    shuoye_lantian_info: "牌堆顶X张牌对你可见。有护甲角色受到伤害时，或一名角色非因此法获得大于2张牌时，你可交给其其中任意张牌令其失去此次护甲承伤效果/取消此次获得牌。",
+//#noname-kit-end translate:shuoye_lantian
+//#noname-kit-begin translate:shuoye_huizuo
+    shuoye_huizuo: "慧佐",
+    shuoye_huizuo_info: "锁定技，你非因此法使用伤害牌时选择：①受到一点无来源伤害令此牌不可被响应②失去一点体力上限，结算后视为对其中一个目标使用一张无任何限制任意基本或普通锦囊牌。",
+// 展示用：只为了让「慧佐」在武将技能界面里以衍生技能的形式出现（nopop 才会内联）
+//#noname-kit-begin translate:shuoye_huizuo_show
+    shuoye_huizuo_show: "慧佐",
+    shuoye_huizuo_show_info: "锁定技，你非因此法使用伤害牌时选择：①受到一点无来源伤害令此牌不可被响应②失去一点体力上限，结算后视为对其中一个目标使用一张无任何限制任意基本或普通锦囊牌。",
+//#noname-kit-end translate:shuoye_huizuo_show
+// 展示用（单独条目）：角色卡技能栏里的金色「慧佐」条目，文案与慧佐本体一致
+    shuoye_huizuo_view: "慧佐",
+    shuoye_huizuo_view_info: "锁定技，你非因此法使用伤害牌时选择：①受到一点无来源伤害令此牌不可被响应②失去一点体力上限，结算后视为对其中一个目标使用一张无任何限制任意基本或普通锦囊牌。",
+//#noname-kit-end translate:shuoye_huizuo
 //#noname-kit-begin translate:shuoye_wudi
     shuoye_wudi: "无敌",
     shuoye_wudi_ab: "【无敌】",
