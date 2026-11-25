@@ -27570,6 +27570,10 @@ shuoye_shanxian: {
             const prompt = isDamage
                 ? `揽天：交给${get.translation(target)}任意张牌堆顶的牌，令其此次伤害不消耗护甲`
                 : `揽天：交给${get.translation(target)}任意张牌堆顶的牌，取消其此次获得的牌`;
+            // 发动台词：第 1 句「笑览世间众生，坐观天行定数。」
+            // 只播语音、不写日志（日志由结算分支的 logSkill 负责，避免一次发动两条日志）；
+            // 第 2/3 句仍在结算分支里用 logSkill(..., [2]/[3]) 播，中间隔着玩家选牌，不会叠音。
+            game.trySkillAudio("shuoye_lantian", player, true, null, null, [1]);
             const result = await player
                 .chooseButton({ createDialog: [prompt, [cards, "card"]], selectButton: [1, cards.length] })
                 .set("lantianTarget", target)
