@@ -24531,13 +24531,25 @@ shuoye_weiyan_enter: {
                 return;
             }
             target.addGaintag(cards, "shuoye_zhengfu");
-            // gaintag 会在牌离开区域时被引擎清除，另外在牌对象上记一份，供结算中的伤害/成败判定使用
+            // gaintag 会在牌离开区域时被引擎清除，另外在牌对象上记一份，供结算中的伤害/成败判定使用。
+            // 联机：直写牌对象不会自动同步，这里广播到全部端，保证客机的 isMarked 判定与 UI 一致
             for (const card of cards) {
                 card.shuoye_zhengfu = true;
                 if (card.storage) {
                     card.storage.shuoye_zhengfu = true;
                 }
             }
+            game.broadcastAll(function (cards2) {
+                for (const card2 of cards2) {
+                    if (!card2) {
+                        continue;
+                    }
+                    card2.shuoye_zhengfu = true;
+                    if (card2.storage) {
+                        card2.storage.shuoye_zhengfu = true;
+                    }
+                }
+            }, cards);
             target.addSkill("shuoye_zhengfu_buff");
             player.markSkill("shuoye_zhengfu");
             game.log(target, "获得了被【征服】标记的牌");
@@ -25264,11 +25276,12 @@ shuoye_weiyan_enter: {
         filter(event, player) {
             // 联机：客机上也要跑。异常必须吞掉，否则会把 game.check 连带弄坏（所有牌变灰）
             try {
-                if (typeof event.filterCard !== "function" || !player || !player.countCards("hes")) {
+                const filter = event.filterCard;
+                if (typeof filter !== "function" || !player || !player.countCards("hes")) {
                     return false;
                 }
                 return player.getCards("hes").some((card) => {
-                const suit = get.suit(card, player);
+                    const suit = get.suit(card, player);
                 let name = null;
                 let nature = null;
                 if (suit === "heart") {
@@ -25429,13 +25442,24 @@ shuoye_weiyan_enter: {
             }
             if (discardSuit === usedSuit && player.isAlive() && game.hasPlayer((current) => current.countDiscardableCards(player, "he") > 0)) {
                 const result2 = await player
-                    .chooseTarget("龙魂：是否弃置一名角色的一张牌？", (card, player2, target) => target.countDiscardableCards(player2, "he") > 0)
+                    .chooseTarget("龙魂：是否弃置一名角色的一张牌？", (card, player2, target) => {
+                        // 联机客机也要跑，异常只让本项失效
+                        try {
+                            return target.countDiscardableCards(player2, "he") > 0;
+                        } catch (e) {
+                            return false;
+                        }
+                    })
                     .set("ai", (target) => {
-                        const player2 = get.player();
-                        if (get.attitude(player2, target) >= 0) {
+                        try {
+                            const player2 = get.player();
+                            if (get.attitude(player2, target) >= 0) {
+                                return -1;
+                            }
+                            return 1 + target.countCards("h");
+                        } catch (e) {
                             return -1;
                         }
-                        return 1 + target.countCards("h");
                     })
                     .forResult();
                 if (result2.bool && result2.targets && result2.targets.length) {

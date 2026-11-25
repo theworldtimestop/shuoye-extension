@@ -1,6 +1,6 @@
 {
   "version": "0.1.48",
-  "update": "新增神郭嘉，阳间模式调整削弱帝皇之戎，兽尼禄",
+  "update": "新增神郭嘉，阳间模式调整削弱帝皇之戎，兽尼禄，修复bug",
   "files": {
     "audio/die/shuoye_leidianyayi1.mp3": "66aab7f7b989b41419e8b69be8e14413a506f74f",
     "audio/die/shuoye_lixin1.mp3": "38f6358fb73b555f59238043602e0066c78fd674",
@@ -305,7 +305,7 @@
     "character/index.js": "865e4e0702b80219f5778dfb93da72b4b92ad4b6",
     "character/intro.js": "60415ba9b23efc5fac171f0babce5302633f3024",
     "character/pinyin.js": "4cb0d048cc9d37faa4971734298251d1d0f4ce16",
-    "character/skill.js": "d33436283fbb88b376ed3a238f7c3cf86f16d669",
+    "character/skill.js": "16da528546c0d2a7ce7b1c3ea849fcface93fc61",
     "character/skill.js.bak-nilu-anim": "0ca573b31e2359403c692043b2a9d7cf996476cb",
     "character/skill.js.bak-nilu-anim2": "67cabbd602699bc5dd1f19dc9f2c4e5f9313343d",
     "character/skillPatch.js": "f6b50867d3c162a8f824ef1f4b2fbed067574be2",
