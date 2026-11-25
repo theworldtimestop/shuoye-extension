@@ -26198,6 +26198,11 @@ shuoye_shanxian: {
                     "shuoye_silie_ban",
                 );
             }
+            // 火攻：重复使用同一张牌会把「展示手牌 → 弃同花色牌」的流程重来一遍，
+            // 容易重复结算/卡住，所以火攻只做技能失效，不做额外结算。
+            if (get.name(card) === "huogong") {
+                return;
+            }
             for (let index = 0; index < 10; index++) {
                 if (!target.isIn() || target.isDead() || !player.isIn() || player.isDead()) {
                     break;
