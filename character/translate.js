@@ -1468,7 +1468,9 @@ shuoye_kuanggu: "狂骨",
 //#noname-kit-end translate:shuoye_shenguojia_prefix
 //#noname-kit-begin translate:shuoye_shenmu
     shuoye_shenmu: "神牧",
-    shuoye_shenmu_info: "每轮首个回合开始时令1名角色获得你一点体力上限（若为你则仅失去体力上限），并获得一点护甲。其直到其下个回合结束时获得技能：慧佐。",
+    shuoye_shenmu_info: `每轮首个回合开始时令1名角色获得你一点体力上限（若为你则仅失去体力上限），并获得一点护甲。其直到其下个回合结束时获得技能【${get.poptip("shuoye_link_shuoye_huizuo")}】。`,
+    // 超链接词条名兜底：即使还没跑到 main/content.js 的 lib.poptip.add，链接也显示「慧佐」而不是 id
+    shuoye_link_shuoye_huizuo: "慧佐",
 //#noname-kit-end translate:shuoye_shenmu
 //#noname-kit-begin translate:shuoye_jimou
     shuoye_jimou: "极谋",

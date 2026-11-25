@@ -627,7 +627,8 @@ shuoye_weiyan: {
         sex: "female",
         group: "shen",
         hp: 1,
-        maxHp: 10,
+        // 初始体力上限 6（早期是 10，已削）
+        maxHp: 6,
         hujia: 0,
         // 内部技能（击杀台词）走神牧的 group，不进这里，否则技能栏会显示无翻译的 id
         skills: ["shuoye_shenmu", "shuoye_jimou", "shuoye_lantian"],

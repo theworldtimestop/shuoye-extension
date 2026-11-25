@@ -462,6 +462,8 @@ export async function content(config, pack) {
                     "拥有" + shuoyeSkillLink("shuoye_huanyu", "幻羽") + shuoyeSkillLink("shuoye_lieqing", "列卿") + "，造成伤害改为弃置目标两倍牌。",
                 ),
             });
+            // 【神郭嘉】神牧描述里【慧佐】的超链接：点开时才取慧佐当前描述（改了描述不用同步）
+            shuoyeSkillLink("shuoye_huizuo", "慧佐");
         }
     } catch (e) {}
     // 【浮雷】是核心 SP 包的延时锦囊：本局没启用该包时补一份最小定义，保证描述里的超链接能正常显示与解释
