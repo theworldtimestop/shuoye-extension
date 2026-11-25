@@ -1474,7 +1474,7 @@ shuoye_kuanggu: "狂骨",
 //#noname-kit-end translate:shuoye_shenmu
 //#noname-kit-begin translate:shuoye_jimou
     shuoye_jimou: "极谋",
-    shuoye_jimou_info: "锁定技，每轮开始后你记录X（游戏轮数）个未记录牌名，这些牌每回合首次进入弃牌堆时你进行判定，若判定牌与已记录牌名之一相同，你增加一点体力上限摸一张牌（最多10）。",
+    shuoye_jimou_info: "锁定技，每轮开始后你记录X（游戏轮数）个未记录牌名，这些牌每回合首次进入弃牌堆时你进行判定（每回合至多X次），若判定牌与已记录牌名之一相同，你增加一点体力上限摸一张牌（最多10）。",
 //#noname-kit-end translate:shuoye_jimou
 //#noname-kit-begin translate:shuoye_lantian
     shuoye_lantian: "揽天",
