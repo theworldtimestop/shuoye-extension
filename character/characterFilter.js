@@ -45,6 +45,8 @@ const quModeAllow = [
 	"shuoye_nilu",
 	"shuoye_dihuangzhirong",
 	"shuoye_shenguojia",
+	// 【黄天】势 / 不胜传说
+	"shuoye_huangtian",
 ];
 
 const characterFilters = {};

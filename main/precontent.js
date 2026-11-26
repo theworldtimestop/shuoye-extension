@@ -198,6 +198,18 @@ export async function precontent() {
             return "camp_" + id;
         };
     }
+    // 【黄天】同阵营判定：有边的模式按边分营，身份局按身份分营，都没有时退回同势力
+    if (typeof lib.shuoyeSameCamp !== "function") {
+        lib.shuoyeSameCamp = function (a, b) {
+            if (!a || !b) return false;
+            if (a === b) return true;
+            const campOf = typeof lib.shuoyeCampOf === "function" ? lib.shuoyeCampOf : null;
+            const ca = campOf ? campOf(a) : "other";
+            const cb = campOf ? campOf(b) : "other";
+            if (ca !== "other" && cb !== "other") return ca === cb;
+            return !!a.group && a.group === b.group;
+        };
+    }
     // 【祈本里香】隐藏武将：在 precontent 也注册一份，保证联机客机在创建玩家时就有完整角色数据（血量/技能/立绘）
     try {
         if (lib.character && !lib.character["shuoye_liixiang"]) {

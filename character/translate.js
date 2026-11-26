@@ -1480,6 +1480,21 @@ shuoye_kuanggu: "狂骨",
     shuoye_lantian: "揽天",
     shuoye_lantian_info: "牌堆顶X张牌对你可见。有护甲角色受到伤害时，或一名角色非因此法获得大于2张牌时，你可交给其其中任意张牌令其失去此次护甲承伤效果/取消此次获得牌。",
 //#noname-kit-end translate:shuoye_lantian
+//#noname-kit-begin translate:shuoye_huangtian
+    shuoye_huangtian: "黄天",
+//#noname-kit-end translate:shuoye_huangtian
+//#noname-kit-begin translate:shuoye_shizhu
+    shuoye_shizhu: "噬主",
+    shuoye_shizhu_info: `每轮开始时你随机观看一名角色的身份，若与你阵营相同，你视为对其使用一张伤害为其体力上限的[杀]。若①命中，其本轮获得${get.poptip("yiji")}。②未命中，其回复一点体力摸一张牌。`,
+//#noname-kit-end translate:shuoye_shizhu
+//#noname-kit-begin translate:shuoye_zhouyou
+    shuoye_zhouyou: "肘友",
+    shuoye_zhouyou_info: `你对与你阵营相同角色使用牌无任何限制，且造成伤害后与其各摸一张牌，若此伤害令其濒死额外摸一张，且本轮其获得${get.poptip("longhun")}。`,
+//#noname-kit-end translate:shuoye_zhouyou
+//#noname-kit-begin translate:shuoye_busheng
+    shuoye_busheng: "不胜",
+    shuoye_busheng_info: "限定技，出牌阶段，你可进行一次指定点数/牌名/花色的坐杀博徒抽奖。若如此做，本回合你获得牌后弃置两张牌，本回合你令一名角色进入濒死后你失去所有手牌与体力且翻面。",
+//#noname-kit-end translate:shuoye_busheng
 //#noname-kit-begin translate:shuoye_huizuo
     shuoye_huizuo: "慧佐",
     shuoye_huizuo_info: "锁定技，你非因此法使用伤害牌时选择：①受到一点无来源伤害令此牌不可被响应②失去一点体力上限，结算后视为对其中一个目标使用一张无任何限制任意基本或普通锦囊牌。",

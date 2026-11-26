@@ -11,7 +11,7 @@ const characterSort = {
 	shuoye_sort_bengbeng: ["shuoye_xier", "shuoye_fuhua", "shuoye_kongzhilvzhe", "shuoye_huangquan", "shuoye_leidianyayi"],
 	shuoye_sort_jojo: ["shuoye_diyabolo", "shuoye_puqishenfu"],
 	shuoye_sort_qiongmingsanjie: ["shuoye_weiyue", "shuoye_huoguang", "shuoye_wuxinchan"],
-	shuoye_sort_qunyou: ["shuoye_ruolian"],
+	shuoye_sort_qunyou: ["shuoye_ruolian", "shuoye_huangtian"],
 	shuoye_sort_taren: ["shuoye_bojiaoyang"],
 	// 无敌少侠
 	shuoye_sort_wudishaoxia: ["shuoye_nuolan", "shuoye_make", "shuoye_cuige", "shuoye_cuige_boss"],

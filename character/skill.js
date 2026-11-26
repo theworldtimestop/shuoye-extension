@@ -15638,6 +15638,12 @@ shuoye_weituan: {
                 player.storage.shuoye_zuosha_buff_groups = kept;
             } else {
                 delete player.storage.shuoye_zuosha_buff_groups;
+                // 【黄天·不胜】坐杀博徒的六回合效果到期时，把特效、循环音乐、立绘视频一起收掉。
+                // 只对发动过【不胜】的角色生效，秤金次仍走原来自己的清除时机，不受影响
+                if (player.awakenedSkills.includes("shuoye_busheng")) {
+                    const B = lib.skill.shuoye_busheng;
+                    if (B && typeof B.stopFx === "function") B.stopFx(player);
+                }
             }
             S.refreshBuffSkills(player);
             S.syncCurrentEffect(player);
@@ -27658,6 +27664,371 @@ shuoye_shanxian: {
         },
     },
 //#noname-kit-end skill:shuoye_lantian
+//#noname-kit-begin skill:shuoye_shizhu
+    //【黄天】噬主：每轮开始随机观看一名角色的身份，同阵营则视为对其使用一张伤害为其体力上限的【杀】
+    shuoye_shizhu: {
+        forced: true,
+        trigger: {
+            global: "roundStart",
+        },
+        // 命中监听常驻：噬主的【杀】造成伤害时把它记在这张虚拟牌上
+        init(player) {
+            if (!player.hasSkill("shuoye_shizhu_hit")) player.addSkill("shuoye_shizhu_hit");
+        },
+        filter(event, player) {
+            return game.hasPlayer((current) => current !== player && current.isAlive());
+        },
+        async content(event, trigger, player) {
+            const targets = game.filterPlayer((current) => current !== player && current.isAlive());
+            if (!targets.length) return;
+            const target = targets.randomGet();
+            player.line(target, "green");
+            // 身份只给黄天本人看：弹窗只在「本机玩家就是黄天」的客户端创建，其余客户端直接返回。
+            // 回调只依赖全局 game/ui/get/document，不引用模块闭包变量，联机下发给客机也不会出错
+            event.videoId = lib.status.videoId++;
+            const videoId = event.videoId;
+            const identity = target.identity || "";
+            // 用 playerid + 已翻译好的名字下发：不依赖客机对玩家对象的还原，回调只用字符串和全局对象
+            const ownerId = player.playerid;
+            const ownerText = get.translation(player);
+            const targetText = get.translation(target);
+            try {
+                game.broadcastAll(
+                    function (oid, ownerText, seenText, mark, id) {
+                        try {
+                            if (typeof game === "undefined" || !game.me || game.me.playerid !== oid) return;
+                            // 幂等：同一个 videoId 只建一次，避免多端重复执行时叠出两个弹窗
+                            if (typeof document !== "undefined" && document.body && document.body.dataset) {
+                                const key = "shuoyeShizhuView" + id;
+                                if (document.body.dataset[key]) return;
+                                document.body.dataset[key] = "1";
+                            }
+                            const dialog = ui.create.dialog(`${ownerText}观看了${seenText}的身份<br>`, "forcebutton");
+                            dialog.videoId = id;
+                            if (mark && typeof ui.create.spinningIdentityCard === "function") {
+                                ui.create.spinningIdentityCard(mark, dialog);
+                            } else {
+                                dialog.addText("身份：未知");
+                            }
+                        } catch (e) {}
+                    },
+                    ownerId,
+                    ownerText,
+                    targetText,
+                    identity,
+                    videoId,
+                );
+                // 只在「本机玩家就是黄天」或联机时才停下来等弹窗：
+                // 单机里黄天是 AI 时没人看这个弹窗，不停顿就不会拖牌局；delayx 还会跟随游戏速度设置
+                if ((game.me && game.me === player) || _status.connectMode) await game.delayx(1.4);
+            } catch (e) {
+                console.error("[朔夜] 噬主：身份弹窗失败", e);
+            }
+            try {
+                game.broadcastAll("closeDialog", videoId);
+            } catch (e) {}
+            game.log(player, "观看了", target, "的身份");
+            if (!lib.shuoyeSameCamp(player, target)) return;
+            await lib.skill.shuoye_shizhu.viewAsKill(player, target);
+        },
+        // 视为对其使用一张【杀】：虚拟牌，伤害 = 其体力上限（baseDamage）。
+        // 命中与否由 shuoye_shizhu_hit 记在这张虚拟牌上，结算完直接读，不在各端各自判断
+        async viewAsKill(player, target) {
+            if (!player || !target || !target.isIn()) return;
+            if (!player.hasSkill("shuoye_shizhu_hit")) player.addSkill("shuoye_shizhu_hit");
+            const use = player.useCard({ name: "sha" }, target);
+            try {
+                if (use.card) {
+                    use.card.shuoyeShizhu = true;
+                    use.card.shuoyeShizhuHit = false;
+                }
+                use.baseDamage = Math.max(1, Number(target.maxHp) || 1);
+            } catch (e) {
+                console.error("[朔夜] 噬主：视为使用【杀】失败", e);
+            }
+            await use;
+            if (!target.isIn()) return;
+            if (use.card && use.card.shuoyeShizhuHit) {
+                game.log(target, "被噬主的【杀】命中，本轮获得技能", "#g【遗计】");
+                target.addTempSkill("yiji", "roundStart");
+            } else {
+                game.log(target, "未被噬主的【杀】命中：回复1点体力并摸一张牌");
+                await target.recover(1);
+                if (target.isIn()) await target.draw(1);
+            }
+        },
+    },
+//#noname-kit-end skill:shuoye_shizhu
+//#noname-kit-begin skill:shuoye_shizhu_hit
+    // 噬主内部监听：噬主视为使用的【杀】造成伤害后，把「命中」记在这张虚拟牌上
+    shuoye_shizhu_hit: {
+        nopop: true,
+        charlotte: true,
+        sub: true,
+        silent: true,
+        popup: false,
+        forced: true,
+        trigger: {
+            source: "damageEnd",
+        },
+        filter(event, player) {
+            return !!(event.num > 0 && event.card && event.card.shuoyeShizhu);
+        },
+        content(event, trigger, player) {
+            trigger.card.shuoyeShizhuHit = true;
+        },
+    },
+//#noname-kit-end skill:shuoye_shizhu_hit
+//#noname-kit-begin skill:shuoye_zhouyou
+    //【黄天】肘友：对同阵营角色使用牌无距离/次数限制；对其造成伤害后各摸一张（濒死再额外摸一张并获得【龙魂】）
+    shuoye_zhouyou: {
+        forced: true,
+        mod: {
+            targetInRange(card, player, target) {
+                if (lib.shuoyeSameCamp(player, target)) return true;
+            },
+            cardUsableTarget(card, player, target) {
+                if (lib.shuoyeSameCamp(player, target)) return true;
+            },
+        },
+        trigger: {
+            source: "damageEnd",
+        },
+        filter(event, player) {
+            const target = event.player;
+            return !!target && target !== player && event.num > 0 && lib.shuoyeSameCamp(player, target);
+        },
+        async content(event, trigger, player) {
+            const target = trigger.player;
+            player.logSkill("shuoye_zhouyou", target);
+            if (player.isAlive()) await player.draw(1);
+            if (target.isIn()) await target.draw(1);
+            if (trigger._dyinged && target.isIn()) {
+                await target.draw(1);
+                target.addTempSkill("longhun", "roundStart");
+                game.log(target, "因肘友濒死，本轮获得技能", "#g【龙魂】");
+            }
+        },
+    },
+//#noname-kit-end skill:shuoye_zhouyou
+//#noname-kit-begin skill:shuoye_busheng
+    //【黄天】不胜：限定技，出牌阶段可进行一次指定花色/点数/牌名之一的坐杀博徒抽奖；
+    //本回合内令一名角色进入濒死后，失去所有手牌与体力并翻面
+    shuoye_busheng: {
+        limited: true,
+        enable: "phaseUse",
+        filter(event, player) {
+            if (player.awakenedSkills.includes("shuoye_busheng")) return false;
+            // 抽奖复用秤金次的〖坐杀博徒〗组件，组件缺失时不允许发动，避免只吃代价不拿收益
+            const S = lib.skill.shuoye_zuosha;
+            return !!(S && typeof S.lottery === "function" && typeof S.randomSpec === "function");
+        },
+        async content(event, trigger, player) {
+            const S = lib.skill.shuoye_zuosha;
+            if (lib.skill[event.name] && lib.skill[event.name].limited) player.awakenSkill(event.name);
+            const dimResult = await player
+                .chooseControl(["花色", "点数", "牌名"])
+                .set("prompt", "不胜：先选择这次抽奖要指定的项目")
+                .set("ai", () => 1)
+                .forResult();
+            const dim = dimResult && dimResult.control;
+            if (!dim) return;
+            let value = null;
+            if (dim === "花色") {
+                const suits = ["spade", "heart", "club", "diamond"];
+                const res = await player
+                    .chooseControl(suits.map((suit) => get.translation(suit)))
+                    .set("prompt", "不胜：指定一个花色，本次抽奖的三张牌均为该花色")
+                    .set("ai", () => 1)
+                    .forResult();
+                const index = res && typeof res.index === "number" ? res.index : 0;
+                value = suits[index] || null;
+            } else if (dim === "点数") {
+                const buttons = [];
+                for (let i = 1; i <= 13; i++) buttons.push([i, get.strNumber(i)]);
+                const res = await player
+                    .chooseButton(["不胜：指定一个点数，本次抽奖的三张牌均为该点数", [buttons, "textbutton"]], true)
+                    .set("ai", (button) => (button.link === 7 ? 10 : 1))
+                    .forResult();
+                if (!res || !res.bool || !res.links || !res.links.length) return;
+                const num = parseInt(res.links[0]);
+                if (isNaN(num)) return;
+                value = num;
+            } else {
+                const list = [];
+                for (const name of S.pool()) list.push([get.type2(name) === "basic" ? "基本" : "锦囊", "", name]);
+                if (!list.length) return;
+                const res = await player
+                    .chooseButton(["不胜：指定一个牌名，本次抽奖的三张牌均为该牌名", [list, "vcard"]], true)
+                    .set("ai", (button) => {
+                        const name = button.link && button.link[2];
+                        return name === "wuzhong" || name === "sha" ? 8 : 2;
+                    })
+                    .forResult();
+                if (!res || !res.bool || !res.links || !res.links.length) return;
+                const link = res.links[0];
+                const name = Array.isArray(link) ? link[2] : link;
+                if (!name) return;
+                value = name;
+            }
+            if (value === null || value === undefined) return;
+            // 三张牌全部按指定值生成（必然三连），其余维度随机
+            const specs = [0, 1, 2].map(() => S.randomSpec(S.pool()));
+            for (const spec of specs) {
+                if (dim === "花色") spec.suit = value;
+                else if (dim === "点数") spec.number = value;
+                else spec.name = value;
+            }
+            player.logSkill("shuoye_busheng");
+            player.storage.shuoye_zuosha_debug_specs = specs;
+            // 坐杀博徒的 buff 组要挂计时技才会按时失效（秤金次在自身 init 里加，这里补上）
+            if (!player.hasSkill("shuoye_zuosha_bufftimer")) player.addSkill("shuoye_zuosha_bufftimer");
+            try {
+                await S.lottery(player);
+            } catch (e) {
+                console.error("[朔夜] 不胜：坐杀博徒抽奖结算异常", e);
+            }
+            // 本回合内：每次获得牌后弃置两张手牌；一旦令一名角色进入濒死，就失去所有手牌与体力并翻面
+            player.addTempSkill("shuoye_busheng_used");
+            player.addTempSkill("shuoye_busheng_cost");
+            // 坐杀博徒的演出（特效/音乐/立绘视频）要在六回合 buff 到期时一起收掉，这里挂个常驻监听
+            if (!player.hasSkill("shuoye_busheng_fx")) player.addSkill("shuoye_busheng_fx");
+            game.log(player, "发动了", "#g【不胜】", "：本回合获得牌后弃置两张手牌；若令一名角色进入濒死，将失去所有手牌与体力并翻面");
+        },
+        // 收掉坐杀博徒的演出：自己的立绘视频 + 背景特效；没有别的角色还在坐杀状态时一并停掉循环 BGM
+        stopFx(player) {
+            const S = lib.skill.shuoye_zuosha;
+            if (!S || !player) return;
+            let shared = false;
+            try {
+                shared = game.hasPlayer((current) => current !== player && Array.isArray(current.storage.shuoye_zuosha_buff_groups) && current.storage.shuoye_zuosha_buff_groups.length > 0);
+            } catch (e) {}
+            if (shared) {
+                // 别的角色还在坐杀状态：只下掉自己的立绘视频，全局 BGM 与背景特效留给对方
+                game.broadcastAll((p) => {
+                    try {
+                        const wrap = p && p.node && p.node._szsVideoWrap;
+                        if (!wrap) return;
+                        p.node._szsVideoWrap = null;
+                        wrap.style.opacity = "0";
+                        setTimeout(function () {
+                            try {
+                                const videos = wrap.querySelectorAll("video");
+                                for (let i = 0; i < videos.length; i++) {
+                                    videos[i].pause();
+                                    videos[i].src = "";
+                                }
+                                if (wrap.parentNode) wrap.parentNode.removeChild(wrap);
+                            } catch (e) {}
+                        }, 900);
+                    } catch (e) {}
+                }, player);
+                return;
+            }
+            try {
+                S.stopJackpotBgm();
+            } catch (e) {}
+            try {
+                S.clearJackpot(player);
+            } catch (e) {}
+            try {
+                game.log(player, "的坐杀博徒演出结束，特效与音乐已停止");
+            } catch (e) {}
+        },
+        ai: {
+            order: 2,
+            result: { player: 1 },
+        },
+    },
+//#noname-kit-end skill:shuoye_busheng
+//#noname-kit-begin skill:shuoye_busheng_cost
+    // 不胜内部结算：本回合内黄天令一名角色进入濒死后，失去所有手牌与体力并翻面
+    shuoye_busheng_cost: {
+        nopop: true,
+        charlotte: true,
+        sub: true,
+        silent: true,
+        popup: false,
+        forced: true,
+        trigger: {
+            global: "dying",
+        },
+        filter(event, player) {
+            if (!event.player || event.player === player) return false;
+            if (_status.currentPhase !== player) return false;
+            if (event.source === player) return true;
+            let reason = event.reason;
+            for (let i = 0; i < 6 && reason; i++) {
+                if (reason.source === player) return true;
+                reason = reason.parent;
+            }
+            return false;
+        },
+        async content(event, trigger, player) {
+            if (player.hasSkill("shuoye_busheng_cost")) player.removeSkill("shuoye_busheng_cost");
+            player.popup("shuoye_busheng");
+            game.log(player, "因【不胜】失去所有手牌与体力，并翻面");
+            const cards = player.getCards("h");
+            if (cards.length) await player.lose(cards);
+            if (player.hp > 0) await player.loseHp(player.hp);
+            if (player.isAlive()) player.turnOver();
+        },
+    },
+//#noname-kit-end skill:shuoye_busheng_cost
+//#noname-kit-begin skill:shuoye_busheng_used
+    // 不胜内部结算：本回合黄天每获得牌后，强制弃置两张手牌（不足两张时弃光手牌）
+    shuoye_busheng_used: {
+        nopop: true,
+        charlotte: true,
+        sub: true,
+        silent: true,
+        popup: false,
+        forced: true,
+        trigger: {
+            player: "gainAfter",
+        },
+        filter(event, player) {
+            // 只管本回合：临时技本身回合结束就掉，这里再校一次当前回合角色
+            if (_status.currentPhase !== player) return false;
+            // 弃置过程中引发的获得牌（如坐杀博徒的“失去牌后摸牌”）不再连锁，避免反复弹窗
+            if (player.storage.shuoye_busheng_used_lock) return false;
+            if (!event.cards || !event.cards.length) return false;
+            return player.countCards("h") > 0;
+        },
+        async content(event, trigger, player) {
+            const num = Math.min(2, player.countCards("h"));
+            if (num <= 0) return;
+            player.storage.shuoye_busheng_used_lock = true;
+            game.log(player, "因【不胜】获得牌后弃置", get.cnNumber(num), "张手牌");
+            try {
+                await player.chooseToDiscard(`不胜：弃置${get.cnNumber(num)}张手牌`, "h", num, true).set("ai", (card) => 8 - get.value(card));
+            } finally {
+                delete player.storage.shuoye_busheng_used_lock;
+            }
+        },
+    },
+//#noname-kit-end skill:shuoye_busheng_used
+//#noname-kit-begin skill:shuoye_busheng_fx
+    // 不胜内部监听：黄天阵亡时把坐杀博徒的演出（特效/音乐/立绘视频）收掉，避免残留
+    shuoye_busheng_fx: {
+        nopop: true,
+        charlotte: true,
+        sub: true,
+        silent: true,
+        popup: false,
+        forced: true,
+        trigger: {
+            player: "die",
+        },
+        filter(event, player) {
+            return player.awakenedSkills.includes("shuoye_busheng");
+        },
+        content(event, trigger, player) {
+            const B = lib.skill.shuoye_busheng;
+            if (B && typeof B.stopFx === "function") B.stopFx(player);
+        },
+    },
+//#noname-kit-end skill:shuoye_busheng_fx
 };
 
 // ===== 【神郭嘉】公共小工具 / 局内表现（蓝色前缀 / 动态立绘） =====

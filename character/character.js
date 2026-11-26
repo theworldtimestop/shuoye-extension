@@ -639,6 +639,17 @@ shuoye_weiyan: {
         trashBin: [],
     },
 //#noname-kit-end character:shuoye_shenguojia
+//#noname-kit-begin character:shuoye_huangtian
+    //【黄天】势 / 不胜传说：势力群，体力3/上限3，初始护甲1
+    shuoye_huangtian: {
+        sex: "female",
+        group: "qun",
+        hp: 3,
+        hujia: 1,
+        skills: ["shuoye_shizhu", "shuoye_zhouyou", "shuoye_busheng"],
+        img: "extension/朔夜/image/shuoye_huangtian.jpg",
+    },
+//#noname-kit-end character:shuoye_huangtian
 };
 for (let i in characters) {
     characters[i].img = characters[i].img || `extension/朔夜/image/character/${i}.jpg`;

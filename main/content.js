@@ -541,7 +541,7 @@ export async function content(config, pack) {
             "shuoye_weiyue", "shuoye_huoguang", "shuoye_longyan",
             "shuoye_majunke", "shuoye_yuantoushanwo", "shuoye_shebengnainyin", "shuoye_quanmoutianbaohuo",
             "shuoye_luotong", "shuoye_yizhisilang", "shuoye_sanlunxia", "shuoye_make",
-            "shuoye_zhaoyun",
+            "shuoye_zhaoyun", "shuoye_huangtian",
         ],
         junk: ["shuoye_xingti", "shuoye_weiershi", "shuoye_ruolian"],
     };
