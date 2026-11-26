@@ -1498,19 +1498,15 @@ shuoye_kuanggu: "狂骨",
 //#noname-kit-begin translate:shuoye_busheng_used
     // 内部技中文名：引擎/UI 会把技能名当作提示前缀显示，没有翻译就会露出 id
     shuoye_busheng_used: "不胜",
-    shuoye_busheng_used_info: "不胜：获得牌后弃置两张手牌。",
 //#noname-kit-end translate:shuoye_busheng_used
 //#noname-kit-begin translate:shuoye_busheng_cost
     shuoye_busheng_cost: "不胜",
-    shuoye_busheng_cost_info: "不胜：令一名角色进入濒死后失去所有手牌与体力并翻面。",
 //#noname-kit-end translate:shuoye_busheng_cost
 //#noname-kit-begin translate:shuoye_busheng_fx
     shuoye_busheng_fx: "不胜",
-    shuoye_busheng_fx_info: "不胜：坐杀博徒的演出到期后收掉特效、音乐与立绘视频。",
 //#noname-kit-end translate:shuoye_busheng_fx
 //#noname-kit-begin translate:shuoye_shizhu_hit
     shuoye_shizhu_hit: "噬主",
-    shuoye_shizhu_hit_info: "噬主：记录视为使用的【杀】是否命中。",
 //#noname-kit-end translate:shuoye_shizhu_hit
 //#noname-kit-begin translate:shuoye_huizuo
     shuoye_huizuo: "慧佐",
