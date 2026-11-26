@@ -28001,7 +28001,8 @@ shuoye_shanxian: {
             player.storage.shuoye_busheng_used_lock = true;
             game.log(player, "因【不胜】获得牌后弃置", get.cnNumber(num), "张手牌");
             try {
-                await player.chooseToDiscard(`不胜：弃置${get.cnNumber(num)}张手牌`, "h", num, true).set("ai", (card) => 8 - get.value(card));
+                // 提示不自己带技能名前缀：引擎/UI 会用技能名（已给中文翻译“不胜”）拼前缀，写成“请弃置…”即可
+                await player.chooseToDiscard(`请弃置${get.cnNumber(num)}张手牌`, "h", num, true).set("ai", (card) => 8 - get.value(card));
             } finally {
                 delete player.storage.shuoye_busheng_used_lock;
             }
