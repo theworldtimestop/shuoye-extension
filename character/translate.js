@@ -1529,8 +1529,8 @@ shuoye_kuanggu: "狂骨",
     shuoye_sp_fulan_power_bg: "限",
 //#noname-kit-end translate:shuoye_sp_fulan_power_bg
 //#noname-kit-begin translate:shuoye_sp_youming
-    shuoye_sp_youming: "幽冥",
-    shuoye_sp_youming_info: "每名角色的回合结束时，若你本回合未受到过其他角色伤害，你选择一项：①失去一点体力获得一点护甲。②若你有护甲，回复一点体力失去一护甲。",
+    shuoye_sp_youming: "幽溟",
+    shuoye_sp_youming_info: "每名角色的回合结束时，若你本回合未受到过其他角色伤害，你可选择一项：①失去一点体力获得一点护甲。②若你有护甲，回复一点体力失去一护甲。",
 //#noname-kit-end translate:shuoye_sp_youming
 //#noname-kit-begin translate:shuoye_huizuo
     shuoye_huizuo: "慧佐",

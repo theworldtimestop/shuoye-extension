@@ -1,6 +1,6 @@
 {
   "version": "0.1.50",
-  "update": "新增：sp怒涛·沧岚",
+  "update": "新增：sp怒涛沧岚",
   "files": {
     "audio/die/shuoye_leidianyayi1.mp3": "66aab7f7b989b41419e8b69be8e14413a506f74f",
     "audio/die/shuoye_lixin1.mp3": "38f6358fb73b555f59238043602e0066c78fd674",
@@ -305,12 +305,12 @@
     "character/index.js": "865e4e0702b80219f5778dfb93da72b4b92ad4b6",
     "character/intro.js": "c0261d15155e5b21c6bbbb1d965905d46e437d02",
     "character/pinyin.js": "4cb0d048cc9d37faa4971734298251d1d0f4ce16",
-    "character/skill.js": "bbb11e0b861546a6d297d6fdfab6a47d5b4590d7",
+    "character/skill.js": "986805f80c4102aef7c46513372e1db777ed386f",
     "character/skill.js.bak-nilu-anim": "0ca573b31e2359403c692043b2a9d7cf996476cb",
     "character/skill.js.bak-nilu-anim2": "67cabbd602699bc5dd1f19dc9f2c4e5f9313343d",
     "character/skillPatch.js": "f6b50867d3c162a8f824ef1f4b2fbed067574be2",
     "character/sort.js": "a26329cb83095f30b6c42afc4ad19550c209c804",
-    "character/translate.js": "34568cec0c1538590c2da2e21ad0d3733dba48b3",
+    "character/translate.js": "7766e3f06f666c8f90265c2f436a83e0c0a66bbc",
     "character/translate.js.bak-nilu-juchang": "65bca17720373a428a0801900fff76f8b1428e33",
     "character/voices.js": "d985672331a7433ce381138648ea1d4ff5573268",
     "diedai.mp4": "0d60f62a791425b13e785a32211e1fc48381bc6e",

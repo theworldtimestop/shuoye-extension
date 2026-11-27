@@ -28123,19 +28123,38 @@ shuoye_shanxian: {
             return event.num > 0 && !event.source && !event.unreal;
         },
         async cost(event, trigger, player) {
-            const result = await player
-                .chooseControl(["①下个回合开始时获得一点护甲", "②下一张牌无任何限制且伤害/回复量+1", "cancel2"])
+            // 本机人类玩家：取消放到弹窗外的控制栏（ui.confirm）；
+            // 客机/托管/AI：cost 不在对方机器执行、到不了外部按钮，所以把取消写进一开始就传下去的 options 里，
+            // 保证客机（收到的是创建时的参数列表）也能取消，不会只能选①②
+            const external = player.isMine() && !ui.confirm;
+            const controls = ["①下个回合开始时获得一点护甲", "②下一张牌无任何限制且伤害/回复量+1"];
+            if (!external) controls.push("取消发动");
+            const next = player
+                .chooseControl(controls)
                 .set("prompt", get.prompt2("shuoye_sp_fulan"))
+                .set("dialogcontrol", true)
                 .set("ai", function (trigger2, player2) {
                     const capped = player2.hujia >= 5;
                     if (!capped && player2.hp <= 2) return "①下个回合开始时获得一点护甲";
                     if (capped || player2.countCards("h") > 0) return "②下一张牌无任何限制且伤害/回复量+1";
                     return "①下个回合开始时获得一点护甲";
-                })
-                .forResult();
+                });
+            let cancelBar = null;
+            if (external) {
+                ui.create.confirm("c");
+                cancelBar = ui.confirm || null;
+            }
+            let choice;
+            try {
+                const result = await next.forResult();
+                choice = result && result.control;
+            } finally {
+                if (cancelBar && cancelBar.parentNode) cancelBar.close();
+            }
+            // 不返回 control 字段，避免引擎按 "cancel" 关键字重算 bool
             event.result = {
-                control: result.control,
-                cost_data: { control: result.control },
+                bool: !!choice && choice !== "取消发动",
+                cost_data: { control: choice },
             };
         },
         async content(event, trigger, player) {
@@ -28231,26 +28250,30 @@ shuoye_shanxian: {
         async cost(event, trigger, player) {
             const controls = ["①失去一点体力，获得一点护甲"];
             if (player.hujia > 0 && player.isDamaged()) controls.push("②回复一点体力，失去一点护甲");
-            controls.push("cancel2");
+            controls.push("取消发动");
             const result = await player
                 .chooseControl(controls)
                 .set("prompt", get.prompt2("shuoye_sp_youming"))
+                .set("dialogcontrol", true)
                 .set("ai", function (trigger2, player2) {
                     if (player2.hujia > 0 && player2.isDamaged()) return "②回复一点体力，失去一点护甲";
                     if (player2.hp > 2 && player2.hujia < 1) return "①失去一点体力，获得一点护甲";
-                    return "cancel2";
+                    return "取消发动";
                 })
                 .forResult();
+            const choice = result && result.control;
+            // 不返回 control 字段：否则引擎会按 "cancel" 关键字重算 bool，这里自己判定取消
             event.result = {
-                control: result.control,
-                cost_data: { control: result.control },
+                bool: !!choice && choice !== "取消发动",
+                cost_data: { control: choice },
             };
         },
         async content(event, trigger, player) {
             const control = (event.cost_data && event.cost_data.control) || "";
             if (control.startsWith("①")) {
                 await player.loseHp();
-                await player.changeHujia(1);
+                // 失去体力可能已经阵亡，死了就不再获得护甲
+                if (player.isAlive()) await player.changeHujia(1);
             } else if (control.startsWith("②")) {
                 await player.recover();
                 await player.changeHujia(-1);
