@@ -28038,24 +28038,46 @@ shuoye_shanxian: {
             name: "凌波·点数",
             content: "已记录的点数：$",
         },
-        group: ["shuoye_sp_lingbo_damage", "shuoye_sp_lingbo_point"],
-    },
-//#noname-kit-end skill:shuoye_sp_lingbo
-//#noname-kit-begin skill:shuoye_sp_lingbo_damage
-    shuoye_sp_lingbo_damage: {
-        charlotte: true,
         forced: true,
         popup: false,
         silent: true,
         trigger: {
-            player: "damageBegin1",
+            player: ["changeHp", "damageBegin1"],
             source: "damageBegin1",
         },
-        filter(event, player) {
+        filter(event, player, name) {
+            if (name === "changeHp") return true;
             return event.player === player || event.source === player;
         },
         async content(event, trigger, player) {
-            // 一、点数为已记录点数的牌造成的伤害视为无来源伤害（先处理，护甲才能正常承伤）
+            // 一、体力每变化 1 点，随机记录一个尚未记录的点数（1~13）
+            if (event.triggername === "changeHp") {
+                // 兼容：有的扩展会重写 changeHp 的 content 且不写 event.changedHp（如 一中杀），
+                // 所以优先用 originalHp（由 player.changeHp 写入，各扩展均未改写）与当前体力自行算变化量
+                let num = 0;
+                if (typeof trigger.originalHp == "number") {
+                    num = Math.abs(player.hp - Math.max(0, trigger.originalHp));
+                } else if (typeof trigger.changedHp == "number") {
+                    num = Math.abs(trigger.changedHp);
+                } else if (typeof trigger.num == "number") {
+                    num = Math.abs(trigger.num);
+                }
+                if (!num) return;
+                const recorded = player.getStorage("shuoye_sp_lingbo");
+                const pool = [];
+                for (let point = 1; point <= 13; point++) {
+                    if (!recorded.includes(point)) pool.push(point);
+                }
+                if (!pool.length) return;
+                const list = [];
+                for (let i = 0; i < num && pool.length; i++) {
+                    list.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+                }
+                if (!list.length) return;
+                player.markAuto("shuoye_sp_lingbo", list);
+                return;
+            }
+            // 二、点数为已记录点数的牌造成的伤害视为无来源伤害（先处理，护甲才能正常承伤）
             const record = player.storage.shuoye_sp_lingbo;
             if (Array.isArray(record) && record.length) {
                 const use = trigger.getParent("useCard");
@@ -28066,54 +28088,17 @@ shuoye_shanxian: {
                         const toSelf = Array.isArray(use.targets) && use.targets.includes(player);
                         if ((fromSelf || toSelf) && trigger.source) {
                             delete trigger.source;
-                            game.log(player, "的【凌波】将", use.card, "造成的伤害视为无来源伤害");
                         }
                     }
                 }
             }
-            // 二、有来源伤害无视护盾承伤效果（护甲不抵挡、不消耗）
+            // 三、有来源伤害无视护甲承伤效果（护甲不抵挡、不消耗）
             if (trigger.player === player && trigger.source && player.hujia > 0 && !trigger.nohujia) {
                 trigger.nohujia = true;
-                game.log(player, "的【凌波】令护甲无法抵挡此伤害");
             }
         },
     },
-//#noname-kit-end skill:shuoye_sp_lingbo_damage
-//#noname-kit-begin skill:shuoye_sp_lingbo_point
-    shuoye_sp_lingbo_point: {
-        charlotte: true,
-        forced: true,
-        popup: false,
-        silent: true,
-        trigger: {
-            player: "changeHp",
-        },
-        filter(event, player) {
-            return !!event.changedHp;
-        },
-        async content(event, trigger, player) {
-            const num = Math.abs(trigger.changedHp);
-            if (!num) return;
-            // 只在尚未记录的点数里随机取（1~13）
-            const recorded = player.getStorage("shuoye_sp_lingbo");
-            const pool = [];
-            for (let point = 1; point <= 13; point++) {
-                if (!recorded.includes(point)) pool.push(point);
-            }
-            if (!pool.length) {
-                game.log(player, "的【凌波】点数已全部记录");
-                return;
-            }
-            const list = [];
-            for (let i = 0; i < num && pool.length; i++) {
-                list.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
-            }
-            if (!list.length) return;
-            player.markAuto("shuoye_sp_lingbo", list);
-            game.log(player, "记录了点数", list.map((point) => get.strNumber(point)).join("、"));
-        },
-    },
-//#noname-kit-end skill:shuoye_sp_lingbo_point
+//#noname-kit-end skill:shuoye_sp_lingbo
 //#noname-kit-begin skill:shuoye_sp_fulan
     shuoye_sp_fulan: {
         trigger: {
@@ -28192,10 +28177,6 @@ shuoye_shanxian: {
             if (num <= 0) return;
             player.removeMark("shuoye_sp_fulan_armor", num);
             // 护甲值至多 5：溢出的部分直接浪费
-            const room = Math.max(0, 5 - player.hujia);
-            if (num > room) {
-                game.log(player, "的【浮岚】护甲至多为5，溢出的", num - room, "点护甲被浪费");
-            }
             await player.changeHujia(num, "gain", 5);
         },
     },
@@ -28235,7 +28216,6 @@ shuoye_shanxian: {
             const info = get.info(trigger.card, false);
             const current = typeof trigger.baseDamage == "number" ? trigger.baseDamage : (info && typeof info.baseDamage == "number" ? info.baseDamage : 1);
             trigger.baseDamage = current + 1;
-            game.log(player, "使用的", trigger.card, "无距离与次数限制，且伤害/回复量+1");
         },
     },
 //#noname-kit-end skill:shuoye_sp_fulan_power
