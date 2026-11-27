@@ -4,7 +4,7 @@ const characterSort = {
 	shuoye_sort_sai: ["shuoye_miaoshitiannv", "shuoye_tianqixinghun", "shuoye_nutaocanglan", "shuoye_sp_nutaocanglan", "shuoye_weiershi", "shuoye_wujishengwu", "shuoye_xituo", "shuoye_qiaolienide", "shuoye_wuweijuezhe", "shuoye_zhenshiqiaotelude", "shuoye_kongyuanxingzhe", "shuoye_dilutianfeng", "shuoye_leinhaite", "shuoye_longyan", "shuoye_shengyuxieyan", "shuoye_zhaoyun", "shuoye_dihuangzhirong"],
 	shuoye_sort_1999: ["shuoye_xingti", "shuoye_yuanlv", "shuoye_xugouji", "shuoye_luxi"],
 	shuoye_sort_guanxing: ["shuoye_zuguoren", "shuoye_fengchuanxiangzi", "shuoye_shuoye", "shuoye_ying", "shuoye_lixin", "shuoye_lx_guang", "shuoye_lx_an"],
-	shuoye_sort_zhanfu: ["shuoye_majunke", "shuoye_yuantoushanwo", "shuoye_shebengnainyin", "shuoye_quanmoutianbaohuo", "shuoye_mankanshizhenzi", "shuoye_yizhisilang"],
+	shuoye_sort_zhanfu: ["shuoye_majunke", "shuoye_yuantoushanwo", "shuoye_shebengnainyin", "shuoye_quanmoutianbaohuo", "shuoye_mankanshizhenzi", "shuoye_yizhisilang", "shuoye_chanliuzi"],
 	shuoye_sort_tongsu: ["shuoye_wenyang", "shuoye_luotong", "shuoye_weiyan", "shuoye_shenguojia"],
 	shuoye_sort_zhoushuhuizhan: ["shuoye_yiguyoutai", "shuoye_wutiaowu", "shuoye_ifwutiaowu", "shuoye_chengjinji", "shuoye_richekuanjian", "shuoye_sanlunxia"],
 	shuoye_sort_ba: ["shuoye_ailisi", "shuoye_feiniaomashi", "shuoye_kongqirinai"],

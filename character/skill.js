@@ -1208,6 +1208,9 @@ if (!lib.shuoyeIf) {
                     if (lib.shuoyeIf && typeof lib.shuoyeIf.refreshHuangjinzhibeiInfo === "function") {
                         lib.shuoyeIf.refreshHuangjinzhibeiInfo();
                     }
+                    if (lib.shuoyeIf && typeof lib.shuoyeIf.refreshQumoshiInfo === "function") {
+                        lib.shuoyeIf.refreshQumoshiInfo();
+                    }
                 } catch (e) {}
             }, value);
         },
@@ -1275,6 +1278,20 @@ if (!lib.shuoyeIf) {
                 const size = lib.shuoyeNilu && typeof lib.shuoyeNilu.cupSize === "function" ? lib.shuoyeNilu.cupSize() : 666;
                 (target || lib.translate)["shuoye_huangjinzhibei_info"] = base.replace("666", String(size));
             } catch (e) {}
+        },
+        // 按阳间模式刷新这些技能的描述：阳间模式下整技禁用 → 显示「该模式不可用。」
+        // 原描述存在 lib.shuoyeQumoshiInfoBase（由 character/index.js 首次记录）
+        refreshQumoshiInfo() {
+            const base = lib.shuoyeQumoshiInfoBase;
+            if (!base || typeof base != "object") return;
+            const qumoshi = lib.shuoyeIf.qumoshi();
+            for (const skill in base) {
+                const text = base[skill];
+                if (typeof text != "string") continue;
+                try {
+                    lib.translate[skill + "_info"] = qumoshi ? "该模式不可用。" : text;
+                } catch (e) {}
+            }
         },
         // ---------------- 无量空处：领域状态 ----------------
         domainOwner() {
@@ -2612,6 +2629,354 @@ if (!lib.shuoyeDihuang) {
         deathSkills: (player) => shuoyeDeathConditionSkills(player),
     };
 }
+
+// ===== 【缠流子】公共入口：武将牌视频 / 技能立绘 / 背景与 BGM =====
+// 说明：以下函数会经 game.broadcastAll 下发到客机执行，回调里只允许依赖全局
+// lib / game / ui / get / _status，禁止引用模块闭包变量（否则客机上会 undefined）。
+if (!lib.shuoyeChan) {
+    lib.shuoyeChan = {
+        // 【激昂】依次获得的五个衍生技（数组顺序即获得顺序）
+        order: ["yiti", "shanren", "jifeng", "wupaizi", "gengyi"],
+        // 每回合首次发动时需要额外播放视频的技能（更衣、狂暴只换立绘）
+        videoSkills: ["yiti", "shanren", "jifeng", "wupaizi"],
+        skillId(key) {
+            return "shuoye_chanliuzi_" + key;
+        },
+        skinId(key) {
+            return "shuoye_chanliuzi_skin_" + key;
+        },
+        turnId() {
+            return String(game.phaseNumber || 0);
+        },
+        roundId() {
+            return String(game.roundNumber || 0);
+        },
+        leftSkills(player) {
+            const left = [];
+            const list = lib.shuoyeChan.order;
+            for (let i = 0; i < list.length; i++) {
+                if (!player.hasSkill(lib.shuoyeChan.skillId(list[i]))) left.push(list[i]);
+            }
+            return left;
+        },
+        // first=true 为首次获得（一体播原版），false 为每回合首次发动（一体播简略版）
+        videoPath(key, first) {
+            if (key == "yiti") return first ? "extension/朔夜/video/shuoye_chanliuzi_yiti.mp4" : "extension/朔夜/video/shuoye_chanliuzi_yiti_short.mp4";
+            if (key == "shanren") return "extension/朔夜/video/shuoye_chanliuzi_shanren.mp4";
+            if (key == "jifeng") return "extension/朔夜/video/shuoye_chanliuzi_jifeng.mp4";
+            if (key == "wupaizi") return "extension/朔夜/video/shuoye_chanliuzi_wupaizi.mp4";
+            if (key == "gengyi") return "extension/朔夜/video/shuoye_chanliuzi_gengyi.mp4";
+            if (key == "kuangbao") return "extension/朔夜/video/shuoye_chanliuzi_kuangbao.mp4";
+            return "";
+        },
+        // storage 统一走广播：客机的 filter / mod / viewAs 才能读到同样的值
+        setStorage(player, key, value) {
+            if (!player) return;
+            game.broadcastAll(
+                function (p, k, v) {
+                    if (!p) return;
+                    if (!p.storage) p.storage = {};
+                    p.storage[k] = v;
+                },
+                player,
+                key,
+                value
+            );
+        },
+        delStorage(player, key) {
+            if (!player) return;
+            game.broadcastAll(function (p, k) {
+                if (p && p.storage) delete p.storage[k];
+            }, player, key);
+        },
+        // 换立绘：changeSkin 内部自己 broadcastAll，主机调用即可
+        applySkin(player, key) {
+            try {
+                if (player && typeof player.changeSkin == "function") player.changeSkin({ characterName: "shuoye_chanliuzi" }, lib.shuoyeChan.skinId(key));
+            } catch (e) {}
+        },
+        // 武将牌上播视频：不暂停游戏、不暂停 BGM、不阻塞结算
+        playAvatarVideo(playerid, src) {
+            if (!playerid || !src) return;
+            game.broadcastAll(
+                function (pid, path) {
+                    try {
+                        if (typeof document == "undefined" || !ui.arena) return;
+                        let target = null;
+                        try {
+                            if (lib.playerOL) target = lib.playerOL[pid];
+                        } catch (e) {}
+                        if (!target) {
+                            target =
+                                (game.players || []).concat(game.dead || []).find(function (p) {
+                                    return p && p.playerid == pid;
+                                }) || null;
+                        }
+                        if (!target || !target.node || !target.node.avatar) return;
+                        const avatar = target.node.avatar;
+                        // 同一武将牌只留本次视频，避免连续触发叠层
+                        const olds = avatar.querySelectorAll(".shuoye-chanliuzi-video");
+                        for (let i = 0; i < olds.length; i++) {
+                            try {
+                                olds[i].pause();
+                            } catch (e) {}
+                            if (olds[i].parentNode) olds[i].parentNode.removeChild(olds[i]);
+                        }
+                        const video = document.createElement("video");
+                        video.className = "shuoye-chanliuzi-video";
+                        // 照【乙骨忧太】：透明 poster + 内联播放，手机上就不会先画一帧播放键
+                        if (lib.shuoyeIf && typeof lib.shuoyeIf.primeVideo == "function") lib.shuoyeIf.primeVideo(video);
+                        video.muted = false;
+                        video.volume = 1;
+                        video.loop = false;
+                        video.playsInline = true;
+                        video.preload = "auto";
+                        video.style.cssText = "position:absolute;left:0;top:0;width:100%;height:100%;object-fit:cover;object-position:center;background:transparent;pointer-events:none;z-index:6;opacity:0;transition:opacity .2s linear;";
+                        video.src = lib.assetURL + path;
+                        let closed = false;
+                        const finish = function () {
+                            if (closed) return;
+                            closed = true;
+                            try {
+                                video.pause();
+                            } catch (e) {}
+                            if (video.parentNode) video.parentNode.removeChild(video);
+                        };
+                        video.addEventListener("error", finish, { once: true });
+                        video.addEventListener("ended", finish, { once: true });
+                        video.addEventListener(
+                            "canplay",
+                            function () {
+                                // 真的能出画面才显示，避免闪一帧播放按钮
+                                if (lib.shuoyeIf && typeof lib.shuoyeIf.revealWhenReady == "function") lib.shuoyeIf.revealWhenReady(video);
+                                else video.style.opacity = "1";
+                                const p = video.play();
+                                if (p && p.catch) {
+                                    p.catch(function () {
+                                        try {
+                                            video.muted = true;
+                                            const p2 = video.play();
+                                            if (p2 && p2.catch) p2.catch(finish);
+                                        } catch (e) {
+                                            finish();
+                                        }
+                                    });
+                                }
+                            },
+                            { once: true }
+                        );
+                        avatar.appendChild(video);
+                        // 兜底：解码失败或卡住时不留残影
+                        setTimeout(finish, 30000);
+                        // 回菜单兜底清理
+                        if (!lib.shuoyeChanFree) {
+                            lib.shuoyeChanFree = true;
+                            try {
+                                lib.onfree.push(function () {
+                                    try {
+                                        const list = document.querySelectorAll(".shuoye-chanliuzi-video");
+                                        for (let i = 0; i < list.length; i++) {
+                                            try {
+                                                list[i].pause();
+                                            } catch (e) {}
+                                            if (list[i].parentNode) list[i].parentNode.removeChild(list[i]);
+                                        }
+                                    } catch (e) {}
+                                });
+                            } catch (e) {}
+                        }
+                    } catch (e) {}
+                },
+                playerid,
+                src
+            );
+        },
+        // 首次获得技能：换立绘 + 播原版视频（更衣额外换背景与 BGM）
+        // 同时记下时间：紧接着的常规「每回合首次」演出要跳过，否则（如本次濒死获得技能）
+        // 会被【一体】之类的短版视频把刚播的获得演出顶掉。
+        acquire(player, key) {
+            if (!player) return;
+            lib.shuoyeChan._acqAt = Date.now();
+            lib.shuoyeChan._acqPid = player.playerid;
+            lib.shuoyeChan.applySkin(player, key);
+            lib.shuoyeChan.playAvatarVideo(player.playerid, lib.shuoyeChan.videoPath(key, true));
+            if (key == "gengyi") lib.shuoyeChan.setBgAndBgm();
+        },
+        // 每回合首次发动：换立绘；疾风/无拍子/闪刃/一体 额外播视频
+        turnShow(player, key) {
+            if (!player) return;
+            // 刚播过「首次获得」演出（同一角色、3 秒内）：这一次常规演出直接跳过，
+            // 否则会把刚露出的技能立绘/视频顶掉（典型：获得技能的那次濒死之后
+            // 【一体】的「失去体力」接着触发，就把新技能的演出顶了）
+            if (lib.shuoyeChan._acqPid && lib.shuoyeChan._acqPid == player.playerid && Date.now() - (lib.shuoyeChan._acqAt || 0) < 3000) {
+                lib.shuoyeChan._acqPid = null;
+                return;
+            }
+            const turn = lib.shuoyeChan.turnId();
+            const flag = "shuoye_chanliuzi_turn_" + key;
+            const old = player.storage ? player.storage[flag] : void 0;
+            if (old === turn) return;
+            lib.shuoyeChan.setStorage(player, flag, turn);
+            lib.shuoyeChan.applySkin(player, key);
+            if (lib.shuoyeChan.videoSkills.includes(key)) lib.shuoyeChan.playAvatarVideo(player.playerid, lib.shuoyeChan.videoPath(key, false));
+        },
+        // 获得衍生技（激昂调用）
+        gainDerived(player, key) {
+            const skill = lib.shuoyeChan.skillId(key);
+            if (!player.hasSkill(skill, null, null, false)) player.addSkill(skill);
+            game.log(player, "获得了技能", "#g【" + get.translation(skill) + "】");
+            // 五个衍生技齐了：全局改写【激昂】的描述（各端 UI 都按改后显示）
+            if (!lib.shuoyeChan.leftSkills(player).length) lib.shuoyeChan.applyJiangRewrite();
+            // 本回合已经演出过，避免同回合重复播放
+            lib.shuoyeChan.setStorage(player, "shuoye_chanliuzi_turn_" + key, lib.shuoyeChan.turnId());
+            lib.shuoyeChan.acquire(player, key);
+        },
+        // 【更衣】：换背景 + 换 BGM（走引擎的临时背景/临时音乐，回菜单由 content.js 还原）
+        setBgAndBgm() {
+            game.broadcastAll(function () {
+                try {
+                    _status.tempBackground = "ext:朔夜/image/shuoye_chanliuzi_bg.jpg";
+                    _status.tempMusic = "ext:朔夜/audio/skill/shuoye_chanliuzi_bgm1.mp3";
+                    game.updateBackground();
+                    if (ui.background && ui.background.style) {
+                        ui.background.style.backgroundSize = "cover";
+                        ui.background.style.backgroundPosition = "50% 50%";
+                    }
+                    game.playBackgroundMusic();
+                    if (ui.backgroundMusic) {
+                        ui.backgroundMusic.loop = true;
+                        const p = ui.backgroundMusic.play();
+                        if (p && p.catch) p.catch(function () {});
+                    }
+                } catch (e) {}
+            });
+        },
+        // 【闪刃】本回合可视为【杀】的花色
+        shanrenSuits(player) {
+            if (!player || !player.storage) return [];
+            if (player.storage.shuoye_chanliuzi_shanren_turn !== lib.shuoyeChan.turnId()) return [];
+            const suits = player.storage.shuoye_chanliuzi_shanren_suits;
+            return Array.isArray(suits) ? suits : [];
+        },
+    };
+}
+
+// ===== 【缠流子】技能名 / 名词 / 卡牌超链接 =====
+// 描述原文一个字都不改，只把名字换成可点词条；点开后显示「【技能名】+ 当前描述」。
+// 用直接赋值而不是写在 lib.shuoyeChan 字面量里，热重载时也能覆盖旧版本。
+lib.shuoyeChan.infoBase = lib.shuoyeChan.infoBase || {};
+// 词条弹窗：点开时才取描述，所以【神衣】激昂的改写也会同步
+lib.shuoyeChan.linkDialog = function (skill, name) {
+    return function (dialog) {
+        try {
+            const info = lib.translate[skill + "_info"] || "";
+            if (dialog.style && dialog.style.setProperty) dialog.style.setProperty("z-index", "2147483647", "important");
+            if (dialog.style) dialog.style.zIndex = "2147483647";
+            if (dialog.parentNode && dialog.parentNode.appendChild) dialog.parentNode.appendChild(dialog);
+            dialog.add('<div class="text" style="text-align:center;font-weight:700">【' + name + "】</div>");
+            dialog.add('<div class="text">' + info + "</div>");
+        } catch (e) {}
+        return dialog;
+    };
+};
+// 技能链接：style = "skill" → 【名】，"square" → [名]，其它 → 名
+lib.shuoyeChan.skillLink = function (skill, name, style) {
+    const id = "shuoye_cl_link_" + skill;
+    try {
+        if (lib.poptip && typeof lib.poptip.add == "function" && typeof lib.poptip.getElement == "function") {
+            lib.poptip.add({ id, name, info: "", dialog: lib.shuoyeChan.linkDialog(skill, name) });
+            const element = lib.poptip.getElement(id);
+            if (style == "skill") return "【" + element + "】";
+            if (style == "square") return "[" + element + "]";
+            return element;
+        }
+    } catch (e) {}
+    if (style == "skill") return "【" + name + "】";
+    if (style == "square") return "[" + name + "]";
+    return name;
+};
+// 名词词条（如【绝毁伤害】）
+lib.shuoyeChan.termLink = function (id, name, info, style) {
+    try {
+        if (lib.poptip && typeof lib.poptip.add == "function" && typeof lib.poptip.getElement == "function") {
+            lib.poptip.add({ id, name, info, dialog: lib.shuoyeChan.linkDialog(id, name) });
+            const element = lib.poptip.getElement(id);
+            if (style == "skill") return "【" + element + "】";
+            return element;
+        }
+    } catch (e) {}
+    return style == "skill" ? "【" + name + "】" : name;
+};
+// 各技能描述里需要变成词条的名字（原文的 [ ]、【 】保持不动）
+lib.shuoyeChan.infoTokens = {
+    shuoye_chanliuzi_shenyi: [
+        // 开头的「昂扬技」是可点词条（带说明）；中间的「激昂：」不加链接，
+        // 只有末尾「均获得则修改【激昂】。」里的【激昂】可点
+        ["昂扬技", () => lib.shuoyeChan.termLink("shuoye_cl_term_angyang", "昂扬技", "一种技能标签：发动后此技能失效，直至满足该技能的『激昂』条件后恢复。", "")],
+        ["【激昂】", () => lib.shuoyeChan.skillLink("shuoye_chanliuzi_shenyi_jiang", "激昂", "skill")],
+        ["[一体]", () => lib.shuoyeChan.skillLink("shuoye_chanliuzi_yiti", "一体", "square")],
+        ["[闪刃]", () => lib.shuoyeChan.skillLink("shuoye_chanliuzi_shanren", "闪刃", "square")],
+        ["[疾风]", () => lib.shuoyeChan.skillLink("shuoye_chanliuzi_jifeng", "疾风", "square")],
+        ["[无拍子]", () => lib.shuoyeChan.skillLink("shuoye_chanliuzi_wupaizi", "无拍子", "square")],
+        ["[更衣]", () => lib.shuoyeChan.skillLink("shuoye_chanliuzi_gengyi", "更衣", "square")],
+    ],
+    shuoye_chanliuzi_yiti: [
+        ["【狂暴】", () => lib.shuoyeChan.skillLink("shuoye_chanliuzi_kuangbao", "狂暴", "skill")],
+        ["【不屈】", () => lib.shuoyeChan.skillLink("shuoye_chanliuzi_buqu", "不屈", "skill")],
+    ],
+    shuoye_chanliuzi_gengyi: [["【绝毁伤害】", () => lib.shuoyeChan.termLink("shuoye_cl_term_juehui", "绝毁伤害", "无法被免疫、转移或减少，且会给予你真正的死亡。", "skill")]],
+    shuoye_chanliuzi_kuangbao: [
+        ["【绝毁伤害】", () => lib.shuoyeChan.termLink("shuoye_cl_term_juehui", "绝毁伤害", "无法被免疫、转移或减少，且会给予你真正的死亡。", "skill")],
+        ["【不屈】", () => lib.shuoyeChan.skillLink("shuoye_chanliuzi_buqu", "不屈", "skill")],
+        ["【狂暴】", () => lib.shuoyeChan.skillLink("shuoye_chanliuzi_kuangbao", "狂暴", "skill")],
+    ],
+};
+// 五个衍生技全部获得后：全局改写【神衣】的「激昂」段与【激昂】词条
+lib.shuoyeChan.applyJiangRewrite = function () {
+    game.broadcastAll(function () {
+        try {
+            if (!lib.shuoyeChan) return;
+            const OLD = "激昂：若存在未获得的技能，进入濒死时，增加一点体力上限回复1点体力，依次获得[一体][闪刃][疾风][无拍子][更衣]其中之一。均获得则修改【激昂】。";
+            const NEW = "激昂：每轮限一次，体力值变动后不大于0，回复1点体力。";
+            const base = lib.shuoyeChan.infoBase || {};
+            if (base.shuoye_chanliuzi_shenyi) {
+                const text = base.shuoye_chanliuzi_shenyi.replace(OLD, NEW);
+                if (text !== base.shuoye_chanliuzi_shenyi) lib.translate["shuoye_chanliuzi_shenyi_info"] = lib.shuoyeChan.decorateText(text, "shuoye_chanliuzi_shenyi");
+            }
+        } catch (e) {}
+    });
+};
+// 纯文本 → 带词条的文本（已装饰过就跳过）
+lib.shuoyeChan.decorateText = function (text, skill) {
+    if (typeof text != "string" || !text) return text;
+    if (text.includes("noname-poptip")) return text;
+    const list = lib.shuoyeChan.infoTokens[skill];
+    if (!list) return text;
+    let out = text;
+    for (const item of list) {
+        const token = item[0];
+        if (!out.includes(token)) continue;
+        let html = token;
+        try {
+            html = item[1]();
+        } catch (e) {
+            html = token;
+        }
+        out = out.split(token).join(html);
+    }
+    return out;
+};
+// 把包里的描述统一装饰一次（存一份纯文本，供 dynamicTranslate 改写用）
+lib.shuoyeChan.decorateAll = function (translate) {
+    if (!translate) return;
+    for (const skill in lib.shuoyeChan.infoTokens) {
+        const key = skill + "_info";
+        const text = translate[key];
+        if (typeof text != "string" || !text) continue;
+        if (!text.includes("noname-poptip")) lib.shuoyeChan.infoBase[skill] = text;
+        translate[key] = lib.shuoyeChan.decorateText(lib.shuoyeChan.infoBase[skill] || text, skill);
+    }
+};
 
 /** @type { importCharacterConfig['skill'] } */
 const skills = {
@@ -11455,6 +11820,8 @@ shuoye_weituan: {
         locked: false,
         changeSkill: true,
         filter(event, player, name) {
+            // 【阳间模式】整技禁用（同【无量空处】）：描述同步显示「该模式不可用」
+            if (lib.shuoyeIf && typeof lib.shuoyeIf.qumoshi === "function" && lib.shuoyeIf.qumoshi()) return false;
             if (player.countMark('charge') < 7) return false;
             if (!player.countCards('hes', function (card) {
                 return get.type(card) != 'basic';
@@ -12841,6 +13208,8 @@ shuoye_weituan: {
         forced: true,
         trigger: { global: "dieAfter" },
         filter(event, player) {
+            // 【阳间模式】整技禁用（同【无量空处】）：描述同步显示「该模式不可用」
+            if (lib.shuoyeIf && typeof lib.shuoyeIf.qumoshi === "function" && lib.shuoyeIf.qumoshi()) return false;
             return player.isAlive();
         },
         async content(event, trigger, player) {
@@ -12853,6 +13222,8 @@ shuoye_weituan: {
                 forced: true,
                 trigger: { player: "dying" },
                 filter(event, player) {
+                    // 【阳间模式】整技禁用：副技也一并关掉
+                    if (lib.shuoyeIf && typeof lib.shuoyeIf.qumoshi === "function" && lib.shuoyeIf.qumoshi()) return false;
                     return !player.storage.shuoyeShenchanguyinFailed;
                 },
                 async content(event, trigger, player) {
@@ -28261,6 +28632,825 @@ shuoye_shanxian: {
         },
     },
 //#noname-kit-end skill:shuoye_sp_youming
+//#noname-kit-begin skill:shuoye_chanliuzi_shenyi
+    //【缠流子】神衣：昂扬技 + 持恒技，出牌阶段限一次。
+    // 主动段用完即「暂时失效」，直到【激昂】结算才恢复（昂扬技语义）；
+    // 激昂挂在 group 子技上，所以主动段失效不影响它继续叠加。
+    shuoye_chanliuzi_shenyi: {
+        sunbenSkill: true,
+        persevereSkill: true,
+        superCharlotte: true,
+        fixed: true,
+        // 衍生技：技能页（十周年UI 的「武将技能」）会按 derivation 展开成一排
+        derivation: ["shuoye_chanliuzi_yiti", "shuoye_chanliuzi_shanren", "shuoye_chanliuzi_jifeng", "shuoye_chanliuzi_wupaizi", "shuoye_chanliuzi_gengyi", "shuoye_chanliuzi_kuangbao", "shuoye_chanliuzi_buqu"],
+        enable: "phaseUse",
+        usable: 1,
+        filterCard: () => false,
+        selectCard: -1,
+        group: ["shuoye_chanliuzi_shenyi_jiang"],
+        filter(event, player) {
+            return !player.storage.shuoye_chanliuzi_shenyi_off;
+        },
+        async content(event, trigger, player) {
+            // 昂扬技：主动段暂时失效，直到【激昂】结算
+            lib.shuoyeChan.setStorage(player, "shuoye_chanliuzi_shenyi_off", true);
+            game.log(player, "发动了", "#g【神衣】", "，主动效果暂时失效，直至【激昂】结算");
+            await player.damage({ num: 1, nosource: true });
+            if (!player.isAlive()) return;
+            await player.draw(2);
+            // 本回合获得的牌无次数限制
+            lib.shuoyeChan.setStorage(player, "shuoye_chanliuzi_free_turn", lib.shuoyeChan.turnId());
+            if (!player.hasSkill("shuoye_chanliuzi_shenyi_free")) player.addTempSkill("shuoye_chanliuzi_shenyi_free", { global: "phaseBefore" });
+            // 本回合此前获得的牌也一并打上标记（gain 历史按回合记录）
+            const gained = [];
+            try {
+                player.getHistory("gain", function (evt) {
+                    const cards = evt.getg ? evt.getg(player) : [];
+                    if (cards && cards.length) gained.addArray(cards);
+                });
+            } catch (e) {}
+            if (gained.length) {
+                const hand = player.getCards("h").filter(function (card) {
+                    return gained.includes(card);
+                });
+                if (hand.length) player.addGaintag(hand, "shuoye_chanliuzi_free");
+            }
+            game.log(player, "本回合获得的牌无次数限制");
+        },
+        ai: {
+            order: 8,
+            result: { player: 2 },
+        },
+        subSkill: {
+            // 激昂：进入濒死时 +1 上限、回 1 点体力、依次获得衍生技；
+            // 五个衍生技齐了改为每轮限一次、体力值变动后不大于 0 时回 1 点。
+            // 另外在 loseMaxHpBefore 提前判定一次：被扣体力上限扣到 ≤0 时也能靠 +1 活下来。
+            jiang: {
+                charlotte: true,
+                fixed: true,
+                superCharlotte: true,
+                persevereSkill: true,
+                forced: true,
+                firstDo: true,
+                trigger: { player: ["dying", "loseMaxHpBefore"] },
+                filter(event, player, name) {
+                    const left = lib.shuoyeChan.leftSkills(player);
+                    if (name == "loseMaxHpBefore") {
+                        if (!left.length) return false;
+                        const num = Number(event.num) || 0;
+                        return num > 0 && player.maxHp - num <= 0;
+                    }
+                    if (left.length) return true;
+                    if (player.hp > 0) return false;
+                    return String((player.storage && player.storage.shuoye_chanliuzi_jiang_round) || "") !== lib.shuoyeChan.roundId();
+                },
+                async content(event, trigger, player) {
+                    const left = lib.shuoyeChan.leftSkills(player);
+                    if (left.length) {
+                        game.log(player, "发动了", "#g【激昂】");
+                        await player.gainMaxHp(1);
+                        await player.recover(1);
+                        lib.shuoyeChan.gainDerived(player, left[0]);
+                    } else {
+                        lib.shuoyeChan.applyJiangRewrite();
+                        lib.shuoyeChan.setStorage(player, "shuoye_chanliuzi_jiang_round", game.roundNumber || 0);
+                        game.log(player, "发动了", "#g【激昂】", "：回复1点体力");
+                        await player.recover(1);
+                    }
+                    // 激昂结算后，神衣主动段恢复
+                    if (player.storage && player.storage.shuoye_chanliuzi_shenyi_off) {
+                        lib.shuoyeChan.setStorage(player, "shuoye_chanliuzi_shenyi_off", false);
+                        game.log(player, "的", "#g【神衣】", "主动效果已恢复");
+                    }
+                },
+            },
+        },
+    },
+//#noname-kit-end skill:shuoye_chanliuzi_shenyi
+//#noname-kit-begin skill:shuoye_chanliuzi_shenyi_free
+    //【缠流子】神衣：本回合获得的牌无次数限制（临时技，回合开始前移除）
+    // 注意：临时技不能加 fixed（否则 removeSkill 会被护住、永远不消失），回合限制另用 storage 兵底。
+    shuoye_chanliuzi_shenyi_free: {
+        charlotte: true,
+        mark: true,
+        marktext: "衣",
+        intro: {
+            content: "本回合你获得的牌无次数限制",
+            markcount() {
+                return 0;
+            },
+        },
+        mod: {
+            cardUsable(card, player, num) {
+                if (!card) return;
+                const turn = String((player.storage && player.storage.shuoye_chanliuzi_free_turn) || "");
+                if (turn !== String(game.phaseNumber || 0)) return;
+                // 注意：getCardUsable 会先 get.autoViewAs(card) 把牌包成 VCard，
+                // 而 VCard.hasGaintag 只看 VCard 自己的 gaintag（构造时不复制标记），
+                // 所以必须同时看 VCard 底下的实体牌 card.cards。
+                const list = Array.isArray(card.cards) && card.cards.length ? card.cards : [card];
+                for (const one of list) {
+                    if (one && typeof one.hasGaintag == "function" && one.hasGaintag("shuoye_chanliuzi_free")) return Infinity;
+                }
+            },
+        },
+        trigger: { player: "gainAfter" },
+        forced: true,
+        silent: true,
+        popup: false,
+        firstDo: true,
+        content(event, trigger, player) {
+            const turn = String((player.storage && player.storage.shuoye_chanliuzi_free_turn) || "");
+            if (turn !== String(game.phaseNumber || 0)) return;
+            const cards = trigger.getg ? trigger.getg(player) : [];
+            if (cards && cards.length) player.addGaintag(cards, "shuoye_chanliuzi_free");
+        },
+        // 临时技到期（下个回合开始）时把卡面标记一并清掉，避免标记跨回合残留
+        onremove(player) {
+            try {
+                const cards = player.getCards("h", function (card) {
+                    return card.hasGaintag("shuoye_chanliuzi_free");
+                });
+                if (cards.length) player.removeGaintag("shuoye_chanliuzi_free", cards);
+            } catch (e) {}
+        },
+    },
+//#noname-kit-end skill:shuoye_chanliuzi_shenyi_free
+//#noname-kit-begin skill:shuoye_chanliuzi_yiti
+    //【缠流子】一体：手牌上限=体力上限；受伤改为失去1点体力；失去体力摸等量牌并可弃X回X/2；
+    // 限定技失救：真正死亡时取消死亡、回体力至1、获得【狂暴】、所有角色获得【不屈】。
+    shuoye_chanliuzi_yiti: {
+        // 衍生技蓝色显示（同【破夜】【星火】【慧佐】的 thundertext 写法）
+        thundertext: true,
+        persevereSkill: true,
+        superCharlotte: true,
+        fixed: true,
+        group: ["shuoye_chanliuzi_yiti_hurt", "shuoye_chanliuzi_yiti_lose", "shuoye_chanliuzi_yiti_shijiu"],
+        mod: {
+            maxHandcardFinal(player, num) {
+                return player.maxHp;
+            },
+        },
+        subSkill: {
+            hurt: {
+                charlotte: true,
+                fixed: true,
+                superCharlotte: true,
+                forced: true,
+                silent: true,
+                popup: false,
+                firstDo: true,
+                trigger: { player: "damageBegin3" },
+                filter(event, player) {
+                    if (event._shuoye_juehui) return false;
+                    return (Number(event.num) || 0) > 0;
+                },
+                async content(event, trigger, player) {
+                    trigger.cancel();
+                    game.log(player, "因", "#g【一体】", "受到的伤害改为失去1点体力");
+                    await player.loseHp(1);
+                },
+            },
+            lose: {
+                charlotte: true,
+                fixed: true,
+                superCharlotte: true,
+                forced: true,
+                silent: true,
+                popup: false,
+                trigger: { player: "loseHpAfter" },
+                filter(event, player) {
+                    return player.isAlive() && (Number(event.num) || 0) > 0;
+                },
+                async content(event, trigger, player) {
+                    const num = Math.max(1, Number(trigger.num) || 1);
+                    await player.draw(num);
+                    // 每回合首次触发：换立绘并播简略版视频
+                    lib.shuoyeChan.turnShow(player, "yiti");
+                    if (!player.isAlive()) return;
+                    const max = player.countCards("he");
+                    if (!max) return;
+                    const result = await player
+                        .chooseToDiscard("he", [1, max], false, "一体：可弃置任意张牌，回复弃置数/2点体力（向下取整）")
+                        .set("ai", function (card) {
+                            const me = get.player();
+                            if (me.hp < me.maxHp) return 6 - get.value(card);
+                            return -get.value(card);
+                        })
+                        .forResult();
+                    if (!result || !result.bool || !result.cards || !result.cards.length) return;
+                    const heal = Math.floor(result.cards.length / 2);
+                    if (heal > 0) {
+                        game.log(player, "弃置" + get.cnNumber(result.cards.length) + "张牌，回复" + get.cnNumber(heal) + "点体力");
+                        await player.recover(heal);
+                    }
+                },
+            },
+            // 限定技·失救：真正死亡（濒死没被救回）时触发
+            shijiu: {
+                charlotte: true,
+                fixed: true,
+                superCharlotte: true,
+                persevereSkill: true,
+                limited: true,
+                forced: true,
+                silent: true,
+                popup: false,
+                trigger: { player: "dieBefore" },
+                filter(event, player) {
+                    if (event.reserveOut) return false;
+                    if (player.hp > 0) return false;
+                    const dying = event.getParent("dying");
+                    if (!(dying && dying.name == "dying")) return false;
+                    // 因【不屈】失败且无人出桃时，由【狂暴】的子技接住（同一次死亡不浪费限定技）
+                    if (player.storage && player.storage.shuoye_chanliuzi_buqu_fail && !player.storage.shuoye_chanliuzi_kb_tao) return false;
+                    return true;
+                },
+                async content(event, trigger, player) {
+                    player.awakenSkill(event.name);
+                    trigger.cancel();
+                    game.log(player, "的", "#g【失救】", "生效：恢复体力至1");
+                    if (player.hp < 1) await player.recover(1 - player.hp);
+                    if (!player.hasSkill("shuoye_chanliuzi_kuangbao", null, null, false)) {
+                        // 走 gainDerived：和【激昂】获得衍生技同一套演出（播狂暴的视频 + 换立绘）
+                        lib.shuoyeChan.gainDerived(player, "kuangbao");
+                    }
+                    const targets = game.players.concat(game.dead).filter(function (current) {
+                        return current && current.isAlive() && current.isIn && current.isIn();
+                    });
+                    let count = 0;
+                    for (const current of targets) {
+                        if (!current.hasSkill("shuoye_chanliuzi_buqu", null, null, false)) {
+                            current.addSkill("shuoye_chanliuzi_buqu");
+                            count++;
+                        }
+                    }
+                    if (count) game.log("所有角色获得了技能", "#g【不屈】");
+                },
+            },
+        },
+    },
+//#noname-kit-end skill:shuoye_chanliuzi_yiti
+//#noname-kit-begin skill:shuoye_chanliuzi_shanren
+    //【缠流子】闪刃：出牌阶段限一次，重铸至多两张手牌，
+    // 本回合与重铸牌同花色的手牌均视为无视防具的【杀】。
+    shuoye_chanliuzi_shanren: {
+        thundertext: true,
+        superCharlotte: true,
+        fixed: true,
+        persevereSkill: true,
+        enable: "phaseUse",
+        usable: 1,
+        position: "h",
+        filter(event, player) {
+            return player.hasCard(function (card) {
+                return player.canRecast(card);
+            }, "h");
+        },
+        filterCard(card, player) {
+            return player.canRecast(card);
+        },
+        selectCard: [1, 2],
+        lose: false,
+        discard: false,
+        delay: false,
+        prompt: "重铸至多两张手牌",
+        check(card) {
+            return 6 - get.value(card);
+        },
+        async content(event, trigger, player) {
+            const cards = event.cards || [];
+            const suits = [];
+            for (const card of cards) {
+                const suit = get.suit(card);
+                if (suit && suit != "none" && !suits.includes(suit)) suits.push(suit);
+            }
+            await player.recast(cards);
+            if (!suits.length) return;
+            lib.shuoyeChan.setStorage(player, "shuoye_chanliuzi_shanren_suits", suits);
+            lib.shuoyeChan.setStorage(player, "shuoye_chanliuzi_shanren_turn", lib.shuoyeChan.turnId());
+            if (!player.hasSkill("shuoye_chanliuzi_shanren_use")) player.addTempSkill("shuoye_chanliuzi_shanren_use", { global: "phaseBefore" });
+            const texts = suits.map(function (suit) {
+                return get.translation(suit);
+            });
+            game.log(player, "本回合", "#y" + texts.join("、"), "花色的手牌视为无视防具的【杀】");
+            lib.shuoyeChan.turnShow(player, "shanren");
+        },
+        ai: {
+            order: 5,
+            result: { player: 1 },
+        },
+    },
+//#noname-kit-end skill:shuoye_chanliuzi_shanren
+//#noname-kit-begin skill:shuoye_chanliuzi_shanren_use
+    //【缠流子】闪刃：本回合与重铸牌同花色的手牌，强制视为【杀】。
+    // 用 mod.cardname（同【霍光·急涛】的写法）：牌名直接被改成【杀】，
+    // 不能选择“用回原牌名”（不是 viewAs），回合结束随临时技一起失效。
+    shuoye_chanliuzi_shanren_use: {
+        charlotte: true,
+        group: ["shuoye_chanliuzi_shanren_armor"],
+        mod: {
+            cardname(card, player, name) {
+                if (!card || name == "sha") return;
+                const suits = lib.shuoyeChan.shanrenSuits(player);
+                if (!suits.length) return;
+                // 只处理实体手牌：虚拟牌（card.parentNode 不存在）不在此处改
+                if (!card.parentNode) return;
+                if (get.position(card) != "h") return;
+                if (get.owner(card) != player) return;
+                if (!suits.includes(get.suit(card))) return;
+                return "sha";
+            },
+        },
+    },
+//#noname-kit-end skill:shuoye_chanliuzi_shanren_use
+//#noname-kit-begin skill:shuoye_chanliuzi_shanren_armor
+    //【缠流子】闪刃：本回合这些【杀】无视防具（写法同青铁剑；随临时技一起到期）
+    shuoye_chanliuzi_shanren_armor: {
+        charlotte: true,
+        forced: true,
+        silent: true,
+        popup: false,
+        trigger: { player: "useCardToPlayered" },
+        filter(event, player) {
+            if (!event.card || get.name(event.card) != "sha") return false;
+            if (!event.target || event.target == player) return false;
+            if (!lib.skill.qinggang2) return false;
+            const suits = lib.shuoyeChan.shanrenSuits(player);
+            if (!suits.length) return false;
+            // 实体牌直接使用时 event.card 就是那张牌（没有 card.cards），虚拟牌才看 card.cards
+            const cards = Array.isArray(event.card.cards) && event.card.cards.length ? event.card.cards : [event.card];
+            return cards.some(function (card) {
+                return suits.includes(get.suit(card));
+            });
+        },
+        content(event, trigger, player) {
+            const target = trigger.target;
+            target.addTempSkill("qinggang2");
+            if (!target.storage.qinggang2) target.storage.qinggang2 = [];
+            target.storage.qinggang2.add(trigger.card);
+            target.markSkill("qinggang2");
+        },
+    },
+//#noname-kit-end skill:shuoye_chanliuzi_shanren_armor
+//#noname-kit-begin skill:shuoye_chanliuzi_jifeng
+    //【缠流子】疾风：锁定技，你计算其他人距离均为1；
+    // 你对距离1角色造成伤害后，选择回复1点体力或摸一张牌。
+    shuoye_chanliuzi_jifeng: {
+        thundertext: true,
+        locked: true,
+        persevereSkill: true,
+        superCharlotte: true,
+        fixed: true,
+        group: ["shuoye_chanliuzi_jifeng_damage"],
+        mod: {
+            globalFrom(from, to, distance) {
+                if (from !== to) return 1;
+            },
+        },
+        subSkill: {
+            damage: {
+                charlotte: true,
+                fixed: true,
+                superCharlotte: true,
+                forced: true,
+                silent: true,
+                popup: false,
+                trigger: { source: "damageEnd" },
+                filter(event, player) {
+                    const target = event.player;
+                    if (!target || target == player) return false;
+                    if (!(Number(event.num) > 0)) return false;
+                    if (!target.isAlive()) return false;
+                    return player.distanceTo(target) <= 1;
+                },
+                async content(event, trigger, player) {
+                    lib.shuoyeChan.turnShow(player, "jifeng");
+                    const list = player.hp < player.maxHp ? ["回复1点体力", "摸一张牌"] : ["摸一张牌"];
+                    const result = await player
+                        .chooseControl(list)
+                        .set("prompt", "疾风：选择一项")
+                        .set("ai", function () {
+                            const me = get.player();
+                            if (me.hp < me.maxHp) return "回复1点体力";
+                            return "摸一张牌";
+                        })
+                        .forResult();
+                    if (result && result.control == "回复1点体力") await player.recover(1);
+                    else await player.draw(1);
+                },
+            },
+        },
+    },
+//#noname-kit-end skill:shuoye_chanliuzi_jifeng
+//#noname-kit-begin skill:shuoye_chanliuzi_wupaizi
+    //【缠流子】无拍子：韵律技。体力值减少时可弃一名角色一张牌，
+    // 平：弃一张牌回复1点体力；仄：摸一张牌。
+    // 转韵：你获得或弃置「本回合未进入过弃牌堆花色」的牌时在平/仄之间切换（初始平）。
+    shuoye_chanliuzi_wupaizi: {
+        thundertext: true,
+        yunlvji: true,
+        persevereSkill: true,
+        superCharlotte: true,
+        fixed: true,
+        mark: true,
+        marktext: "韵",
+        intro: {
+            content(storage, player) {
+                return player.storage.shuoye_chanliuzi_wupaizi ? "当前：仄" : "当前：平";
+            },
+        },
+        group: ["shuoye_chanliuzi_wupaizi_lose", "shuoye_chanliuzi_wupaizi_zhuan"],
+        subSkill: {
+            lose: {
+                charlotte: true,
+                fixed: true,
+                superCharlotte: true,
+                frequent: true,
+                trigger: { player: "changeHp" },
+                filter(event, player) {
+                    if (!(Number(event.num) < 0)) return false;
+                    if (!player.isAlive()) return false;
+                    return game.hasPlayer(function (current) {
+                        return current.countCards("hej") > 0;
+                    });
+                },
+                check(event, player) {
+                    return true;
+                },
+                async content(event, trigger, player) {
+                    lib.shuoyeChan.turnShow(player, "wupaizi");
+                    const result = await player
+                        .chooseTarget("无拍子：弃置一名角色的一张牌", true, function (card, player, target) {
+                            return target.countCards("hej") > 0;
+                        })
+                        .set("ai", function (target) {
+                            const me = get.player();
+                            if (target == me) return -1;
+                            return -get.attitude(me, target) + (target.countCards("hej") > 2 ? 0.5 : 0);
+                        })
+                        .forResult();
+                    if (!result || !result.bool || !result.targets || !result.targets.length) return;
+                    await player.discardPlayerCard(result.targets[0], "hej", true);
+                    if (player.storage.shuoye_chanliuzi_wupaizi) {
+                        game.log(player, "仄：摸一张牌");
+                        await player.draw(1);
+                        return;
+                    }
+                    if (player.countDiscardableCards(player, "he") < 1) return;
+                    await player.chooseToDiscard("he", 1, true, "平：弃置一张牌回复1点体力").set("ai", function (card) {
+                        return 6 - get.value(card);
+                    });
+                    game.log(player, "平：回复1点体力");
+                    await player.recover(1);
+                },
+            },
+            zhuan: {
+                charlotte: true,
+                fixed: true,
+                superCharlotte: true,
+                forced: true,
+                silent: true,
+                popup: false,
+                firstDo: true,
+                trigger: { player: "recoverAfter" },
+                // 转韵：每回合首次恢复体力 → 平/仄切换（一回合最多一次）
+                filter(event, player) {
+                    if (!(Number(event.num) > 0)) return false;
+                    const turn = lib.shuoyeChan.turnId();
+                    return String((player.storage && player.storage.shuoye_chanliuzi_wupaizi_zhuan_turn) || "") !== turn;
+                },
+                content(event, trigger, player) {
+                    // 本回合已经转过了：记下回合号，之后本回合不再触发
+                    lib.shuoyeChan.setStorage(player, "shuoye_chanliuzi_wupaizi_zhuan_turn", lib.shuoyeChan.turnId());
+                    const next = !player.storage.shuoye_chanliuzi_wupaizi;
+                    lib.shuoyeChan.setStorage(player, "shuoye_chanliuzi_wupaizi", next);
+                    player.markSkill("shuoye_chanliuzi_wupaizi");
+                    game.log(player, "转韵", next ? "仄" : "平");
+                },
+            },
+        },
+    },
+//#noname-kit-end skill:shuoye_chanliuzi_wupaizi
+//#noname-kit-begin skill:shuoye_chanliuzi_gengyi
+    //【缠流子】更衣：你对其他角色造成的伤害改为无属性【绝毁伤害】；
+    // 无装备角色不可响应你的牌；有装备角色受到你的伤害后你获得其一件装备；
+    // 每轮开始时把手牌数调整为体力上限。
+    shuoye_chanliuzi_gengyi: {
+        thundertext: true,
+        persevereSkill: true,
+        superCharlotte: true,
+        fixed: true,
+        group: ["shuoye_chanliuzi_gengyi_damage", "shuoye_chanliuzi_gengyi_direct", "shuoye_chanliuzi_gengyi_equip", "shuoye_chanliuzi_gengyi_round"],
+        subSkill: {
+            damage: {
+                charlotte: true,
+                fixed: true,
+                superCharlotte: true,
+                forced: true,
+                silent: true,
+                popup: false,
+                firstDo: true,
+                // 用最早的 damageBegin1 就转换：否则目标的减伤（damageBegin2/3）会先把数值减掉，
+                // 显得“绝毁伤害被减免”。转换后的绝毁事件内部只允许增伤、不允许减伤。
+                trigger: { source: "damageBegin1" },
+                filter(event, player) {
+                    if (event._shuoye_juehui) return false;
+                    if (!event.player || event.player == player) return false;
+                    return (Number(event.num) || 0) > 0;
+                },
+                async content(event, trigger, player) {
+                    const target = trigger.player;
+                    const num = Number(trigger.num) || 1;
+                    trigger.cancel();
+                    game.log(player, "对", target, "造成的伤害改为", "#y" + num, "点无属性【绝毁伤害】");
+                    await shuoyeJuehuiDamage(target, num, player);
+                    lib.shuoyeChan.turnShow(player, "gengyi");
+                },
+            },
+            direct: {
+                charlotte: true,
+                fixed: true,
+                superCharlotte: true,
+                forced: true,
+                silent: true,
+                popup: false,
+                firstDo: true,
+                trigger: { player: "useCard1" },
+                filter(event, player) {
+                    const targets = (event.targets || []).filter(function (target) {
+                        return target != player;
+                    });
+                    if (!targets.length) return false;
+                    return targets.some(function (target) {
+                        return target.countCards("e") == 0;
+                    });
+                },
+                content(event, trigger, player) {
+                    const all = (trigger.targets || []).filter(function (target) {
+                        return target != player;
+                    });
+                    const targets = all.filter(function (target) {
+                        return target.countCards("e") == 0;
+                    });
+                    if (!targets.length) return;
+                    if (!Array.isArray(trigger.directHit)) trigger.directHit = [];
+                    trigger.directHit.addArray(targets);
+                    if (all.length && all.every(function (target) {
+                        return target.countCards("e") == 0;
+                    }))
+                        trigger.nowuxie = true;
+                    game.log(player, "的", trigger.card, "对无装备角色不可响应");
+                },
+            },
+            equip: {
+                charlotte: true,
+                fixed: true,
+                superCharlotte: true,
+                forced: true,
+                silent: true,
+                popup: false,
+                trigger: { source: "damageEnd" },
+                filter(event, player) {
+                    const target = event.player;
+                    if (!target || target == player) return false;
+                    if (!(Number(event.num) > 0)) return false;
+                    return target.isAlive() && target.countCards("e") > 0;
+                },
+                async content(event, trigger, player) {
+                    await player.gainPlayerCard(trigger.player, "e", true);
+                },
+            },
+            round: {
+                charlotte: true,
+                fixed: true,
+                superCharlotte: true,
+                forced: true,
+                silent: true,
+                popup: false,
+                trigger: { global: "roundStart" },
+                filter(event, player) {
+                    if (!player.isAlive()) return false;
+                    return player.countCards("h") != player.maxHp;
+                },
+                async content(event, trigger, player) {
+                    const hand = player.countCards("h");
+                    if (hand < player.maxHp) await player.drawTo(player.maxHp);
+                    else if (hand > player.maxHp) await player.chooseToDiscard("h", hand - player.maxHp, true);
+                },
+            },
+        },
+    },
+//#noname-kit-end skill:shuoye_chanliuzi_gengyi
+//#noname-kit-begin skill:shuoye_chanliuzi_kuangbao
+    //【缠流子】狂暴（【失救】获得）：其他角色本轮第2张【杀】起，
+    // 其本轮每使用一张牌摸一张并受到1点无来源【绝毁伤害】；
+    // 你因【不屈】失败进入濒死时：若其他角色对你使用桃，你失去【狂暴】；
+    // 否则回复体力至1并失去【不屈】。
+    shuoye_chanliuzi_kuangbao: {
+        thundertext: true,
+        persevereSkill: true,
+        superCharlotte: true,
+        fixed: true,
+        group: ["shuoye_chanliuzi_kuangbao_use", "shuoye_chanliuzi_kuangbao_tao", "shuoye_chanliuzi_kuangbao_save", "shuoye_chanliuzi_kuangbao_reset"],
+        subSkill: {
+            use: {
+                charlotte: true,
+                fixed: true,
+                superCharlotte: true,
+                forced: true,
+                silent: true,
+                popup: false,
+                trigger: { global: "useCardAfter" },
+                filter(event, player) {
+                    const user = event.player;
+                    if (!user || user == player) return false;
+                    if (!event.card || !user.isAlive()) return false;
+                    if (get.name(event.card) == "sha") return true;
+                    const store = user.storage && user.storage.shuoye_chanliuzi_kb;
+                    return !!(store && store.round === lib.shuoyeChan.roundId() && (Number(store.sha) || 0) >= 2);
+                },
+                async content(event, trigger, player) {
+                    const user = trigger.player;
+                    const round = lib.shuoyeChan.roundId();
+                    let store = user.storage && user.storage.shuoye_chanliuzi_kb;
+                    if (!store || typeof store != "object" || store.round !== round) store = { round: round, sha: 0 };
+                    if (get.name(trigger.card) == "sha") store.sha = (Number(store.sha) || 0) + 1;
+                    lib.shuoyeChan.setStorage(user, "shuoye_chanliuzi_kb", { round: round, sha: Number(store.sha) || 0 });
+                    if (store.sha < 2) return;
+                    game.log(user, "本轮第" + get.cnNumber(store.sha) + "张【杀】起使用牌，触发", "#g【狂暴】");
+                    await user.draw(1);
+                    await shuoyeJuehuiDamage(user, 1, null);
+                },
+            },
+            tao: {
+                charlotte: true,
+                fixed: true,
+                superCharlotte: true,
+                forced: true,
+                silent: true,
+                popup: false,
+                firstDo: true,
+                trigger: { global: "useCard" },
+                filter(event, player) {
+                    if (!event.card || get.name(event.card) != "tao") return false;
+                    if (!event.player || event.player == player) return false;
+                    if (!(event.targets || []).includes(player)) return false;
+                    if (!player.isDying()) return false;
+                    return !!(player.storage && player.storage.shuoye_chanliuzi_buqu_fail);
+                },
+                content(event, trigger, player) {
+                    lib.shuoyeChan.setStorage(player, "shuoye_chanliuzi_kb_tao", true);
+                    game.log(player, "被其他角色使用【桃】救援，失去", "#g【狂暴】");
+                    player.removeSkill("shuoye_chanliuzi_kuangbao", true);
+                },
+            },
+            save: {
+                charlotte: true,
+                fixed: true,
+                superCharlotte: true,
+                forced: true,
+                silent: true,
+                popup: false,
+                trigger: { player: "dieBefore" },
+                filter(event, player) {
+                    if (event.reserveOut) return false;
+                    if (player.hp > 0) return false;
+                    const dying = event.getParent("dying");
+                    if (!dying || dying.name != "dying") return false;
+                    if (!(player.storage && player.storage.shuoye_chanliuzi_buqu_fail)) return false;
+                    return !(player.storage && player.storage.shuoye_chanliuzi_kb_tao);
+                },
+                async content(event, trigger, player) {
+                    trigger.cancel();
+                    game.log(player, "因【不屈】失败濒死且无人出桃：回复体力至1，失去", "#g【不屈】");
+                    if (player.hp < 1) await player.recover(1 - player.hp);
+                    player.removeSkill("shuoye_chanliuzi_buqu");
+                    lib.shuoyeChan.delStorage(player, "shuoye_chanliuzi_buqu_fail");
+                    lib.shuoyeChan.delStorage(player, "shuoye_chanliuzi_kb_tao");
+                },
+            },
+            reset: {
+                charlotte: true,
+                fixed: true,
+                superCharlotte: true,
+                forced: true,
+                silent: true,
+                popup: false,
+                trigger: { player: ["changeHp", "phaseBefore"] },
+                filter(event, player) {
+                    if (!player.storage) return false;
+                    if (!player.storage.shuoye_chanliuzi_buqu_fail && !player.storage.shuoye_chanliuzi_kb_tao) return false;
+                    return player.hp > 0;
+                },
+                content(event, trigger, player) {
+                    lib.shuoyeChan.delStorage(player, "shuoye_chanliuzi_buqu_fail");
+                    lib.shuoyeChan.delStorage(player, "shuoye_chanliuzi_kb_tao");
+                },
+            },
+        },
+    },
+//#noname-kit-end skill:shuoye_chanliuzi_kuangbao
+//#noname-kit-begin skill:shuoye_chanliuzi_buqu
+    //【缠流子】不屈（【失救】时全员获得）：扣减体力时若体力值不大于X，
+    // 可将牌堆顶X张牌置于武将牌上为「创」，无重复点数则本次扣减后不进入濒死流程；
+    // 回复1点体力后，若「创」数与体力之和大于1，选择一张「创」置入弃牌堆。
+    shuoye_chanliuzi_buqu: {
+        thundertext: true,
+        mark: true,
+        marktext: "创",
+        intro: {
+            content: "expansion",
+            markcount: "expansion",
+        },
+        // 锁定技，必须发动（trigger + forced 会被 get.is.locked 判为锁定技）
+        forced: true,
+        trigger: { player: "changeHp" },
+        filter(event, player) {
+            const num = Number(event.num) || 0;
+            if (num >= 0) return false;
+            if (!player.isAlive()) return false;
+            return player.hp <= -num;
+        },
+        async content(event, trigger, player) {
+            const X = -Number(trigger.num);
+            if (X <= 0) return;
+            const cards = get.cards(X);
+            if (!cards || !cards.length) return;
+            const next = player.addToExpansion(cards, "gain2");
+            next.gaintag.add("shuoye_chanliuzi_buqu");
+            await next;
+            const all = player.getExpansions("shuoye_chanliuzi_buqu");
+            try {
+                await player.showCards(all, "不屈的创");
+            } catch (e) {}
+            const nums = [];
+            let dup = false;
+            for (const card of all) {
+                // 其它扩展可能造出点数 >13 或根本没有点数的牌：统一用 Number 归一，
+                // 非有限数值的牌不参与重复判定，避免两张“无点数”牌被误判为重复。
+                const number = Number(get.number(card));
+                if (!Number.isFinite(number)) continue;
+                if (nums.includes(number)) {
+                    dup = true;
+                    break;
+                }
+                nums.push(number);
+            }
+            if (!dup) {
+                const parent = trigger.getParent && (trigger.getParent("damage") || trigger.getParent("loseHp"));
+                if (parent) parent.nodying = true;
+                game.log(player, "的【不屈】生效，此次扣减体力后不进行濒死流程");
+            } else {
+                lib.shuoyeChan.setStorage(player, "shuoye_chanliuzi_buqu_fail", true);
+                game.log(player, "的【不屈】失败");
+            }
+            if (player.hp > 0) lib.shuoyeChan.delStorage(player, "shuoye_chanliuzi_buqu_fail");
+        },
+        group: ["shuoye_chanliuzi_buqu_recover"],
+        onremove(player, skill) {
+            const cards = player.getExpansions(skill);
+            if (cards.length) player.loseToDiscardpile(cards);
+        },
+        subSkill: {
+            recover: {
+                charlotte: true,
+                forced: true,
+                silent: true,
+                popup: false,
+                trigger: { player: "recoverAfter" },
+                filter(event, player) {
+                    const count = player.getExpansions("shuoye_chanliuzi_buqu").length;
+                    if (!count) return false;
+                    return count + player.hp > 1;
+                },
+                // 不询问，直接自动弃：「优先丢点数重复的创」（保住“无重复则不进濒死”的保护），
+                // 没有重复就丢第一张，避免每次回复都要选牌浪费时间
+                async content(event, trigger, player) {
+                    const cards = player.getExpansions("shuoye_chanliuzi_buqu");
+                    if (!cards.length) return;
+                    const count = {};
+                    for (const card of cards) {
+                        const number = Number(get.number(card));
+                        if (!Number.isFinite(number)) continue;
+                        count[number] = (count[number] || 0) + 1;
+                    }
+                    let pick = null;
+                    for (const card of cards) {
+                        const number = Number(get.number(card));
+                        if (Number.isFinite(number) && count[number] > 1) {
+                            pick = card;
+                            break;
+                        }
+                    }
+                    if (!pick) pick = cards[0];
+                    game.log(player, "将一张「创」置入弃牌堆");
+                    await player.loseToDiscardpile(pick);
+                },
+            },
+        },
+    },
+//#noname-kit-end skill:shuoye_chanliuzi_buqu
 };
 
 // ===== 【神郭嘉】公共小工具 / 局内表现（蓝色前缀 / 动态立绘） =====

@@ -41,6 +41,15 @@ game.import("character", function () {
 			shuoye_yuantoushanwo: [["shuoye_yuantoushanwo_awaken", ["ext:朔夜/image/shuoye_yuantoushanwo_awaken.jpg"]]],
 			// 【帝皇之戎】阴形态（帝皇之御）立绘，由【万煌】切换时 player.changeSkin 调用
 			shuoye_dihuangzhirong: [["shuoye_dihuangzhirong_yu", ["ext:朔夜/image/shuoye_dihuangzhirong_yu.png"]]],
+			// 【缠流子】技能立绘：首次获得 / 每回合首次发动时由 lib.shuoyeChan 调 player.changeSkin 切换
+			shuoye_chanliuzi: [
+				["shuoye_chanliuzi_skin_yiti", ["ext:朔夜/image/shuoye_chanliuzi_skin_yiti.jpg"]],
+				["shuoye_chanliuzi_skin_shanren", ["ext:朔夜/image/shuoye_chanliuzi_skin_shanren.jpg"]],
+				["shuoye_chanliuzi_skin_jifeng", ["ext:朔夜/image/shuoye_chanliuzi_skin_jifeng.jpg"]],
+				["shuoye_chanliuzi_skin_wupaizi", ["ext:朔夜/image/shuoye_chanliuzi_skin_wupaizi.jpg"]],
+				["shuoye_chanliuzi_skin_gengyi", ["ext:朔夜/image/shuoye_chanliuzi_skin_gengyi.jpg"]],
+				["shuoye_chanliuzi_skin_kuangbao", ["ext:朔夜/image/shuoye_chanliuzi_skin_kuangbao.jpg"]],
+			],
 		},
 		dynamicTranslate: { ...dynamicTranslates },
 		characterIntro: { ...characterIntros },
@@ -110,12 +119,29 @@ game.import("character", function () {
     if (lib.shuoyeIf && typeof lib.shuoyeIf.refreshHuangjinzhibeiInfo === "function") {
         lib.shuoyeIf.refreshHuangjinzhibeiInfo(shuoye.translate);
     }
+    // 【阳间模式】空元行者【神忏福音】/ 空崎日奈【终幕】：该模式下整技禁用（filter 见 skill.js）
+    if (!lib.shuoyeQumoshiInfoBase) {
+        lib.shuoyeQumoshiInfoBase = {
+            shuoye_shenchanguyin: shuoye.translate["shuoye_shenchanguyin_info"],
+            shuoye_zhongmu: shuoye.translate["shuoye_zhongmu_info"],
+        };
+    }
+    if (lib.shuoyeIf && lib.shuoyeIf.qumoshi()) {
+        shuoye.translate["shuoye_shenchanguyin_info"] = "该模式不可用。";
+        shuoye.translate["shuoye_zhongmu_info"] = "该模式不可用。";
+    }
     lib.translate["shuoye_character_config"] = "朔夜";
     if (!lib.config[`extension_朔夜_characterPack_shuoye_enable`]) {
 		game.saveExtensionConfig("朔夜", "characterPack_shuoye_enable", true);
 		lib.config.characters.add("shuoye");
 		game.saveConfig("characters", lib.config.characters);
 	}
+    // 【缠流子】技能名超链接：把描述里的技能名装饰成可点词条（原文括号不变）
+    try {
+        lib.shuoyeChan.decorateAll(shuoye.translate);
+    } catch (e) {
+        console.error("[朔夜] 缠流子技能词条装饰失败", e);
+    }
     return shuoye;
 });
 

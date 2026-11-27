@@ -40,5 +40,6 @@ const characterTitles = {
 	shuoye_dihuangzhirong: "直至烈阳升起",
 	shuoye_shenguojia: "星月奇佐",
 	shuoye_huangtian: "势",
+	shuoye_chanliuzi: "不屈的鲜血",
 };
 export default characterTitles;

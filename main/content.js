@@ -530,7 +530,7 @@ export async function content(config, pack) {
     } catch (e) {}
     // 评级：SSS -> legend，SS -> epic，S -> rare，A -> junk
     const shuoyeRarity = {
-        legend: ["shuoye_u_aoerjiamali", "shuoye_taikongyishitaer", "shuoye_shuoye", "shuoye_zhenshiqiaotelude", "shuoye_yiguyoutai", "shuoye_lixin", "shuoye_shengyuxieyan", "shuoye_nilu", "shuoye_cuige"],
+        legend: ["shuoye_u_aoerjiamali", "shuoye_taikongyishitaer", "shuoye_shuoye", "shuoye_zhenshiqiaotelude", "shuoye_yiguyoutai", "shuoye_lixin", "shuoye_shengyuxieyan", "shuoye_nilu", "shuoye_cuige", "shuoye_chanliuzi"],
         epic: ["shuoye_ifwutiaowu", "shuoye_weiyan", "shuoye_chengjinji", "shuoye_miaoshitiannv", "shuoye_tianqixinghun", "shuoye_xituo", "shuoye_qiaolienide", "shuoye_chongtiansiling", "shuoye_luxi", "shuoye_wuweijuezhe", "shuoye_kongyuanxingzhe", "shuoye_wuxinchan", "shuoye_shenguojia", "shuoye_dilutianfeng", "shuoye_lx_guang", "shuoye_lx_an", "shuoye_richekuanjian", "shuoye_mankanshizhenzi", "shuoye_bojiaoyang", "shuoye_leidianyayi", "shuoye_nuolan", "shuoye_dihuangzhirong"],
         rare: [
             "shuoye_zuguoren", "shuoye_ailisi", "shuoye_feiniaomashi", "shuoye_fengchuanxiangzi",
@@ -545,6 +545,27 @@ export async function content(config, pack) {
         ],
         junk: ["shuoye_xingti", "shuoye_weiershi", "shuoye_ruolian"],
     };
+    // 返回菜单时还原【缠流子】更衣换掉的背景与 BGM
+    try {
+        lib.onfree.push(function () {
+            try {
+                let changed = false;
+                if (_status.tempBackground === "ext:朔夜/image/shuoye_chanliuzi_bg.jpg") {
+                    delete _status.tempBackground;
+                    changed = true;
+                }
+                if (_status.tempMusic === "ext:朔夜/audio/skill/shuoye_chanliuzi_bgm1.mp3") {
+                    delete _status.tempMusic;
+                    changed = true;
+                }
+                if (changed) {
+                    game.updateBackground();
+                    game.playBackgroundMusic();
+                    if (ui.backgroundMusic) ui.backgroundMusic.loop = false;
+                }
+            } catch (e) {}
+        });
+    } catch (e) {}
     // 返回菜单时恢复胃炎 BGM，避免 _status.tempMusic 把扩展 BGM 带进菜单
     try {
         lib.onfree.push(function () {

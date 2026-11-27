@@ -49,6 +49,9 @@ const quModeAllow = [
 	"shuoye_huangtian",
 	// 【SP怒涛·沧岚】
 	"shuoye_sp_nutaocanglan",
+	// 【空元行者】/【空崎日奈】（阳间模式下这两个角色的【神忏福音】【终幕】整技禁用）
+	"shuoye_kongyuanxingzhe",
+	"shuoye_kongqirinai",
 ];
 
 const characterFilters = {};

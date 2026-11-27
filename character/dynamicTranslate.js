@@ -45,5 +45,23 @@ const dynamicTranslates = {
         } catch (e) {}
         return lib.translate["shuoye_kuanggu_info"];
     },
+    // 【缠流子】神衣：五个衍生技全部获得后，把「激昂」那段描述改写掉
+    shuoye_chanliuzi_shenyi(player, skill) {
+        const current = lib.translate["shuoye_chanliuzi_shenyi_info"] || "";
+        const infoBase = lib.shuoyeChan && lib.shuoyeChan.infoBase;
+        const base = (infoBase && infoBase["shuoye_chanliuzi_shenyi"]) || current;
+        if (!player || !base) return current || base;
+        const all = ["yiti", "shanren", "jifeng", "wupaizi", "gengyi"].every(function (key) {
+            return player.hasSkill("shuoye_chanliuzi_" + key);
+        });
+        if (!all) return current || base;
+        const oldText = "激昂：若存在未获得的技能，进入濒死时，增加一点体力上限回复1点体力，依次获得[一体][闪刃][疾风][无拍子][更衣]其中之一。均获得则修改【激昂】。";
+        const newText = "激昂：每轮限一次，体力值变动后不大于0，回复1点体力。";
+        let text = base.replace(oldText, newText);
+        try {
+            if (lib.shuoyeChan && typeof lib.shuoyeChan.decorateText == "function") text = lib.shuoyeChan.decorateText(text, "shuoye_chanliuzi_shenyi");
+        } catch (e) {}
+        return text;
+    },
 };
 export default dynamicTranslates;

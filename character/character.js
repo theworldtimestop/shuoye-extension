@@ -662,6 +662,16 @@ shuoye_weiyan: {
         trashBin: [],
     },
 //#noname-kit-end character:shuoye_sp_nutaocanglan
+//#noname-kit-begin character:shuoye_chanliuzi
+    shuoye_chanliuzi: {
+        sex: "female",
+        hp: 1,
+        group: "shu",
+        skills: ["shuoye_chanliuzi_shenyi"],
+        img: "extension/朔夜/image/shuoye_chanliuzi.png",
+        trashBin: [],
+    },
+//#noname-kit-end character:shuoye_chanliuzi
 };
 for (let i in characters) {
     characters[i].img = characters[i].img || `extension/朔夜/image/character/${i}.jpg`;

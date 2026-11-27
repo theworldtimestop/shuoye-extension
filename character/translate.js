@@ -1532,6 +1532,66 @@ shuoye_kuanggu: "狂骨",
     shuoye_sp_youming: "幽溟",
     shuoye_sp_youming_info: "每名角色的回合结束时，若你本回合未受到过其他角色伤害，你可选择一项：①失去一点体力获得一点护甲。②若你有护甲，回复一点体力失去一护甲。",
 //#noname-kit-end translate:shuoye_sp_youming
+//#noname-kit-begin translate:shuoye_chanliuzi
+    shuoye_chanliuzi: "缠流子",
+    // 技能立绘（换肤）与背景：皮肤/立绘列表按 lib.translate[图片ID] 显示名称，未注册就会露英文文件名
+    shuoye_chanliuzi_skin_yiti: "一体",
+    shuoye_chanliuzi_skin_shanren: "闪刃",
+    shuoye_chanliuzi_skin_jifeng: "疾风",
+    shuoye_chanliuzi_skin_wupaizi: "无拍子",
+    shuoye_chanliuzi_skin_gengyi: "更衣",
+    shuoye_chanliuzi_skin_kuangbao: "狂暴",
+    shuoye_chanliuzi_bg: "缠流子·背景",
+    // 【神衣】「无次数限制」的卡牌标记（卡面上的 gainttag 文字）
+    shuoye_chanliuzi_free: "无次数",
+//#noname-kit-end translate:shuoye_chanliuzi
+//#noname-kit-begin translate:shuoye_chanliuzi_shenyi
+    shuoye_chanliuzi_shenyi: "神衣",
+    shuoye_chanliuzi_shenyi_info: "昂扬技，持恒技，出牌阶段限一次，你可受到一点无来源伤害摸两张牌，然后本回合你获得的牌无次数限制。激昂：若存在未获得的技能，进入濒死时，增加一点体力上限回复1点体力，依次获得[一体][闪刃][疾风][无拍子][更衣]其中之一。均获得则修改【激昂】。",
+//#noname-kit-end translate:shuoye_chanliuzi_shenyi
+//#noname-kit-begin translate:shuoye_chanliuzi_yiti
+    shuoye_chanliuzi_yiti: "一体",
+    shuoye_chanliuzi_yiti_info: "持恒技，你的手牌上限为体力上限，你受伤改为失去1点体力。你失去体力时摸等量牌，然后你可弃置X（任意）张牌回复X/2点体力。限定技，失救：恢复体力至1获得【狂暴】，所有角色获得【不屈】。",
+//#noname-kit-end translate:shuoye_chanliuzi_yiti
+//#noname-kit-begin translate:shuoye_chanliuzi_shanren
+    shuoye_chanliuzi_shanren: "闪刃",
+    shuoye_chanliuzi_shanren_info: "出牌阶段限一次，你可重铸至多两张手牌，本回合同花色手牌均视为无视防具的【杀】。",
+//#noname-kit-end translate:shuoye_chanliuzi_shanren
+//#noname-kit-begin translate:shuoye_chanliuzi_jifeng
+    shuoye_chanliuzi_jifeng: "疾风",
+    shuoye_chanliuzi_jifeng_info: "锁定技，你计算其他人距离均为1。你对距离1角色造成伤害时恢复一点体力或摸一张牌。",
+//#noname-kit-end translate:shuoye_chanliuzi_jifeng
+//#noname-kit-begin translate:shuoye_chanliuzi_wupaizi
+    shuoye_chanliuzi_wupaizi: "无拍子",
+    // 技能名超过两个字：引擎在武将技能页会截前两字，这里用 _ab 给完整名（同【维特鲁姆手刀】写法）
+    shuoye_chanliuzi_wupaizi_ab: "【无拍子】",
+    shuoye_chanliuzi_wupaizi_info: "韵律技，你体力值减少时弃置一名角色一张牌，平：你弃一张牌恢复一点体力。仄：你摸1张牌。转韵：你每回合首次恢复体力",
+//#noname-kit-end translate:shuoye_chanliuzi_wupaizi
+//#noname-kit-begin translate:shuoye_chanliuzi_gengyi
+    shuoye_chanliuzi_gengyi: "更衣",
+    shuoye_chanliuzi_gengyi_info: "持恒技，你对其他角色造成的所有伤害改为无属性【绝毁伤害】。无装备角色不可响应你的牌，有装备角色受到你的伤害后你获得其一件装备。每轮开始时你调整手牌数至体力上限。",
+//#noname-kit-end translate:shuoye_chanliuzi_gengyi
+//#noname-kit-begin translate:shuoye_chanliuzi_kuangbao
+    shuoye_chanliuzi_kuangbao: "狂暴",
+    shuoye_chanliuzi_kuangbao_info: "其他角色于一轮内第二次使用【杀】起，其本轮每使用一张牌摸一张牌并受到一点无来源【绝毁伤害】。你因【不屈】失败进入濒死时，若其他角色对你使用桃，你失去【狂暴】。否则你回复体力至1并失去【不屈】。",
+//#noname-kit-end translate:shuoye_chanliuzi_kuangbao
+//#noname-kit-begin translate:shuoye_chanliuzi_buqu
+    shuoye_chanliuzi_buqu: "不屈",
+    shuoye_chanliuzi_buqu_info: "锁定技，当你扣减体力时，若你的体力值不大于X，你将牌堆顶的X张牌置于你的武将牌上，称为“创”，若没有与此“创”点数相同的其他“创”，你于此次扣减体力后之后不进行濒死流程（X为你此次扣减的体力点数）。当你回复1点体力后，若“创”数与你的体力之和大于1，你将一张“创”置入弃牌堆。",
+//#noname-kit-end translate:shuoye_chanliuzi_buqu
+//#noname-kit-begin translate:shuoye_chanliuzi_shenyi_free
+    shuoye_chanliuzi_shenyi_free: "神衣",
+//#noname-kit-end translate:shuoye_chanliuzi_shenyi_free
+//#noname-kit-begin translate:shuoye_chanliuzi_shanren_use
+    shuoye_chanliuzi_shanren_use: "闪刃",
+//#noname-kit-end translate:shuoye_chanliuzi_shanren_use
+//#noname-kit-begin translate:shuoye_chanliuzi_shanren_armor
+    shuoye_chanliuzi_shanren_armor: "闪刃",
+//#noname-kit-end translate:shuoye_chanliuzi_shanren_armor
+//#noname-kit-begin translate:shuoye_chanliuzi_shenyi_jiang
+    shuoye_chanliuzi_shenyi_jiang: "激昂",
+    shuoye_chanliuzi_shenyi_jiang_info: "每轮限一次，体力值变动后不大于0，回复1点体力。",
+//#noname-kit-end translate:shuoye_chanliuzi_shenyi_jiang
 //#noname-kit-begin translate:shuoye_huizuo
     shuoye_huizuo: "慧佐",
     shuoye_huizuo_info: "锁定技，你非因此法使用伤害牌时选择：①受到一点无来源伤害令此牌不可被响应②失去一点体力上限，结算后视为对其中一个目标使用一张无任何限制任意基本或普通锦囊牌。",
