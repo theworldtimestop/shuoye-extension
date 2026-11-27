@@ -28862,12 +28862,18 @@ shuoye_shanxian: {
                     if (player.hp > 0) return false;
                     const dying = event.getParent("dying");
                     if (!(dying && dying.name == "dying")) return false;
+                    // 限定技：已发动过就不再触发。
+                    // 注意 awakenSkill 对 group 展开出来的子技不生效（filterSkills 只在展开前
+                    // 过滤 disabledSkills，filterTrigger 也不看 awakenedSkills），所以自己记标记。
+                    if (player.storage && player.storage.shuoye_chanliuzi_yiti_shijiu_used) return false;
                     // 因【不屈】失败且无人出桃时，由【狂暴】的子技接住（同一次死亡不浪费限定技）
                     if (player.storage && player.storage.shuoye_chanliuzi_buqu_fail && !player.storage.shuoye_chanliuzi_kb_tao) return false;
                     return true;
                 },
                 async content(event, trigger, player) {
                     player.awakenSkill(event.name);
+                    // 真正的“已发动”门控（子技的 awakenSkill 不会阻止自己再次触发）
+                    lib.shuoyeChan.setStorage(player, "shuoye_chanliuzi_yiti_shijiu_used", true);
                     trigger.cancel();
                     game.log(player, "的", "#g【失救】", "生效：恢复体力至1");
                     if (player.hp < 1) await player.recover(1 - player.hp);
