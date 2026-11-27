@@ -2865,16 +2865,46 @@ if (!lib.shuoyeChan) {
 // 描述原文一个字都不改，只把名字换成可点词条；点开后显示「【技能名】+ 当前描述」。
 // 用直接赋值而不是写在 lib.shuoyeChan 字面量里，热重载时也能覆盖旧版本。
 lib.shuoyeChan.infoBase = lib.shuoyeChan.infoBase || {};
-// 词条弹窗：点开时才取描述，所以【神衣】激昂的改写也会同步
+// 词条弹窗：点开时才取描述，所以【神衣】激昂的改写也会同步。
+// 手机端有些界面（例如「技能界面」）是直接挂在 document.body 上的，
+// z-index 只在同一层叠上下文里比较，弹窗留在 ui.window 里再高也会被盖住。
+// 所以先把内容与高层级设好，再在下一帧把整个解释框搬到 body 顶层、固定居中。
 lib.shuoyeChan.linkDialog = function (skill, name) {
     return function (dialog) {
         try {
             const info = lib.translate[skill + "_info"] || "";
-            if (dialog.style && dialog.style.setProperty) dialog.style.setProperty("z-index", "2147483647", "important");
-            if (dialog.style) dialog.style.zIndex = "2147483647";
-            if (dialog.parentNode && dialog.parentNode.appendChild) dialog.parentNode.appendChild(dialog);
             dialog.add('<div class="text" style="text-align:center;font-weight:700">【' + name + "】</div>");
             dialog.add('<div class="text">' + info + "</div>");
+            if (dialog.style && dialog.style.setProperty) dialog.style.setProperty("z-index", "2147483647", "important");
+            setTimeout(function () {
+                try {
+                    if (!dialog || !dialog.parentNode) return;
+                    if (typeof document == "undefined" || !document.body) return;
+                    if (dialog.parentNode === document.body) return;
+                    const zoom = Number(game.documentZoom) || 1;
+                    const style = dialog.style;
+                    if (!style) return;
+                    document.body.appendChild(dialog);
+                    style.setProperty("position", "fixed", "important");
+                    style.setProperty("z-index", "2147483647", "important");
+                    style.setProperty("left", "50%", "important");
+                    style.setProperty("top", "50%", "important");
+                    style.setProperty("transform", "translate(-50%, -50%) scale(" + zoom + ")", "important");
+                    style.setProperty("max-width", "min(86vw, 560px)", "important");
+                    style.setProperty("max-height", "70vh", "important");
+                    style.setProperty("margin", "0", "important");
+                    style.overflow = "auto";
+                    // 手机上点框内任意位置也能关（点外面由引擎的 poplayer 关）
+                    dialog.addEventListener(lib.config && lib.config.touchscreen ? "touchend" : "click", function (e) {
+                        try {
+                            if (e && e.stopPropagation) e.stopPropagation();
+                        } catch (err) {}
+                        try {
+                            game.closePoptipDialog();
+                        } catch (err) {}
+                    });
+                } catch (e) {}
+            }, 0);
         } catch (e) {}
         return dialog;
     };
