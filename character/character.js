@@ -650,6 +650,18 @@ shuoye_weiyan: {
         img: "extension/朔夜/image/shuoye_huangtian.jpg",
     },
 //#noname-kit-end character:shuoye_huangtian
+//#noname-kit-begin character:shuoye_sp_nutaocanglan
+    shuoye_sp_nutaocanglan: {
+        sex: "female",
+        hp: 3,
+        maxHp: 3,
+        hujia: 2,
+        group: "wei",
+        skills: ["shuoye_sp_lingbo", "shuoye_sp_fulan", "shuoye_sp_youming"],
+        img: "extension/朔夜/image/shuoye_sp_nutaocanglan.png",
+        trashBin: [],
+    },
+//#noname-kit-end character:shuoye_sp_nutaocanglan
 };
 for (let i in characters) {
     characters[i].img = characters[i].img || `extension/朔夜/image/character/${i}.jpg`;

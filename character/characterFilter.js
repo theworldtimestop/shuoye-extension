@@ -47,6 +47,8 @@ const quModeAllow = [
 	"shuoye_shenguojia",
 	// 【黄天】势 / 不胜传说
 	"shuoye_huangtian",
+	// 【SP怒涛·沧岚】
+	"shuoye_sp_nutaocanglan",
 ];
 
 const characterFilters = {};

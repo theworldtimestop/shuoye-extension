@@ -1508,6 +1508,30 @@ shuoye_kuanggu: "狂骨",
 //#noname-kit-begin translate:shuoye_shizhu_hit
     shuoye_shizhu_hit: "噬主",
 //#noname-kit-end translate:shuoye_shizhu_hit
+//#noname-kit-begin translate:shuoye_sp_nutaocanglan
+    shuoye_sp_nutaocanglan: "SP怒涛·沧岚",
+//#noname-kit-end translate:shuoye_sp_nutaocanglan
+//#noname-kit-begin translate:shuoye_sp_lingbo
+    shuoye_sp_lingbo: "凌波",
+    shuoye_sp_lingbo_info: "有来源伤害无视你的护盾承伤效果。你体力变化1点时随机记录一个未记录的点数。你使用/被用此点数牌造成伤害视为无来源伤害。",
+//#noname-kit-end translate:shuoye_sp_lingbo
+//#noname-kit-begin translate:shuoye_sp_lingbo_bg
+    shuoye_sp_lingbo_bg: "点",
+//#noname-kit-end translate:shuoye_sp_lingbo_bg
+//#noname-kit-begin translate:shuoye_sp_fulan
+    shuoye_sp_fulan: "浮岚",
+    shuoye_sp_fulan_info: "场上有角色受到一点无来源伤害时你可选择一项摸一张牌：①你下个回合开始时获得一点护甲（至多5）②你使用下一张牌无任何限制且伤害/回复量+1。",
+//#noname-kit-end translate:shuoye_sp_fulan
+//#noname-kit-begin translate:shuoye_sp_fulan_armor_bg
+    shuoye_sp_fulan_armor_bg: "甲",
+//#noname-kit-end translate:shuoye_sp_fulan_armor_bg
+//#noname-kit-begin translate:shuoye_sp_fulan_power_bg
+    shuoye_sp_fulan_power_bg: "限",
+//#noname-kit-end translate:shuoye_sp_fulan_power_bg
+//#noname-kit-begin translate:shuoye_sp_youming
+    shuoye_sp_youming: "幽冥",
+    shuoye_sp_youming_info: "每名角色的回合结束时，若你本回合未受到过其他角色伤害，你选择一项：①失去一点体力获得一点护甲。②若你有护甲，回复一点体力失去一护甲。",
+//#noname-kit-end translate:shuoye_sp_youming
 //#noname-kit-begin translate:shuoye_huizuo
     shuoye_huizuo: "慧佐",
     shuoye_huizuo_info: "锁定技，你非因此法使用伤害牌时选择：①受到一点无来源伤害令此牌不可被响应②失去一点体力上限，结算后视为对其中一个目标使用一张无任何限制任意基本或普通锦囊牌。",

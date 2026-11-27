@@ -8,6 +8,7 @@ const characterTitles = {
 	shuoye_lx_guang: '<span class="shj-title-gold">光</span>',
 	shuoye_lx_an: '<span class="shj-title-dark">暗</span>',
 	shuoye_nutaocanglan: "水王",
+	shuoye_sp_nutaocanglan: "假日水王",
 	shuoye_weiyue: "穹明",
 	shuoye_wujishengwu: "极",
 	shuoye_zuguoren: "渴爱",

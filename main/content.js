@@ -534,7 +534,7 @@ export async function content(config, pack) {
         epic: ["shuoye_ifwutiaowu", "shuoye_weiyan", "shuoye_chengjinji", "shuoye_miaoshitiannv", "shuoye_tianqixinghun", "shuoye_xituo", "shuoye_qiaolienide", "shuoye_chongtiansiling", "shuoye_luxi", "shuoye_wuweijuezhe", "shuoye_kongyuanxingzhe", "shuoye_wuxinchan", "shuoye_shenguojia", "shuoye_dilutianfeng", "shuoye_lx_guang", "shuoye_lx_an", "shuoye_richekuanjian", "shuoye_mankanshizhenzi", "shuoye_bojiaoyang", "shuoye_leidianyayi", "shuoye_nuolan", "shuoye_dihuangzhirong"],
         rare: [
             "shuoye_zuguoren", "shuoye_ailisi", "shuoye_feiniaomashi", "shuoye_fengchuanxiangzi",
-            "shuoye_nutaocanglan", "shuoye_wujishengwu", "shuoye_wutiaowu", "shuoye_xier",
+            "shuoye_nutaocanglan", "shuoye_sp_nutaocanglan", "shuoye_wujishengwu", "shuoye_wutiaowu", "shuoye_xier",
             "shuoye_yuanlv", "shuoye_diyabolo", "shuoye_fuhua", "shuoye_kongzhilvzhe",
             "shuoye_puqishenfu", "shuoye_xugouji", "shuoye_aertuoliya", "shuoye_zhende",
             "shuoye_huangquan", "shuoye_kongqirinai", "shuoye_wenyang", "shuoye_ying",

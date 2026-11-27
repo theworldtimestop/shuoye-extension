@@ -28030,6 +28030,234 @@ shuoye_shanxian: {
         },
     },
 //#noname-kit-end skill:shuoye_busheng_fx
+//#noname-kit-begin skill:shuoye_sp_lingbo
+    shuoye_sp_lingbo: {
+        mark: true,
+        marktext: "点",
+        intro: {
+            name: "凌波·点数",
+            content: "已记录的点数：$",
+        },
+        group: ["shuoye_sp_lingbo_damage", "shuoye_sp_lingbo_point"],
+    },
+//#noname-kit-end skill:shuoye_sp_lingbo
+//#noname-kit-begin skill:shuoye_sp_lingbo_damage
+    shuoye_sp_lingbo_damage: {
+        charlotte: true,
+        forced: true,
+        popup: false,
+        silent: true,
+        trigger: {
+            player: "damageBegin1",
+            source: "damageBegin1",
+        },
+        filter(event, player) {
+            return event.player === player || event.source === player;
+        },
+        async content(event, trigger, player) {
+            // 一、点数为已记录点数的牌造成的伤害视为无来源伤害（先处理，护甲才能正常承伤）
+            const record = player.storage.shuoye_sp_lingbo;
+            if (Array.isArray(record) && record.length) {
+                const use = trigger.getParent("useCard");
+                if (use && use.card) {
+                    const num = get.number(use.card);
+                    if (typeof num == "number" && record.includes(num)) {
+                        const fromSelf = use.player === player;
+                        const toSelf = Array.isArray(use.targets) && use.targets.includes(player);
+                        if ((fromSelf || toSelf) && trigger.source) {
+                            delete trigger.source;
+                            game.log(player, "的【凌波】将", use.card, "造成的伤害视为无来源伤害");
+                        }
+                    }
+                }
+            }
+            // 二、有来源伤害无视护盾承伤效果（护甲不抵挡、不消耗）
+            if (trigger.player === player && trigger.source && player.hujia > 0 && !trigger.nohujia) {
+                trigger.nohujia = true;
+                game.log(player, "的【凌波】令护甲无法抵挡此伤害");
+            }
+        },
+    },
+//#noname-kit-end skill:shuoye_sp_lingbo_damage
+//#noname-kit-begin skill:shuoye_sp_lingbo_point
+    shuoye_sp_lingbo_point: {
+        charlotte: true,
+        forced: true,
+        popup: false,
+        silent: true,
+        trigger: {
+            player: "changeHp",
+        },
+        filter(event, player) {
+            return !!event.changedHp;
+        },
+        async content(event, trigger, player) {
+            const num = Math.abs(trigger.changedHp);
+            if (!num) return;
+            // 只在尚未记录的点数里随机取（1~13）
+            const recorded = player.getStorage("shuoye_sp_lingbo");
+            const pool = [];
+            for (let point = 1; point <= 13; point++) {
+                if (!recorded.includes(point)) pool.push(point);
+            }
+            if (!pool.length) {
+                game.log(player, "的【凌波】点数已全部记录");
+                return;
+            }
+            const list = [];
+            for (let i = 0; i < num && pool.length; i++) {
+                list.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+            }
+            if (!list.length) return;
+            player.markAuto("shuoye_sp_lingbo", list);
+            game.log(player, "记录了点数", list.map((point) => get.strNumber(point)).join("、"));
+        },
+    },
+//#noname-kit-end skill:shuoye_sp_lingbo_point
+//#noname-kit-begin skill:shuoye_sp_fulan
+    shuoye_sp_fulan: {
+        trigger: {
+            global: "damageEnd",
+        },
+        filter(event, player) {
+            return event.num > 0 && !event.source && !event.unreal;
+        },
+        async cost(event, trigger, player) {
+            const result = await player
+                .chooseControl(["①下个回合开始时获得一点护甲", "②下一张牌无任何限制且伤害/回复量+1", "cancel2"])
+                .set("prompt", get.prompt2("shuoye_sp_fulan"))
+                .set("ai", function (trigger2, player2) {
+                    const capped = player2.hujia >= 5;
+                    if (!capped && player2.hp <= 2) return "①下个回合开始时获得一点护甲";
+                    if (capped || player2.countCards("h") > 0) return "②下一张牌无任何限制且伤害/回复量+1";
+                    return "①下个回合开始时获得一点护甲";
+                })
+                .forResult();
+            event.result = {
+                control: result.control,
+                cost_data: { control: result.control },
+            };
+        },
+        async content(event, trigger, player) {
+            const control = (event.cost_data && event.cost_data.control) || "";
+            await player.draw();
+            if (control.startsWith("①")) {
+                player.addMark("shuoye_sp_fulan_armor", 1);
+            } else if (control.startsWith("②")) {
+                player.addMark("shuoye_sp_fulan_power", 1);
+            }
+        },
+        group: ["shuoye_sp_fulan_armor", "shuoye_sp_fulan_power"],
+    },
+//#noname-kit-end skill:shuoye_sp_fulan
+//#noname-kit-begin skill:shuoye_sp_fulan_armor
+    shuoye_sp_fulan_armor: {
+        charlotte: true,
+        forced: true,
+        popup: false,
+        silent: true,
+        mark: "auto",
+        marktext: "甲",
+        intro: {
+            name: "浮岚·护甲",
+            content: "下个回合开始时获得的护甲：$",
+        },
+        trigger: {
+            player: "phaseBegin",
+        },
+        filter(event, player) {
+            return player.countMark("shuoye_sp_fulan_armor") > 0;
+        },
+        async content(event, trigger, player) {
+            const num = player.countMark("shuoye_sp_fulan_armor");
+            if (num <= 0) return;
+            player.removeMark("shuoye_sp_fulan_armor", num);
+            // 护甲值至多 5：溢出的部分直接浪费
+            const room = Math.max(0, 5 - player.hujia);
+            if (num > room) {
+                game.log(player, "的【浮岚】护甲至多为5，溢出的", num - room, "点护甲被浪费");
+            }
+            await player.changeHujia(num, "gain", 5);
+        },
+    },
+//#noname-kit-end skill:shuoye_sp_fulan_armor
+//#noname-kit-begin skill:shuoye_sp_fulan_power
+    shuoye_sp_fulan_power: {
+        charlotte: true,
+        forced: true,
+        popup: false,
+        silent: true,
+        mark: "auto",
+        marktext: "限",
+        intro: {
+            name: "浮岚·无限制",
+            content: "接下来无限制且伤害/回复量+1的牌数：$",
+        },
+        mod: {
+            targetInRange(card, player) {
+                if (player.countMark("shuoye_sp_fulan_power") > 0) return true;
+            },
+            cardUsable(card, player, num) {
+                const count = player.countMark("shuoye_sp_fulan_power");
+                if (count > 0 && typeof num == "number") return num + count;
+            },
+        },
+        trigger: {
+            player: "useCard0",
+        },
+        filter(event, player) {
+            return !!event.card && player.countMark("shuoye_sp_fulan_power") > 0;
+        },
+        async content(event, trigger, player) {
+            player.removeMark("shuoye_sp_fulan_power", 1);
+            // 不消耗使用次数（useCard0 在引擎计次数之前，置 addCount=false 即可）
+            trigger.addCount = false;
+            // 伤害/回复量+1：改写该牌伤害/回复的基数（每个目标、每次结算都+1，不随标记叠加）
+            const info = get.info(trigger.card, false);
+            const current = typeof trigger.baseDamage == "number" ? trigger.baseDamage : (info && typeof info.baseDamage == "number" ? info.baseDamage : 1);
+            trigger.baseDamage = current + 1;
+            game.log(player, "使用的", trigger.card, "无距离与次数限制，且伤害/回复量+1");
+        },
+    },
+//#noname-kit-end skill:shuoye_sp_fulan_power
+//#noname-kit-begin skill:shuoye_sp_youming
+    shuoye_sp_youming: {
+        trigger: {
+            global: "phaseEnd",
+        },
+        filter(event, player) {
+            return !player.hasHistory("damage", (evt) => evt.source && evt.source !== player);
+        },
+        async cost(event, trigger, player) {
+            const controls = ["①失去一点体力，获得一点护甲"];
+            if (player.hujia > 0 && player.isDamaged()) controls.push("②回复一点体力，失去一点护甲");
+            controls.push("cancel2");
+            const result = await player
+                .chooseControl(controls)
+                .set("prompt", get.prompt2("shuoye_sp_youming"))
+                .set("ai", function (trigger2, player2) {
+                    if (player2.hujia > 0 && player2.isDamaged()) return "②回复一点体力，失去一点护甲";
+                    if (player2.hp > 2 && player2.hujia < 1) return "①失去一点体力，获得一点护甲";
+                    return "cancel2";
+                })
+                .forResult();
+            event.result = {
+                control: result.control,
+                cost_data: { control: result.control },
+            };
+        },
+        async content(event, trigger, player) {
+            const control = (event.cost_data && event.cost_data.control) || "";
+            if (control.startsWith("①")) {
+                await player.loseHp();
+                await player.changeHujia(1);
+            } else if (control.startsWith("②")) {
+                await player.recover();
+                await player.changeHujia(-1);
+            }
+        },
+    },
+//#noname-kit-end skill:shuoye_sp_youming
 };
 
 // ===== 【神郭嘉】公共小工具 / 局内表现（蓝色前缀 / 动态立绘） =====

@@ -14,6 +14,7 @@ const characterIntro = {
 	shuoye_dilutianfeng: "承敕赦之权，执录世之锋。万录既成，天锋落定。",
 	shuoye_sanlunxia: "京都咒术高专一年级的学生，使用新阴流剑术。为了守护重要的人，她把自己的【适应】逼成了“最终BOSS”级的麻烦。",
 	shuoye_nutaocanglan: "沧海怒涛，尽在掌中。<br>水之王者的疆域，从来不容旁人踏足。",
+	shuoye_sp_nutaocanglan: "听水歌！替对面奏响水歌！逐个逐个逐个壮！",
 	shuoye_huoguang: "光刃破涛，一击既出，不悔不回。",
 	shuoye_wuxinchan: "蝉鸣藏于龙鳞之下，沧吟起时，山海俱寂。",
 	shuoye_zhenshiqiaotelude: "金祖与玄源两条古龙侍立身侧，一怒则百龙俯首。<br>镇世之名，不是虚言。",
