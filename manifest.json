@@ -1,6 +1,6 @@
 {
   "version": "0.1.51",
-  "update": "新增：缠流子。阳间模式修正：削弱版空元行者，空崎日奈",
+  "update": "新增缠流子，阳间模式新增削弱版：空崎日奈，空元行者",
   "files": {
     "audio/die/shuoye_leidianyayi1.mp3": "66aab7f7b989b41419e8b69be8e14413a506f74f",
     "audio/die/shuoye_lixin1.mp3": "38f6358fb73b555f59238043602e0066c78fd674",
@@ -394,7 +394,7 @@
     "image/group_shou.png": "b21bd13753d85004bf7383344f63c08e0656560d",
     "image/nilu_bg.jpg": "b571c20490df927bc8c94d4f7f8837f37d8cfc5d",
     "image/shuoye_bojiaoyang.jpg": "efaf2dcbda9a37a9be1277b7126e018ae9f48fc0",
-    "image/shuoye_chanliuzi.png": "46e714a820fac40a8d5d5dbd5e9f94c38b35b479",
+    "image/shuoye_chanliuzi.png": "47919bf84873d9abe9e51bb46e4a681d72baffb7",
     "image/shuoye_chanliuzi_bg.jpg": "cad4cfe1040ae16efd38dc5681c9a90b58d34ce6",
     "image/shuoye_chanliuzi_skin_gengyi.jpg": "6eea40e87b72d75bb24fb4dc5672654c4b58682c",
     "image/shuoye_chanliuzi_skin_jifeng.jpg": "a159e25aa6642b0ef9ec070a4223a839cdd6bfdb",
