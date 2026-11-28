@@ -1565,7 +1565,7 @@ shuoye_kuanggu: "狂骨",
     shuoye_chanliuzi_wupaizi: "无拍子",
     // 技能名超过两个字：引擎在武将技能页会截前两字，这里用 _ab 给完整名（同【维特鲁姆手刀】写法）
     shuoye_chanliuzi_wupaizi_ab: "【无拍子】",
-    shuoye_chanliuzi_wupaizi_info: "韵律技，你体力值减少时弃置一名角色一张牌，平：你弃一张牌恢复一点体力。仄：你摸1张牌。转韵：你每回合首次恢复体力",
+    shuoye_chanliuzi_wupaizi_info: "韵律技，你每回合首次体力值减少时弃置一名角色一张牌，平：你弃一张牌恢复一点体力。仄：你摸1张牌。平仄：对一名角色造成一点伤害。转韵：你每回合首次恢复体力。",
 //#noname-kit-end translate:shuoye_chanliuzi_wupaizi
 //#noname-kit-begin translate:shuoye_chanliuzi_gengyi
     shuoye_chanliuzi_gengyi: "更衣",

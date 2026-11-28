@@ -2858,6 +2858,14 @@ if (!lib.shuoyeChan) {
             const suits = player.storage.shuoye_chanliuzi_shanren_suits;
             return Array.isArray(suits) ? suits : [];
         },
+        // 【无拍子】韵律状态：0=平 1=仄 2=平仄（客机本地也会读，所以放全局）
+        wupaiziState(player) {
+            const value = Number(player && player.storage ? player.storage.shuoye_chanliuzi_wupaizi : 0);
+            return value === 1 ? 1 : value === 2 ? 2 : 0;
+        },
+        wupaiziName(state) {
+            return state === 1 ? "仄" : state === 2 ? "平仄" : "平";
+        },
     };
 }
 
@@ -28830,12 +28838,34 @@ shuoye_shanxian: {
                     if (!player.isAlive()) return;
                     const max = player.countCards("he");
                     if (!max) return;
+                    // 人机：只弃 2 或 4 张（回 1 或 2 点），并尽量让回复后体力不超过 2，
+                    // 否则体力高了不好触发【神衣】的受伤条件。人类玩家保持自由选择。
+                    let want = -1;
+                    try {
+                        const isAI = !_status.connectMode && player !== game.me;
+                        if (isAI) {
+                            want = player.hp <= 0 ? 4 : player.hp == 1 ? 2 : 0;
+                            want = Math.min(want, max);
+                            if (want % 2) want -= 1;
+                            while (want > 0 && player.hp + Math.floor(want / 2) > 2) want -= 2;
+                        }
+                    } catch (e) {
+                        want = -1;
+                    }
                     const result = await player
-                        .chooseToDiscard("he", [1, max], false, "一体：可弃置任意张牌，回复弃置数/2点体力（向下取整）")
+                        .chooseToDiscard("he", want > 0 ? [want, want] : [1, max], false, "一体：可弃置任意张牌，回复弃置数/2点体力（向下取整）")
+                        .set("shuoye_yiti_want", want)
                         .set("ai", function (card) {
-                            const me = get.player();
-                            if (me.hp < me.maxHp) return 6 - get.value(card);
-                            return -get.value(card);
+                            const evt = get.event();
+                            const want2 = evt && typeof evt.shuoye_yiti_want == "number" ? evt.shuoye_yiti_want : -1;
+                            // 0：人机判断不值得回血（体力已≥2），直接不弃
+                            if (want2 === 0) return -1;
+                            // -1：不是人机（本机玩家 / 联机）→ 保持原来的判定：体力没满才想弃
+                            if (want2 === -1) {
+                                const me = get.player();
+                                if (me.hp >= me.maxHp) return -get.value(card);
+                            }
+                            return 6 - get.value(card);
                         })
                         .forResult();
                     if (!result || !result.bool || !result.cards || !result.cards.length) return;
@@ -28866,8 +28896,8 @@ shuoye_shanxian: {
                     // 注意 awakenSkill 对 group 展开出来的子技不生效（filterSkills 只在展开前
                     // 过滤 disabledSkills，filterTrigger 也不看 awakenedSkills），所以自己记标记。
                     if (player.storage && player.storage.shuoye_chanliuzi_yiti_shijiu_used) return false;
-                    // 因【不屈】失败且无人出桃时，由【狂暴】的子技接住（同一次死亡不浪费限定技）
-                    if (player.storage && player.storage.shuoye_chanliuzi_buqu_fail && !player.storage.shuoye_chanliuzi_kb_tao) return false;
+                    // 【狂暴】会接住（仍有【不屈】且无人出桃）：同一次死亡不浪费限定技
+                    if (!(player.storage && player.storage.shuoye_chanliuzi_kb_tao) && player.hasSkill("shuoye_chanliuzi_kuangbao", null, null, false) && player.hasSkill("shuoye_chanliuzi_buqu", null, null, false)) return false;
                     return true;
                 },
                 async content(event, trigger, player) {
@@ -29050,9 +29080,10 @@ shuoye_shanxian: {
     },
 //#noname-kit-end skill:shuoye_chanliuzi_jifeng
 //#noname-kit-begin skill:shuoye_chanliuzi_wupaizi
-    //【缠流子】无拍子：韵律技。体力值减少时可弃一名角色一张牌，
-    // 平：弃一张牌回复1点体力；仄：摸一张牌。
-    // 转韵：你获得或弃置「本回合未进入过弃牌堆花色」的牌时在平/仄之间切换（初始平）。
+    //【缠流子】无拍子：韵律技，三种韵律循环 平 → 仄 → 平仄（初始平）。
+    // 每回合首次体力值减少时弃置一名角色一张牌，然后按当前韵律结算：
+    // 平：弃一张牌回复1点体力；仄：摸一张牌；平仄：对一名角色造成1点伤害（普通伤害，非绝毁）。
+    // 转韵：每回合首次恢复体力时切换到下一种韵律。
     shuoye_chanliuzi_wupaizi: {
         thundertext: true,
         yunlvji: true,
@@ -29063,7 +29094,7 @@ shuoye_shanxian: {
         marktext: "韵",
         intro: {
             content(storage, player) {
-                return player.storage.shuoye_chanliuzi_wupaizi ? "当前：仄" : "当前：平";
+                return "当前韵律：" + lib.shuoyeChan.wupaiziName(lib.shuoyeChan.wupaiziState(player));
             },
         },
         group: ["shuoye_chanliuzi_wupaizi_lose", "shuoye_chanliuzi_wupaizi_zhuan"],
@@ -29072,19 +29103,23 @@ shuoye_shanxian: {
                 charlotte: true,
                 fixed: true,
                 superCharlotte: true,
-                frequent: true,
+                // 文本无“可以”→ 自动发动，不再询问
+                forced: true,
+                silent: true,
                 trigger: { player: "changeHp" },
                 filter(event, player) {
                     if (!(Number(event.num) < 0)) return false;
                     if (!player.isAlive()) return false;
+                    // 每回合首次体力值减少
+                    const turn = lib.shuoyeChan.turnId();
+                    if (String((player.storage && player.storage.shuoye_chanliuzi_wupaizi_lose_turn) || "") === turn) return false;
                     return game.hasPlayer(function (current) {
                         return current.countCards("hej") > 0;
                     });
                 },
-                check(event, player) {
-                    return true;
-                },
                 async content(event, trigger, player) {
+                    // 本回合已经发动过了
+                    lib.shuoyeChan.setStorage(player, "shuoye_chanliuzi_wupaizi_lose_turn", lib.shuoyeChan.turnId());
                     lib.shuoyeChan.turnShow(player, "wupaizi");
                     const result = await player
                         .chooseTarget("无拍子：弃置一名角色的一张牌", true, function (card, player, target) {
@@ -29098,17 +29133,43 @@ shuoye_shanxian: {
                         .forResult();
                     if (!result || !result.bool || !result.targets || !result.targets.length) return;
                     await player.discardPlayerCard(result.targets[0], "hej", true);
-                    if (player.storage.shuoye_chanliuzi_wupaizi) {
+                    const state = lib.shuoyeChan.wupaiziState(player);
+                    // 仄：摸一张牌
+                    if (state === 1) {
                         game.log(player, "仄：摸一张牌");
                         await player.draw(1);
                         return;
                     }
-                    if (player.countDiscardableCards(player, "he") < 1) return;
-                    await player.chooseToDiscard("he", 1, true, "平：弃置一张牌回复1点体力").set("ai", function (card) {
-                        return 6 - get.value(card);
-                    });
-                    game.log(player, "平：回复1点体力");
-                    await player.recover(1);
+                    // 平：弃一张牌回复1点体力
+                    if (state === 0) {
+                        if (player.countDiscardableCards(player, "he") < 1) return;
+                        await player.chooseToDiscard("he", 1, true, "平：弃置一张牌回复1点体力").set("ai", function (card) {
+                            return 6 - get.value(card);
+                        });
+                        game.log(player, "平：回复1点体力");
+                        await player.recover(1);
+                        return;
+                    }
+                    // 平仄：对一名角色造成1点伤害（普通伤害，不走绝毁）
+                    const result2 = await player
+                        .chooseTarget("平仄：对一名角色造成1点伤害", true, function (card, player, target) {
+                            return !!(target && target.isAlive() && target.isIn());
+                        })
+                        .set("ai", function (target) {
+                            const me = get.player();
+                            if (target == me) {
+                                // 自己只有 1 血且【神衣】还没被【激昂】刷新时，打自己来刷新神衣
+                                if (me.hp <= 1 && me.storage && me.storage.shuoye_chanliuzi_shenyi_off) return 2;
+                                return -1;
+                            }
+                            if (target.hp <= 1) return -get.attitude(me, target) + 2;
+                            return -get.attitude(me, target);
+                        })
+                        .forResult();
+                    if (!result2 || !result2.bool || !result2.targets || !result2.targets.length) return;
+                    const pingzeTarget = result2.targets[0];
+                    game.log(player, "平仄：对", pingzeTarget, "造成1点伤害");
+                    await pingzeTarget.damage(1, player);
                 },
             },
             zhuan: {
@@ -29129,10 +29190,11 @@ shuoye_shanxian: {
                 content(event, trigger, player) {
                     // 本回合已经转过了：记下回合号，之后本回合不再触发
                     lib.shuoyeChan.setStorage(player, "shuoye_chanliuzi_wupaizi_zhuan_turn", lib.shuoyeChan.turnId());
-                    const next = !player.storage.shuoye_chanliuzi_wupaizi;
+                    // 平 → 仄 → 平仄 → 平 循环
+                    const next = (lib.shuoyeChan.wupaiziState(player) + 1) % 3;
                     lib.shuoyeChan.setStorage(player, "shuoye_chanliuzi_wupaizi", next);
                     player.markSkill("shuoye_chanliuzi_wupaizi");
-                    game.log(player, "转韵", next ? "仄" : "平");
+                    game.log(player, "转韵", lib.shuoyeChan.wupaiziName(next));
                 },
             },
         },
@@ -29324,8 +29386,10 @@ shuoye_shanxian: {
                     if (player.hp > 0) return false;
                     const dying = event.getParent("dying");
                     if (!dying || dying.name != "dying") return false;
-                    if (!(player.storage && player.storage.shuoye_chanliuzi_buqu_fail)) return false;
-                    return !(player.storage && player.storage.shuoye_chanliuzi_kb_tao);
+                    // 有人对你出【桃】→ 只失去【狂暴】（由 tao 子技处理），这里不兜底
+                    if (player.storage && player.storage.shuoye_chanliuzi_kb_tao) return false;
+                    // 【不屈】还在（不屈失败，或不屈生效却没挡住这次濒死）都由狂暴兜底
+                    return !!player.hasSkill("shuoye_chanliuzi_buqu", null, null, false);
                 },
                 async content(event, trigger, player) {
                     trigger.cancel();
@@ -29404,8 +29468,13 @@ shuoye_shanxian: {
                 nums.push(number);
             }
             if (!dup) {
-                const parent = trigger.getParent && (trigger.getParent("damage") || trigger.getParent("loseHp"));
+                // 濒死判定在哪一层做，nodying 就要标在哪一层：
+                // 一体会把伤害转成 loseHp，真正做濒死判定的是 loseHp 的 content，
+                // 只标在外层 damage 上就会出现“不屈生效了却被推进濒死”。先找 loseHp，再退回 damage。
+                let parent = trigger.getParent && trigger.getParent("loseHp");
+                if (!parent && trigger.getParent) parent = trigger.getParent("damage");
                 if (parent) parent.nodying = true;
+                trigger.nodying = true;
                 game.log(player, "的【不屈】生效，此次扣减体力后不进行濒死流程");
             } else {
                 lib.shuoyeChan.setStorage(player, "shuoye_chanliuzi_buqu_fail", true);
