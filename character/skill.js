@@ -2866,6 +2866,28 @@ if (!lib.shuoyeChan) {
         wupaiziName(state) {
             return state === 1 ? "仄" : state === 2 ? "平仄" : "平";
         },
+        // 【不屈】「创」是否有点数重复（重复则不屈不生效）
+        buquDuplicate(player) {
+            if (!player || typeof player.getExpansions !== "function") return false;
+            const cards = player.getExpansions("shuoye_chanliuzi_buqu");
+            if (!cards || !cards.length) return false;
+            const nums = [];
+            for (const card of cards) {
+                const number = Number(get.number(card));
+                if (!Number.isFinite(number)) continue;
+                if (nums.includes(number)) return true;
+                nums.push(number);
+            }
+            return false;
+        },
+        // 【不屈】是否正在保护她（有创且无重复点数，且没判定失败过）
+        buquProtecting(player) {
+            if (!player || !player.storage) return false;
+            if (player.storage.shuoye_chanliuzi_buqu_fail) return false;
+            const cards = typeof player.getExpansions === "function" ? player.getExpansions("shuoye_chanliuzi_buqu") : [];
+            if (!cards || !cards.length) return false;
+            return !lib.shuoyeChan.buquDuplicate(player);
+        },
     };
 }
 
@@ -29056,7 +29078,8 @@ shuoye_shanxian: {
                 // 在伤害确定前加成（比【更衣】的绝毁转换同层，两边都能正常结算）
                 trigger: { source: "damageBegin1" },
                 filter(event, player) {
-                    if (event.cancelled) return false;
+                    // 引擎里“事件被取消”的标记是 _cancelled（gameEvent.js:634），不是 cancelled
+                    if (event._cancelled) return false;
                     const target = event.player;
                     if (!target || target == player) return false;
                     if (!(Number(event.num) || 0)) return false;
@@ -29488,12 +29511,34 @@ shuoye_shanxian: {
             }
             if (player.hp > 0) lib.shuoyeChan.delStorage(player, "shuoye_chanliuzi_buqu_fail");
         },
-        group: ["shuoye_chanliuzi_buqu_recover"],
+        group: ["shuoye_chanliuzi_buqu_guard", "shuoye_chanliuzi_buqu_recover"],
         onremove(player, skill) {
             const cards = player.getExpansions(skill);
             if (cards.length) player.loseToDiscardpile(cards);
+            // 同官方国战不屈（shenhua.js:8109-8118）：创被移去后体力仍不大于0 就正常进濒死
+            if (player.hp <= 0 && player.isAlive()) player.dying({});
         },
         subSkill: {
+            // 漏网之鱼：不屈只能把 nodying 标在「当次扣血事件」上，
+            // 如果濒死是被其它途径（别的技能直接调 dying、体力已≤0 后又进濒死流程…）打开的，
+            // 这里在濒死事件开始前直接取消，真正做到“有创且点数不重复就不进濒死”。
+            guard: {
+                charlotte: true,
+                fixed: true,
+                superCharlotte: true,
+                forced: true,
+                silent: true,
+                popup: false,
+                firstDo: true,
+                trigger: { player: "dyingBefore" },
+                filter(event, player) {
+                    return lib.shuoyeChan.buquProtecting(player);
+                },
+                content(event, trigger, player) {
+                    trigger.cancel();
+                    game.log(player, "的", "#g【不屈】", "阻止了此次濒死流程");
+                },
+            },
             recover: {
                 charlotte: true,
                 forced: true,
@@ -29506,27 +29551,31 @@ shuoye_shanxian: {
                     return count + player.hp > 1;
                 },
                 // 不询问，直接自动弃：「优先丢点数重复的创」（保住“无重复则不进濒死”的保护），
-                // 没有重复就丢第一张，避免每次回复都要选牌浪费时间
+                // 没有重复就丢第一张；回复 N 点就逐次弃 N 张（同官方国战不屈 shenhua.js:8140-8158）
                 async content(event, trigger, player) {
-                    const cards = player.getExpansions("shuoye_chanliuzi_buqu");
-                    if (!cards.length) return;
-                    const count = {};
-                    for (const card of cards) {
-                        const number = Number(get.number(card));
-                        if (!Number.isFinite(number)) continue;
-                        count[number] = (count[number] || 0) + 1;
-                    }
-                    let pick = null;
-                    for (const card of cards) {
-                        const number = Number(get.number(card));
-                        if (Number.isFinite(number) && count[number] > 1) {
-                            pick = card;
-                            break;
+                    const times = Math.max(1, Number(trigger.num) || 1);
+                    for (let i = 0; i < times; i++) {
+                        const cards = player.getExpansions("shuoye_chanliuzi_buqu");
+                        if (!cards.length) return;
+                        if (!(cards.length + player.hp > 1)) return;
+                        const count = {};
+                        for (const card of cards) {
+                            const number = Number(get.number(card));
+                            if (!Number.isFinite(number)) continue;
+                            count[number] = (count[number] || 0) + 1;
                         }
+                        let pick = null;
+                        for (const card of cards) {
+                            const number = Number(get.number(card));
+                            if (Number.isFinite(number) && count[number] > 1) {
+                                pick = card;
+                                break;
+                            }
+                        }
+                        if (!pick) pick = cards[0];
+                        game.log(player, "将一张「创」置入弃牌堆");
+                        await player.loseToDiscardpile(pick);
                     }
-                    if (!pick) pick = cards[0];
-                    game.log(player, "将一张「创」置入弃牌堆");
-                    await player.loseToDiscardpile(pick);
                 },
             },
         },
