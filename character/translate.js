@@ -1559,7 +1559,7 @@ shuoye_kuanggu: "狂骨",
 //#noname-kit-end translate:shuoye_chanliuzi_shanren
 //#noname-kit-begin translate:shuoye_chanliuzi_jifeng
     shuoye_chanliuzi_jifeng: "疾风",
-    shuoye_chanliuzi_jifeng_info: "锁定技，你计算其他人距离均为1。你对距离1角色造成伤害时恢复一点体力或摸一张牌。",
+    shuoye_chanliuzi_jifeng_info: "锁定技，你计算其他人距离均为1。你对距离1角色造成伤害时可弃一张牌令伤害+1。",
 //#noname-kit-end translate:shuoye_chanliuzi_jifeng
 //#noname-kit-begin translate:shuoye_chanliuzi_wupaizi
     shuoye_chanliuzi_wupaizi: "无拍子",

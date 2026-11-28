@@ -29031,7 +29031,7 @@ shuoye_shanxian: {
 //#noname-kit-end skill:shuoye_chanliuzi_shanren_armor
 //#noname-kit-begin skill:shuoye_chanliuzi_jifeng
     //【缠流子】疾风：锁定技，你计算其他人距离均为1；
-    // 你对距离1角色造成伤害后，选择回复1点体力或摸一张牌。
+    // 你对距离1角色造成伤害时，可弃一张牌令此伤害+1。
     shuoye_chanliuzi_jifeng: {
         thundertext: true,
         locked: true,
@@ -29052,28 +29052,34 @@ shuoye_shanxian: {
                 forced: true,
                 silent: true,
                 popup: false,
-                trigger: { source: "damageEnd" },
+                firstDo: true,
+                // 在伤害确定前加成（比【更衣】的绝毁转换同层，两边都能正常结算）
+                trigger: { source: "damageBegin1" },
                 filter(event, player) {
+                    if (event.cancelled) return false;
                     const target = event.player;
                     if (!target || target == player) return false;
-                    if (!(Number(event.num) > 0)) return false;
-                    if (!target.isAlive()) return false;
-                    return player.distanceTo(target) <= 1;
+                    if (!(Number(event.num) || 0)) return false;
+                    if (player.distanceTo(target) !== 1) return false;
+                    return player.countCards("he") > 0;
                 },
                 async content(event, trigger, player) {
-                    lib.shuoyeChan.turnShow(player, "jifeng");
-                    const list = player.hp < player.maxHp ? ["回复1点体力", "摸一张牌"] : ["摸一张牌"];
+                    const target = trigger.player;
+                    // 人机：只在“加 1 点就能打死”时才弃牌
+                    const kill = target && target.hp > 0 && target.hp > (Number(trigger.num) || 0) && target.hp <= (Number(trigger.num) || 0) + 1;
                     const result = await player
-                        .chooseControl(list)
-                        .set("prompt", "疾风：选择一项")
-                        .set("ai", function () {
-                            const me = get.player();
-                            if (me.hp < me.maxHp) return "回复1点体力";
-                            return "摸一张牌";
+                        .chooseToDiscard("he", 1, "疾风：可弃置一张牌，令此伤害+1")
+                        .set("shuoye_jifeng_want", kill ? 1 : 0)
+                        .set("ai", function (card) {
+                            const evt = get.event();
+                            if (!(evt && evt.shuoye_jifeng_want)) return -1;
+                            return 6 - get.value(card);
                         })
                         .forResult();
-                    if (result && result.control == "回复1点体力") await player.recover(1);
-                    else await player.draw(1);
+                    if (!result || !result.bool) return;
+                    trigger.num++;
+                    lib.shuoyeChan.turnShow(player, "jifeng");
+                    game.log(player, "发动", "#g【疾风】", "令本次伤害+1");
                 },
             },
         },
